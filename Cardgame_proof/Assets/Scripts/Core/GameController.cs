@@ -236,13 +236,54 @@ namespace CardgameProof.Core
             for (int i = 0; i < total; i++)
             {
                 CardType type = i < ActiveModeConfig.CharactersPerPlayer ? CardType.Character : CardType.Archive;
-                var placed = new PlacedCardData { CardId = $"{player}_{type}_{i}", CardType = type, Owner = player, Coordinate = Vector2Int.zero, IsFaceUp = false };
+                string cardId = BuildPrototypeCardIdForSetup(player, type, i);
+                var placed = new PlacedCardData { CardId = cardId, CardType = type, Owner = player, Coordinate = Vector2Int.zero, IsFaceUp = false };
                 GameObject go = new GameObject($"SetupCard_{i}", typeof(RectTransform), typeof(Image), typeof(LayoutElement), typeof(CanvasGroup));
                 go.transform.SetParent(trayRoot, false);
                 SetupCardView view = go.AddComponent<SetupCardView>();
                 view.Initialize(FindFirstObjectByType<Canvas>(), placed, OnSetupCardDrop);
                 trayCards.Add(view);
             }
+        }
+
+        private string BuildPrototypeCardIdForSetup(PlayerId player, CardType type, int setupIndex)
+        {
+            if (type == CardType.Character)
+            {
+                int characterIndex = setupIndex;
+                CharacterData character = GetCharacterForSetup(player, characterIndex);
+                if (character == null)
+                {
+                    Debug.LogWarning($"[Cards] Character data missing for setupIndex={setupIndex}. Using fallback id.");
+                    return $"{player}_character_missing_{setupIndex}";
+                }
+                return $"{player}_{character.Id}_{setupIndex}";
+            }
+
+            int archiveIndex = setupIndex - ActiveModeConfig.CharactersPerPlayer;
+            ArchiveCardData archive = GetArchiveForSetup(player, archiveIndex);
+            if (archive == null)
+            {
+                Debug.LogWarning($"[Cards] Archive data missing for setupIndex={setupIndex}. Using fallback id.");
+                return $"{player}_archive_missing_{archiveIndex}";
+            }
+            return $"{player}_{archive.Id}_{archiveIndex}";
+        }
+
+        private static CharacterData GetCharacterForSetup(PlayerId player, int index)
+        {
+            if (PrototypeDatabase.Characters == null || PrototypeDatabase.Characters.Count == 0) return null;
+            int offset = player == PlayerId.PlayerOne ? 0 : 1;
+            int mapped = (index + offset) % PrototypeDatabase.Characters.Count;
+            return PrototypeDatabase.Characters[mapped];
+        }
+
+        private static ArchiveCardData GetArchiveForSetup(PlayerId player, int index)
+        {
+            if (PrototypeDatabase.ArchiveCards == null || PrototypeDatabase.ArchiveCards.Count == 0) return null;
+            int offset = player == PlayerId.PlayerOne ? 0 : 1;
+            int mapped = (index + offset) % PrototypeDatabase.ArchiveCards.Count;
+            return PrototypeDatabase.ArchiveCards[mapped];
         }
 
         private void OnSetupCardDrop(SetupCardView cardView, UnityEngine.EventSystems.PointerEventData eventData)

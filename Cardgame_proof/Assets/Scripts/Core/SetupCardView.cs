@@ -59,9 +59,21 @@ namespace CardgameProof.Core
 
         private void BuildLabels()
         {
-            CreateLabel("Title", BuildCompactTitle(CardData.CardId), 0.76f, 30);
-            CreateLabel("Type", CardData.CardType == CardType.Character ? "Personagem" : "Arquivo", 0.52f, 24);
-            CreateLabel("Effect", CardData.CardType == CardType.Character ? "Pista de personagem" : "Efeito de arquivo", 0.26f, 20);
+            if (CardData.CardType == CardType.Character)
+            {
+                CharacterData character = FindCharacterFromCardId(CardData.CardId);
+                CreateLabel("Title", character?.DisplayName ?? "Dado não cadastrado", 0.78f, 26);
+                CreateLabel("Type", character?.Area ?? "Dado não cadastrado", 0.53f, 20);
+                CreateLabel("Effect", character?.Era ?? "Dado não cadastrado", 0.30f, 18);
+                if (character == null) Debug.LogWarning($"[Cards] Character placeholder fallback used for cardId={CardData.CardId}");
+                return;
+            }
+
+            ArchiveCardData archive = FindArchiveFromCardId(CardData.CardId);
+            CreateLabel("Title", archive?.Title ?? "Dado não cadastrado", 0.78f, 26);
+            CreateLabel("Type", "Arquivo", 0.53f, 20);
+            CreateLabel("Effect", archive?.Description ?? "Dado não cadastrado", 0.30f, 18);
+            if (archive == null) Debug.LogWarning($"[Cards] Archive placeholder fallback used for cardId={CardData.CardId}");
         }
 
         private void CreateLabel(string name, string value, float yNorm, int size)
@@ -109,6 +121,24 @@ namespace CardgameProof.Core
             }
         }
 
-        private static string BuildCompactTitle(string raw) => string.IsNullOrEmpty(raw) ? "Carta" : raw.Replace("_", " ");
+        private static CharacterData FindCharacterFromCardId(string cardId)
+        {
+            if (string.IsNullOrEmpty(cardId)) return null;
+            foreach (CharacterData character in PrototypeDatabase.Characters)
+            {
+                if (cardId.Contains(character.Id, StringComparison.OrdinalIgnoreCase)) return character;
+            }
+            return null;
+        }
+
+        private static ArchiveCardData FindArchiveFromCardId(string cardId)
+        {
+            if (string.IsNullOrEmpty(cardId)) return null;
+            foreach (ArchiveCardData archive in PrototypeDatabase.ArchiveCards)
+            {
+                if (cardId.Contains(archive.Id, StringComparison.OrdinalIgnoreCase)) return archive;
+            }
+            return null;
+        }
     }
 }
