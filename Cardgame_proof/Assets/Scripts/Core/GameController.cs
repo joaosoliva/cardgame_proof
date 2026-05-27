@@ -12,13 +12,19 @@ namespace CardgameProof.Core
     {
         private static readonly IReadOnlyList<TutorialStep> DefaultTutorialSteps = new List<TutorialStep>
         {
-            new TutorialStep { Id = "welcome_archive", Title = "Bem-vindo ao Arquivo", Body = "Neste jogo, vocês investigam personagens importantes da ciência e da academia. O objetivo é descobrir quem está escondido no arquivo do outro jogador.", Phase = GamePhase.TutorialIntro, TargetKey = "main_menu", OnlyShowOnce = true },
-            new TutorialStep { Id = "build_archive", Title = "Completar o arquivo", Body = "Você posiciona apenas Personagens e Cartas de Arquivo. Ao finalizar, o jogo preenche as lacunas com cartas Sem Registro.", Phase = GamePhase.Setup, TargetKey = "board_grid", OnlyShowOnce = true },
-            new TutorialStep { Id = "sem_registro", Title = "Sem Registro", Body = "Algumas cartas representam partes do arquivo onde nada útil foi encontrado. Elas revelam apenas 'Sem Registro' e ajudam a reduzir o espaço de busca.", Phase = GamePhase.Setup, TargetKey = "placed_card_actions", OnlyShowOnce = true }
+            new TutorialStep { Id = "welcome", Title = "Bem-vindo ao Arquivo", Body = "Você vai montar um arquivo secreto e depois investigar o arquivo do outro jogador.", Phase = GamePhase.Setup, TargetKey = "board_grid", OnlyShowOnce = true, CompleteTrigger = TutorialTrigger.ContinueButton, ShowContinueButton = true },
+            new TutorialStep { Id = "character_card_intro", Title = "Dossiês de Personagem", Body = "Arraste um Dossiê de Personagem para a grade.", Phase = GamePhase.Setup, TargetKey = "character_card_hand", CompleteTrigger = TutorialTrigger.CharacterCardPlaced, ShowContinueButton = false },
+            new TutorialStep { Id = "archive_card_intro", Title = "Cartas de Arquivo", Body = "Agora arraste uma Carta de Arquivo para a grade.", Phase = GamePhase.Setup, TargetKey = "archive_card_hand", CompleteTrigger = TutorialTrigger.ArchiveCardPlaced, ShowContinueButton = false },
+            new TutorialStep { Id = "setup_goal", Title = "Monte seu arquivo", Body = "Posicione o restante das cartas para liberar a finalização.", Phase = GamePhase.Setup, TargetKey = "board_grid", CompleteTrigger = TutorialTrigger.AllRequiredCardsPlaced, ShowContinueButton = false },
+            new TutorialStep { Id = "confirm_setup", Title = "Finalizar montagem", Body = "Toque em Finalizar montagem para completar o arquivo.", Phase = GamePhase.Setup, TargetKey = "confirm_setup_button", CompleteTrigger = TutorialTrigger.SetupConfirmed, ShowContinueButton = false },
+            new TutorialStep { Id = "auto_no_record", Title = "Sem Registro", Body = "As lacunas são preenchidas automaticamente com cartas Sem Registro.", Phase = GamePhase.Setup, TargetKey = "board_grid", CompleteTrigger = TutorialTrigger.AutoNoRecordFillCompleted, ShowContinueButton = false }
         };
+
+
 
         private SceneRootBuilder sceneRoot;
         private TutorialOverlayView tutorialOverlay;
+        private TutorialManager tutorialManager;
         private ReadyScreenView readyScreenView;
         private InvestigationOverlayView investigationOverlayView;
         private GuidebookOverlayView guidebookOverlayView;
@@ -157,7 +163,7 @@ namespace CardgameProof.Core
         }
 
         public void LoadPrototypeMode(string modeId) => ActiveModeConfig = PrototypeDatabase.GetMode(modeId);
-        public void ShowTutorialSequence(IReadOnlyList<TutorialStep> sequence) { EnsureTutorialOverlay(); tutorialOverlay?.ShowSequence(sequence); }
+        public void ShowTutorialSequence(IReadOnlyList<TutorialStep> sequence) { EnsureTutorialOverlay(); tutorialManager?.StartSequence(sequence); }
         private void TransitionToTutorialIntro() => SetPhase(GamePhase.TutorialIntro);
 
         private void StartPassAndPlaySetup()
@@ -189,6 +195,7 @@ namespace CardgameProof.Core
             EnsureBoardController();
             boardController.ClearBoard();
             boardController.BuildBoard(sceneRoot.CenterBoardArea, ActiveModeConfig.BoardSize, null);
+            tutorialManager?.RegisterTarget("board_grid", sceneRoot.CenterBoardArea);
             boardController.OnPlacedCardTapped = OnPlacedCardTapped;
             boardController.RefreshVisualsForPhase(CurrentPhase);
         }
@@ -223,6 +230,7 @@ namespace CardgameProof.Core
             RectTransform r1 = CreateActionButton(placedActionsRoot, "Remover", OnRemoveSelectedPlacedCard).GetComponent<RectTransform>();
             RectTransform r2 = CreateActionButton(placedActionsRoot, "Confirmar", () => { selectedPlacedCoordinate = null; boardController.SetSelectedCoordinate(null); }).GetComponent<RectTransform>();
             finalizeSetupButton = CreateActionButton(placedActionsRoot, "Finalizar montagem", OnFinalizeSetupPressed);
+            tutorialManager?.RegisterTarget("confirm_setup_button", finalizeSetupButton.GetComponent<RectTransform>());
             RectTransform r3 = finalizeSetupButton.GetComponent<RectTransform>();
             PositionActionButton(r1, x + (width + spacing) * 0f, width);
             PositionActionButton(r2, x + (width + spacing) * 1f, width);
@@ -246,6 +254,8 @@ namespace CardgameProof.Core
                 SetupCardView view = go.AddComponent<SetupCardView>();
                 view.Initialize(FindFirstObjectByType<Canvas>(), placed, OnSetupCardDrop);
                 trayCards.Add(view);
+                if (type == CardType.Character) tutorialManager?.RegisterTarget("character_card_hand", view.GetComponent<RectTransform>());
+                if (type == CardType.Archive) tutorialManager?.RegisterTarget("archive_card_hand", view.GetComponent<RectTransform>());
             }
         }
 
@@ -303,6 +313,8 @@ namespace CardgameProof.Core
             AudioManager.Instance?.PlayCardPlace();
             cardView.gameObject.SetActive(false);
             StorePlacedCardForCurrentPlayer(data);
+            tutorialManager?.Notify(data.CardType == CardType.Character ? TutorialTrigger.CharacterCardPlaced : TutorialTrigger.ArchiveCardPlaced);
+            tutorialManager?.Notify(TutorialTrigger.AnyCardPlaced);
             UpdateFinalizeButtonState();
         }
 
@@ -320,7 +332,7 @@ namespace CardgameProof.Core
             boardController.SetSelectedCoordinate(null);
             UpdateFinalizeButtonState();
         }
-        private void UpdateFinalizeButtonState() { int active = 0; foreach (var c in trayCards) if (c != null && c.gameObject.activeSelf) active++; finalizeSetupButton.interactable = active == 0; }
+        private void UpdateFinalizeButtonState() { int active = 0; foreach (var c in trayCards) if (c != null && c.gameObject.activeSelf) active++; bool ready = active == 0; finalizeSetupButton.interactable = ready; if (ready) tutorialManager?.Notify(TutorialTrigger.AllRequiredCardsPlaced); }
 
         private void OnFinalizeSetupPressed()
         {
@@ -335,6 +347,7 @@ namespace CardgameProof.Core
                 investigationOverlayView.AddButton("Fechar", investigationOverlayView.Hide);
                 return;
             }
+            tutorialManager?.Notify(TutorialTrigger.SetupConfirmed);
             matchReportService.EndSetup(currentSetupPlayer);
             HideSetupSensitiveUi();
             StartCoroutine(FillEmptyCellsWithNoRecordCoroutine(currentSetupPlayer, () =>
@@ -374,6 +387,7 @@ namespace CardgameProof.Core
             PlayerId opponent = currentTurnPlayer == PlayerId.PlayerOne ? PlayerId.PlayerTwo : PlayerId.PlayerOne;
             boardController.ClearBoard();
             boardController.BuildBoard(sceneRoot.CenterBoardArea, ActiveModeConfig.BoardSize, null);
+            tutorialManager?.RegisterTarget("board_grid", sceneRoot.CenterBoardArea);
             boardController.OnPlacedCardTapped = OnInvestigationCellTapped;
             Debug.Log($"[TURN] Switching to Player {currentTurnPlayer}. Rendering opponent board owned by {opponent}.");
             foreach (PlacedCardData card in playerBoardStates[opponent])
@@ -404,8 +418,10 @@ namespace CardgameProof.Core
             if (card.CardType == CardType.Character && blockedCharacterGuesses[currentTurnPlayer].Contains(card.CardId)) return;
             matchReportService.MarkFirstInvestigation();
             card.IsInvestigated = true;
-            if (card.CardType == CardType.Archive) { EnsureInvestigationOverlayView(); ResolveArchiveCard(card); return; }
-            if (card.CardType == CardType.SemRegistro) { ResolveSemRegistroCard(card); return; }
+            tutorialManager?.Notify(TutorialTrigger.CellInvestigated);
+            if (card.CardType == CardType.Archive) { tutorialManager?.Notify(TutorialTrigger.ArchiveFound); EnsureInvestigationOverlayView(); ResolveArchiveCard(card); return; }
+            if (card.CardType == CardType.SemRegistro) { tutorialManager?.Notify(TutorialTrigger.NoRecordFound); ResolveSemRegistroCard(card); return; }
+            tutorialManager?.Notify(TutorialTrigger.CharacterFound);
             ResolveCharacterCard(card);
         }
         private void ResolveSemRegistroCard(PlacedCardData card)
@@ -490,6 +506,7 @@ namespace CardgameProof.Core
             matchReportService.OnClueRequested(characterId, category);
             LogTelemetry("clue_requested", $"character={characterId};category={category}");
             AudioManager.Instance?.PlayClue();
+            tutorialManager?.Notify(TutorialTrigger.ClueSelected);
             investigationOverlayView.Show("Pista revelada", $"{GetCategoryLabel(category)}\n\n{GetClueText(characterId, category)}");
             investigationOverlayView.AddButton("Tentar identificar", () => ShowGuessOverlay(characterId));
             investigationOverlayView.AddButton("Encerrar turno", EndTurnAfterOverlay);
@@ -511,6 +528,7 @@ namespace CardgameProof.Core
     
 
             LogTelemetry("guess_made", $"character={characterId};guess={guessedName}");
+            tutorialManager?.Notify(TutorialTrigger.GuessMade);
             if (correct)
             {
                 LogTelemetry("guess_correct", $"character={characterId};guess={guessedName}");
@@ -527,7 +545,7 @@ namespace CardgameProof.Core
         }
 
         private void EndTurnAfterOverlay() { investigationOverlayView.Hide(); EndTurnWithPassScreen(); }
-        private void EndTurnWithPassScreen() { PlayerId next = currentTurnPlayer == PlayerId.PlayerOne ? PlayerId.PlayerTwo : PlayerId.PlayerOne; ShowReadyScreen("Passe o aparelho para o próximo jogador", "Estou pronto", () => { currentTurnPlayer = next; Debug.Log($"[STATE] CurrentPlayer: {currentTurnPlayer}"); matchReportService.TurnStart(currentTurnPlayer); HideReadyScreen(); ShowOpponentBoardForCurrentTurn(); UpdateHud(); }); }
+        private void EndTurnWithPassScreen() { tutorialManager?.Notify(TutorialTrigger.TurnPassed); PlayerId next = currentTurnPlayer == PlayerId.PlayerOne ? PlayerId.PlayerTwo : PlayerId.PlayerOne; ShowReadyScreen("Passe o aparelho para o próximo jogador", "Estou pronto", () => { currentTurnPlayer = next; Debug.Log($"[STATE] CurrentPlayer: {currentTurnPlayer}"); matchReportService.TurnStart(currentTurnPlayer); HideReadyScreen(); ShowOpponentBoardForCurrentTurn(); UpdateHud(); }); }
 
         private void BuildInvestigationHud()
         {
@@ -644,7 +662,7 @@ namespace CardgameProof.Core
             investigationOverlayView.AddButton("Confirmar", () => { researchTokens[currentTurnPlayer] = Mathf.Max(0, researchTokens[currentTurnPlayer] - 1); totalResearchUses += 1; matchReportService.OnGuidebookUse(currentTurnPlayer); AudioManager.Instance?.PlayResearch(); UpdateHud(); investigationOverlayView.Hide(); ShowGuidebookOverlay(); });
             investigationOverlayView.AddButton("Cancelar", investigationOverlayView.Hide);
         }
-        private void ShowGuidebookOverlay() { EnsureGuidebookOverlayView(); guidebookOverlayView.Show(PrototypeDatabase.Characters); }
+        private void ShowGuidebookOverlay() { tutorialManager?.Notify(TutorialTrigger.GuideOpened); EnsureGuidebookOverlayView(); guidebookOverlayView.Show(PrototypeDatabase.Characters); }
         private void ShowRulesOverlay() { EnsureInvestigationOverlayView(); investigationOverlayView.Show("Resumo das Regras", "Durante a montagem, posicione seus Personagens e Cartas de Arquivo. Ao finalizar, as lacunas do arquivo são preenchidas automaticamente com Sem Registro.\n\nSem Registro não tem efeito. Ele apenas indica que aquela parte do arquivo não tinha um dossiê útil.\n\n1. Investigue cartas no arquivo adversário.\n2. Se encontrar um Dossiê, peça uma pista e tente identificar o personagem.\n3. Se encontrar uma Carta de Arquivo, revele e resolva seu efeito.\n4. Se encontrar Sem Registro, apenas marque aquela carta como investigada.\n5. Personagens só revelam sua identidade após uma identificação correta.\n6. Vence quem completar o objetivo do modo escolhido."); investigationOverlayView.AddButton("Fechar", investigationOverlayView.Hide); }
 
         private void HideSetupSensitiveUi()
@@ -713,6 +731,7 @@ namespace CardgameProof.Core
                 }
             }
             matchReportService.OnAutoNoRecordGenerated(owner, generated);
+            tutorialManager?.Notify(TutorialTrigger.AutoNoRecordFillCompleted);
             matchReportService.OnAutoFillDuration(Time.realtimeSinceStartup - started);
             investigationOverlayView.Show("Arquivo", "Arquivo completo.");
             investigationOverlayView.AddButton("Continuar", () =>
@@ -724,7 +743,8 @@ namespace CardgameProof.Core
         }
 
         private void EnsureBoardController() { if (boardController != null) return; GameObject boardObject = new GameObject("BoardController", typeof(RectTransform)); boardObject.transform.SetParent(sceneRoot.CenterBoardArea, false); boardController = boardObject.AddComponent<BoardController>(); }
-        private void EnsureTutorialOverlay() { if (tutorialOverlay != null) return; Debug.Log("[UI] Creating TutorialOverlayView"); GameObject overlayObject = new GameObject("TutorialOverlayView"); overlayObject.transform.SetParent(sceneRoot.OverlayLayer, false); tutorialOverlay = overlayObject.AddComponent<TutorialOverlayView>(); tutorialOverlay.Initialize(sceneRoot.OverlayLayer); }
+        private void EnsureTutorialOverlay() { if (tutorialOverlay != null) return; Debug.Log("[UI] Creating TutorialOverlayView"); GameObject overlayObject = new GameObject("TutorialOverlayView"); overlayObject.transform.SetParent(sceneRoot.OverlayLayer, false); tutorialOverlay = overlayObject.AddComponent<TutorialOverlayView>(); tutorialOverlay.Initialize(sceneRoot.OverlayLayer);
+            tutorialManager = new TutorialManager(tutorialOverlay); }
         private void EnsureInvestigationOverlayView() { if (investigationOverlayView != null) return; Debug.Log("[UI] Creating InvestigationOverlayView"); GameObject go = new GameObject("InvestigationOverlayView"); go.transform.SetParent(sceneRoot.OverlayLayer, false); investigationOverlayView = go.AddComponent<InvestigationOverlayView>(); investigationOverlayView.Initialize(sceneRoot.OverlayLayer); }
         private void EnsureGuidebookOverlayView() { if (guidebookOverlayView != null) return; Debug.Log("[UI] Creating GuidebookOverlayView"); GameObject go = new GameObject("GuidebookOverlayView"); go.transform.SetParent(sceneRoot.OverlayLayer, false); guidebookOverlayView = go.AddComponent<GuidebookOverlayView>(); guidebookOverlayView.Initialize(sceneRoot.OverlayLayer); }
         private void EnsureWinScreenView() { if (winScreenView != null) return; Debug.Log("[UI] Creating WinScreenView"); GameObject go = new GameObject("WinScreenView"); go.transform.SetParent(sceneRoot.OverlayLayer, false); winScreenView = go.AddComponent<WinScreenView>(); winScreenView.Initialize(sceneRoot.OverlayLayer); }

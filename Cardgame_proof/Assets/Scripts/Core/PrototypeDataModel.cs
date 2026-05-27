@@ -110,6 +110,10 @@ namespace CardgameProof.Core
         public GamePhase? Phase;
         public string TargetKey;
         public bool OnlyShowOnce;
+        public TutorialTrigger CompleteTrigger = TutorialTrigger.ContinueButton;
+        public bool BlockOutsideTarget;
+        public bool ShowContinueButton = true;
+        public string RequiredCardType;
     }
 
     [Serializable]
