@@ -568,10 +568,13 @@ namespace CardgameProof.Core
                 {
                     RevealType = CardRevealType.CharacterIdentified,
                     Title = revealData != null ? revealData.DisplayName : "Identificação correta",
-                    Body = revealData != null ? $"Área: {revealData.Area}
-Época: {revealData.Era}
-Região: {revealData.Region}
-Contribuição: {revealData.Contribution}" : "Identificação correta!",
+                    Body = revealData != null ? string.Join("\n", new[]
+                    {
+                        $"Área: {revealData.Area}",
+                        $"Época: {revealData.Era}",
+                        $"Região: {revealData.Region}",
+                        $"Contribuição: {revealData.Contribution}"
+                    }) : "Identificação correta!",
                     RequireTapToContinue = true,
                     Celebratory = true
                 }, () =>
