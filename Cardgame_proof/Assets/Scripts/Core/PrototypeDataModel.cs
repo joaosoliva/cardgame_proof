@@ -64,7 +64,7 @@ namespace CardgameProof.Core
     }
 
     [Serializable]
-    public sealed class CardData
+    public class CardData
     {
         public string Id;
         public CardType CardType;
