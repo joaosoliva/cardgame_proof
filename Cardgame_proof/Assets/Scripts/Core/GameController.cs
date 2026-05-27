@@ -343,9 +343,13 @@ namespace CardgameProof.Core
         private void ResolveGuess(string characterId, string guessedName)
         {
             totalGuesses += 1;
-            CharacterData target = FindCharacterByCardId(characterId);
-            bool correct = target != null && string.Equals(target.DisplayName, guessedName, StringComparison.Ordinal);
+			
+			CharacterData target = FindCharacterByCardId(characterId);
+			bool correct = target != null && string.Equals(target.DisplayName, guessedName, StringComparison.Ordinal);
+						
             matchReportService.OnGuess(correct, characterId);
+    
+
             LogTelemetry("guess_made", $"character={characterId};guess={guessedName}");
             if (correct)
             {
@@ -394,9 +398,7 @@ namespace CardgameProof.Core
             string winnerLabel = winner == PlayerId.PlayerOne ? "Jogador 1" : "Jogador 2";
             EnsureWinScreenView();
             EnsureMatchReportView();
-            lastWinTitle = $"Vitória do {winnerLabel}!";
-            lastWinDetails = $"Personagens identificados: {scores[winner]}\nModo: {modeLabel}";
-            winScreenView.Show(lastWinTitle, lastWinDetails, OpenReportFromWinScreen, RestartCurrentModeMatch, ReturnToMainMenu);
+            winScreenView.Show($"Vitória do {winnerLabel}!", $"Personagens identificados: {scores[winner]}\nModo: {modeLabel}", OpenReportFromWinScreen, RestartCurrentModeMatch, ReturnToMainMenu);
             AudioManager.Instance?.PlayWin();
             lastReportText = matchReportService.Finish(winnerLabel, scores[PlayerId.PlayerOne], scores[PlayerId.PlayerTwo]).ModeName != null ? matchReportService.BuildReadableReport() : string.Empty;
             LogTelemetry("match_finished", $"winner={winner};mode={ActiveModeConfig?.Id};duration={ActiveModeConfig?.DurationMinutes};final_scores={scores[PlayerId.PlayerOne]}-{scores[PlayerId.PlayerTwo]};total_clues_requested={totalCluesRequested};total_research_uses={totalResearchUses};total_guesses={totalGuesses}");
@@ -480,39 +482,10 @@ namespace CardgameProof.Core
         private void EnsureGuidebookOverlayView() { if (guidebookOverlayView != null) return; GameObject go = new GameObject("GuidebookOverlayView"); go.transform.SetParent(sceneRoot.OverlayLayer, false); guidebookOverlayView = go.AddComponent<GuidebookOverlayView>(); guidebookOverlayView.Initialize(sceneRoot.OverlayLayer); }
         private void EnsureWinScreenView() { if (winScreenView != null) return; GameObject go = new GameObject("WinScreenView"); go.transform.SetParent(sceneRoot.OverlayLayer, false); winScreenView = go.AddComponent<WinScreenView>(); winScreenView.Initialize(sceneRoot.OverlayLayer); }
         private void EnsureMatchReportView() { if (matchReportView != null) return; GameObject go = new GameObject("MatchReportView"); go.transform.SetParent(sceneRoot.OverlayLayer, false); matchReportView = go.AddComponent<MatchReportView>(); matchReportView.Initialize(sceneRoot.OverlayLayer); }
-        private string lastWinTitle;
-        private string lastWinDetails;
-        private void OpenReportFromWinScreen() { EnsureMatchReportView(); winScreenView.Hide(); matchReportView.Show(lastReportText, () => { matchReportView.Hide(); winScreenView.Show(lastWinTitle, lastWinDetails, OpenReportFromWinScreen, RestartCurrentModeMatch, ReturnToMainMenu); }); }
+        private void OpenReportFromWinScreen() { EnsureMatchReportView(); winScreenView.Hide(); matchReportView.Show(lastReportText, () => { matchReportView.Hide(); winScreenView.Show("Resultado", "Veja o resumo final", OpenReportFromWinScreen, RestartCurrentModeMatch, ReturnToMainMenu); }); }
         private void EnsureReadyScreenView() { if (readyScreenView != null) return; GameObject go = new GameObject("ReadyScreenView"); go.transform.SetParent(sceneRoot.OverlayLayer, false); readyScreenView = go.AddComponent<ReadyScreenView>(); readyScreenView.Initialize(sceneRoot.OverlayLayer); }
         private void ShowReadyScreen(string message, string buttonText, Action onConfirm) { EnsureReadyScreenView(); readyScreenView.Show(message, buttonText, onConfirm); }
         private void HideReadyScreen() => readyScreenView?.Hide();
-
-
-        private void Update()
-        {
-            if (Input.GetKeyDown(KeyCode.Escape))
-            {
-                HandleAndroidBack();
-            }
-        }
-
-        private void HandleAndroidBack()
-        {
-            if (matchReportView != null && matchReportView.gameObject.activeSelf) { matchReportView.Hide(); return; }
-            if (winScreenView != null && winScreenView.gameObject.activeSelf) { ReturnToMainMenu(); return; }
-            if (guidebookOverlayView != null && guidebookOverlayView.gameObject.activeSelf) { guidebookOverlayView.Hide(); return; }
-            if (investigationOverlayView != null && investigationOverlayView.gameObject.activeSelf) { investigationOverlayView.Hide(); return; }
-            if (readyScreenView != null && readyScreenView.gameObject.activeSelf) { readyScreenView.Hide(); return; }
-
-            if (CurrentPhase != GamePhase.MainMenu)
-            {
-                ShowReadyScreen("Deseja voltar ao menu principal?", "Voltar ao menu", ReturnToMainMenu);
-            }
-            else
-            {
-                ShowReadyScreen("Deseja sair do jogo?", "Sair", Application.Quit);
-            }
-        }
 
         private static Button CreateActionButton(RectTransform parent, string text, Action onClick)
         {
