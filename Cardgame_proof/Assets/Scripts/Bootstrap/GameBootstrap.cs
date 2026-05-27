@@ -13,7 +13,15 @@ namespace CardgameProof.Bootstrap
             Debug.Log("[Bootstrap] GameBootstrap.Start begin");
             EnsurePortraitResolution();
             EnsureEventSystem();
-            Core.AudioManager.EnsureInstance();
+            Core.AudioManager audioManager = Core.AudioManager.EnsureInstance();
+            if (audioManager == null)
+            {
+                Debug.LogWarning("[Bootstrap] AudioManager unavailable. Continuing without audio.");
+            }
+            else
+            {
+                Debug.Log("[Bootstrap] AudioManager ready");
+            }
 
             Canvas rootCanvas = EnsureRootCanvas();
             SceneRootBuilder rootBuilder = rootCanvas.gameObject.GetComponent<SceneRootBuilder>();

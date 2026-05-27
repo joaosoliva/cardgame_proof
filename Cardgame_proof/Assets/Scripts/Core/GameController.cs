@@ -25,6 +25,7 @@ namespace CardgameProof.Core
         private readonly MatchReportService matchReportService = new MatchReportService();
         private string lastReportText;
         private BoardController boardController;
+        private RectTransform mainMenuRoot;
 
         private RectTransform trayRoot;
         private RectTransform placedActionsRoot;
@@ -74,27 +75,29 @@ namespace CardgameProof.Core
             RectTransform fullRoot = sceneRoot.FullScreenRoot;
             if (fullRoot.Find("MainMenuRoot") != null)
             {
+                mainMenuRoot = fullRoot.Find("MainMenuRoot") as RectTransform;
+                if (mainMenuRoot != null) mainMenuRoot.gameObject.SetActive(true);
                 CurrentPhase = GamePhase.MainMenu;
                 Debug.Log("[GameController] Entered MainMenu phase");
                 return;
             }
 
             GameObject menuRootObject = new GameObject("MainMenuRoot", typeof(RectTransform), typeof(Image));
-            RectTransform menuRoot = menuRootObject.GetComponent<RectTransform>();
-            menuRoot.SetParent(fullRoot, false);
-            menuRoot.anchorMin = Vector2.zero; menuRoot.anchorMax = Vector2.one;
-            menuRoot.offsetMin = Vector2.zero; menuRoot.offsetMax = Vector2.zero;
-            menuRoot.GetComponent<Image>().color = new Color(0.08f, 0.11f, 0.16f, 1f);
+            mainMenuRoot = menuRootObject.GetComponent<RectTransform>();
+            mainMenuRoot.SetParent(fullRoot, false);
+            mainMenuRoot.anchorMin = Vector2.zero; mainMenuRoot.anchorMax = Vector2.one;
+            mainMenuRoot.offsetMin = Vector2.zero; mainMenuRoot.offsetMax = Vector2.zero;
+            mainMenuRoot.GetComponent<Image>().color = new Color(0.08f, 0.11f, 0.16f, 1f);
 
             VerticalLayoutGroup layout = menuRootObject.AddComponent<VerticalLayoutGroup>();
             layout.childAlignment = TextAnchor.MiddleCenter;
             layout.padding = new RectOffset(56, 56, 120, 80);
             layout.spacing = 28f; layout.childControlWidth = true;
 
-            CreateTitle(menuRoot, "Nosso jogo, diversão ilimitada");
-            CreateModeButton(menuRoot, "Partida Rápida — 5 min", "5min");
-            CreateModeButton(menuRoot, "Partida Completa — 10 min", "10min");
-            CreateFooter(menuRoot, "Protótipo digital para teste de jogo físico");
+            CreateTitle(mainMenuRoot, "Nosso jogo, diversão ilimitada");
+            CreateModeButton(mainMenuRoot, "Partida Rápida — 5 min", "quick_5");
+            CreateModeButton(mainMenuRoot, "Partida Completa — 10 min", "full_10");
+            CreateFooter(mainMenuRoot, "Protótipo digital para teste de jogo físico");
             CurrentPhase = GamePhase.MainMenu;
             Debug.Log("[GameController] Entered MainMenu phase");
         }
@@ -115,9 +118,30 @@ namespace CardgameProof.Core
 
         private void OnModeSelected(string modeId)
         {
+            if (modeId == "quick_5") Debug.Log("[MENU] 5 min button clicked");
+            if (modeId == "full_10") Debug.Log("[MENU] 10 min button clicked");
             AudioManager.Instance?.PlayButton();
-            LoadPrototypeMode(modeId);
+            StartGameMode(modeId);
+        }
+
+        public void StartGameMode(string modeId)
+        {
+            string resolvedModeId = modeId;
+            if (modeId == "quick_5")
+            {
+                resolvedModeId = "5min";
+                Debug.Log("[GAME] Mode selected: quick_5");
+            }
+            else if (modeId == "full_10")
+            {
+                resolvedModeId = "10min";
+                Debug.Log("[GAME] Mode selected: full_10");
+            }
+
+            LoadPrototypeMode(resolvedModeId);
             if (ActiveModeConfig == null) return;
+            if (mainMenuRoot != null) mainMenuRoot.gameObject.SetActive(false);
+            Debug.Log("[GAME] Entering Tutorial/Setup");
             TransitionToTutorialIntro();
             StartPassAndPlaySetup();
             ShowTutorialSequence(DefaultTutorialSteps);
@@ -421,6 +445,7 @@ namespace CardgameProof.Core
             winScreenView.Hide();
             if (sceneRoot?.FullScreenRoot == null) return;
             for (int i = sceneRoot.FullScreenRoot.childCount - 1; i >= 0; i--) Destroy(sceneRoot.FullScreenRoot.GetChild(i).gameObject);
+            mainMenuRoot = null;
             CurrentPhase = GamePhase.MainMenu;
             InitializeMainMenu(sceneRoot);
         }
