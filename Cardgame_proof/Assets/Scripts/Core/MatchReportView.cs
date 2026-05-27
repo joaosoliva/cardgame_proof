@@ -48,6 +48,13 @@ namespace CardgameProof.Core
             GameObject go = new GameObject("Text", typeof(RectTransform), typeof(LayoutElement), typeof(TextMeshProUGUI));
             go.transform.SetParent(parent, false);
             go.GetComponent<LayoutElement>().preferredHeight = height;
+            TextMeshProUGUI t = go.GetComponent<TextMeshProUGUI>();
+            t.text = value;
+            t.fontSize = size;
+            t.color = Color.white;
+            t.alignment = anchor;
+            t.enableWordWrapping = true;
+            t.overflowMode = TextOverflowModes.Overflow;
             return t;
         }
         private static Button CreateButton(Transform parent, string label)
