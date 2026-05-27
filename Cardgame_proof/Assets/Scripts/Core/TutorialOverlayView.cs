@@ -120,8 +120,8 @@ namespace CardgameProof.Core
             text.alignment = alignment;
             text.fontSize = fontSize;
             text.color = color;
-            text.horizontalOverflow = TextWrappingModes.Normal;
-            text.verticalOverflow = TextOverflowModes.Overflow;
+            text.enableWordWrapping = true;
+            text.overflowMode = TextOverflowModes.Overflow;
             return text;
         }
 
