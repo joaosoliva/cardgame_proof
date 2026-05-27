@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using CardgameProof.Bootstrap;
@@ -7,6 +8,49 @@ namespace CardgameProof.Core
 {
     public sealed class GameController : MonoBehaviour
     {
+        private static readonly IReadOnlyList<TutorialStep> DefaultTutorialSteps = new List<TutorialStep>
+        {
+            new TutorialStep
+            {
+                Id = "welcome_archive",
+                Title = "Bem-vindo ao Arquivo",
+                Body = "Neste jogo, vocês investigam personagens importantes da ciência e da academia. O objetivo é descobrir quem está escondido no arquivo do outro jogador.",
+                Phase = GamePhase.TutorialIntro,
+                TargetKey = "main_menu",
+                OnlyShowOnce = true
+            },
+            new TutorialStep
+            {
+                Id = "build_archive",
+                Title = "Monte seu arquivo",
+                Body = "Arraste suas cartas para a grade. Personagens e cartas de arquivo ficarão escondidos do adversário.",
+                Phase = GamePhase.Setup,
+                TargetKey = "board_grid",
+                OnlyShowOnce = true
+            },
+            new TutorialStep
+            {
+                Id = "character_cards",
+                Title = "Cartas de Personagem",
+                Body = "Cada personagem representa uma figura acadêmica. Durante a partida, o adversário poderá pedir pistas para tentar identificá-la.",
+                Phase = GamePhase.Investigation,
+                TargetKey = "character_cards",
+                OnlyShowOnce = true
+            },
+            new TutorialStep
+            {
+                Id = "archive_cards",
+                Title = "Cartas de Arquivo",
+                Body = "Cartas de arquivo não são vazias. Elas representam lacunas, fragmentos ou referências e sempre geram alguma informação ou recurso.",
+                Phase = GamePhase.Investigation,
+                TargetKey = "archive_cards",
+                OnlyShowOnce = true
+            }
+        };
+
+        private SceneRootBuilder sceneRoot;
+        private TutorialOverlayView tutorialOverlay;
+
         public GameModeConfig ActiveModeConfig { get; private set; }
         public GamePhase CurrentPhase { get; private set; } = GamePhase.MainMenu;
 
@@ -23,13 +67,16 @@ namespace CardgameProof.Core
             Debug.Log($"Prototype database has {PrototypeDatabase.Characters.Count} characters and {PrototypeDatabase.ArchiveCards.Count} archive card types.");
         }
 
-        public void InitializeMainMenu(SceneRootBuilder sceneRoot)
+        public void InitializeMainMenu(SceneRootBuilder builtSceneRoot)
         {
-            if (sceneRoot == null || sceneRoot.FullScreenRoot == null)
+            if (builtSceneRoot == null || builtSceneRoot.FullScreenRoot == null)
             {
                 Debug.LogWarning("Main menu initialization skipped: SceneRootBuilder is not ready.");
                 return;
             }
+
+            sceneRoot = builtSceneRoot;
+            EnsureTutorialOverlay();
 
             RectTransform fullRoot = sceneRoot.FullScreenRoot;
             Transform existing = fullRoot.Find("MainMenuRoot");
@@ -66,6 +113,12 @@ namespace CardgameProof.Core
             CurrentPhase = GamePhase.MainMenu;
         }
 
+        public void ShowTutorialSequence(IReadOnlyList<TutorialStep> sequence)
+        {
+            EnsureTutorialOverlay();
+            tutorialOverlay?.ShowSequence(sequence);
+        }
+
         private void OnModeSelected(string modeId)
         {
             PlayButtonClickIfAudioManagerExists();
@@ -76,12 +129,31 @@ namespace CardgameProof.Core
             }
 
             TransitionToTutorialIntro();
+            ShowTutorialSequence(DefaultTutorialSteps);
         }
 
         private void TransitionToTutorialIntro()
         {
             CurrentPhase = GamePhase.TutorialIntro;
             Debug.Log($"Transitioning to TutorialIntro with mode '{ActiveModeConfig.Id}' ({ActiveModeConfig.DisplayName}).");
+        }
+
+        private void EnsureTutorialOverlay()
+        {
+            if (sceneRoot == null || sceneRoot.OverlayLayer == null)
+            {
+                return;
+            }
+
+            if (tutorialOverlay != null)
+            {
+                return;
+            }
+
+            GameObject overlayObject = new GameObject("TutorialOverlayView");
+            overlayObject.transform.SetParent(sceneRoot.OverlayLayer, false);
+            tutorialOverlay = overlayObject.AddComponent<TutorialOverlayView>();
+            tutorialOverlay.Initialize(sceneRoot.OverlayLayer);
         }
 
         private static void PlayButtonClickIfAudioManagerExists()

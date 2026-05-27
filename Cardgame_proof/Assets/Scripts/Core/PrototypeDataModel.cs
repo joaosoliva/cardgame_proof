@@ -98,6 +98,19 @@ namespace CardgameProof.Core
         public PlacedCardData Occupant;
     }
 
+
+    [Serializable]
+    public sealed class TutorialStep
+    {
+        public string Id;
+        public string Title;
+        [TextArea]
+        public string Body;
+        public GamePhase? Phase;
+        public string TargetKey;
+        public bool OnlyShowOnce;
+    }
+
     [Serializable]
     public sealed class PlacedCardData
     {
