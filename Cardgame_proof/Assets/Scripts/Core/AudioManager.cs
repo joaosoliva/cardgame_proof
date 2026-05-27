@@ -10,17 +10,18 @@ namespace CardgameProof.Core
         private AudioSource sfxSource;
         private AudioSource bgSource;
 
-        private AudioClip buttonClip;
-        private AudioClip pickClip;
-        private AudioClip placeClip;
-        private AudioClip invalidClip;
-        private AudioClip revealClip;
-        private AudioClip clueClip;
-        private AudioClip researchClip;
-        private AudioClip correctClip;
-        private AudioClip wrongClip;
-        private AudioClip winClip;
-        private AudioClip backgroundClip;
+        [Header("Optional authored clips (fallback to procedural if null)")]
+        [SerializeField] private AudioClip buttonClip;
+        [SerializeField] private AudioClip pickClip;
+        [SerializeField] private AudioClip placeClip;
+        [SerializeField] private AudioClip invalidClip;
+        [SerializeField] private AudioClip revealClip;
+        [SerializeField] private AudioClip clueClip;
+        [SerializeField] private AudioClip researchClip;
+        [SerializeField] private AudioClip correctClip;
+        [SerializeField] private AudioClip wrongClip;
+        [SerializeField] private AudioClip winClip;
+        [SerializeField] private AudioClip backgroundClip;
 
         public static AudioManager EnsureInstance()
         {
@@ -42,7 +43,7 @@ namespace CardgameProof.Core
             bgSource.playOnAwake = false;
             bgSource.loop = true;
             bgSource.volume = 0.08f;
-            BuildProceduralClips();
+            BuildFallbackClipsIfMissing();
             StartBackgroundLoop();
         }
 
@@ -71,19 +72,19 @@ namespace CardgameProof.Core
             sfxSource.PlayOneShot(clip, 0.8f);
         }
 
-        private void BuildProceduralClips()
+        private void BuildFallbackClipsIfMissing()
         {
-            buttonClip = MakeTone(720f, 0.07f);
-            pickClip = MakeTone(480f, 0.06f);
-            placeClip = MakeTone(540f, 0.08f);
-            invalidClip = MakeTone(180f, 0.12f);
-            revealClip = MakeTone(640f, 0.12f);
-            clueClip = MakeTone(760f, 0.11f);
-            researchClip = MakeTone(420f, 0.11f);
-            correctClip = MakeTone(940f, 0.14f);
-            wrongClip = MakeTone(220f, 0.14f);
-            winClip = MakeTone(1040f, 0.22f);
-            backgroundClip = MakeSoftBackground();
+            if (buttonClip == null) buttonClip = MakeTone(720f, 0.07f);
+            if (pickClip == null) pickClip = MakeTone(480f, 0.06f);
+            if (placeClip == null) placeClip = MakeTone(540f, 0.08f);
+            if (invalidClip == null) invalidClip = MakeTone(180f, 0.12f);
+            if (revealClip == null) revealClip = MakeTone(640f, 0.12f);
+            if (clueClip == null) clueClip = MakeTone(760f, 0.11f);
+            if (researchClip == null) researchClip = MakeTone(420f, 0.11f);
+            if (correctClip == null) correctClip = MakeTone(940f, 0.14f);
+            if (wrongClip == null) wrongClip = MakeTone(220f, 0.14f);
+            if (winClip == null) winClip = MakeTone(1040f, 0.22f);
+            if (backgroundClip == null) backgroundClip = MakeSoftBackground();
         }
 
         private static AudioClip MakeTone(float frequency, float duration)
