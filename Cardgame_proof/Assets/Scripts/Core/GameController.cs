@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -12,7 +13,7 @@ namespace CardgameProof.Core
         private static readonly IReadOnlyList<TutorialStep> DefaultTutorialSteps = new List<TutorialStep>
         {
             new TutorialStep { Id = "welcome_archive", Title = "Bem-vindo ao Arquivo", Body = "Neste jogo, vocês investigam personagens importantes da ciência e da academia. O objetivo é descobrir quem está escondido no arquivo do outro jogador.", Phase = GamePhase.TutorialIntro, TargetKey = "main_menu", OnlyShowOnce = true },
-            new TutorialStep { Id = "build_archive", Title = "Monte seu arquivo", Body = "Arraste suas cartas para a grade. Personagens e cartas de arquivo ficarão escondidos do adversário.", Phase = GamePhase.Setup, TargetKey = "board_grid", OnlyShowOnce = true },
+            new TutorialStep { Id = "build_archive", Title = "Completar o arquivo", Body = "Você posiciona apenas Personagens e Cartas de Arquivo. Ao finalizar, o jogo preenche as lacunas com cartas Sem Registro.", Phase = GamePhase.Setup, TargetKey = "board_grid", OnlyShowOnce = true },
             new TutorialStep { Id = "sem_registro", Title = "Sem Registro", Body = "Algumas cartas representam partes do arquivo onde nada útil foi encontrado. Elas revelam apenas 'Sem Registro' e ajudam a reduzir o espaço de busca.", Phase = GamePhase.Setup, TargetKey = "placed_card_actions", OnlyShowOnce = true }
         };
 
@@ -44,6 +45,7 @@ namespace CardgameProof.Core
         private int totalCluesRequested;
         private int totalResearchUses;
         private int totalGuesses;
+        private bool isAutoFillingNoRecord;
 
         private PlayerId currentSetupPlayer = PlayerId.PlayerOne;
         private PlayerId currentTurnPlayer = PlayerId.PlayerOne;
@@ -231,15 +233,12 @@ namespace CardgameProof.Core
         {
             foreach (var card in trayCards) if (card != null) Destroy(card.gameObject);
             trayCards.Clear();
-            int totalBoardCells = ActiveModeConfig.BoardSize.x * ActiveModeConfig.BoardSize.y;
-            int semRegistroCount = Mathf.Max(0, totalBoardCells - ActiveModeConfig.CharactersPerPlayer - ActiveModeConfig.ArchiveCardsPerPlayer);
-            int total = ActiveModeConfig.CharactersPerPlayer + ActiveModeConfig.ArchiveCardsPerPlayer + semRegistroCount;
+            int total = ActiveModeConfig.CharactersPerPlayer + ActiveModeConfig.ArchiveCardsPerPlayer;
             for (int i = 0; i < total; i++)
             {
                 CardType type;
                 if (i < ActiveModeConfig.CharactersPerPlayer) type = CardType.Character;
-                else if (i < ActiveModeConfig.CharactersPerPlayer + ActiveModeConfig.ArchiveCardsPerPlayer) type = CardType.Archive;
-                else type = CardType.SemRegistro;
+                else type = CardType.Archive;
                 string cardId = BuildPrototypeCardIdForSetup(player, type, i);
                 var placed = new PlacedCardData { CardId = cardId, CardType = type, Owner = player, Coordinate = Vector2Int.zero, IsFaceUp = false };
                 GameObject go = new GameObject($"SetupCard_{i}", typeof(RectTransform), typeof(Image), typeof(LayoutElement), typeof(CanvasGroup));
@@ -325,14 +324,28 @@ namespace CardgameProof.Core
 
         private void OnFinalizeSetupPressed()
         {
-            matchReportService.EndSetup(currentSetupPlayer);
-            HideSetupSensitiveUi();
-            if (currentSetupPlayer == PlayerId.PlayerOne)
+            if (isAutoFillingNoRecord)
             {
-                ShowReadyScreen("Passe o aparelho para o Jogador 2", "Estou pronto", () => BeginSetupForPlayer(PlayerId.PlayerTwo));
                 return;
             }
-            ShowReadyScreen("Passe o aparelho para o Jogador 1", "Começar investigação", StartInvestigationPhase);
+            if (!finalizeSetupButton.interactable)
+            {
+                EnsureInvestigationOverlayView();
+                investigationOverlayView.Show("Montagem", "Posicione todas as cartas antes de finalizar.");
+                investigationOverlayView.AddButton("Fechar", investigationOverlayView.Hide);
+                return;
+            }
+            matchReportService.EndSetup(currentSetupPlayer);
+            HideSetupSensitiveUi();
+            StartCoroutine(FillEmptyCellsWithNoRecordCoroutine(currentSetupPlayer, () =>
+            {
+                if (currentSetupPlayer == PlayerId.PlayerOne)
+                {
+                    ShowReadyScreen("Passe o aparelho para o Jogador 2", "Estou pronto", () => BeginSetupForPlayer(PlayerId.PlayerTwo));
+                    return;
+                }
+                ShowReadyScreen("Passe o aparelho para o Jogador 1", "Começar investigação", StartInvestigationPhase);
+            }));
         }
 
         private void StartInvestigationPhase()
@@ -632,7 +645,7 @@ namespace CardgameProof.Core
             investigationOverlayView.AddButton("Cancelar", investigationOverlayView.Hide);
         }
         private void ShowGuidebookOverlay() { EnsureGuidebookOverlayView(); guidebookOverlayView.Show(PrototypeDatabase.Characters); }
-        private void ShowRulesOverlay() { EnsureInvestigationOverlayView(); investigationOverlayView.Show("Resumo das Regras", "1. Investigue cartas no arquivo adversário.\n2. Se encontrar um Dossiê, peça uma pista e tente identificar o personagem.\n3. Se encontrar uma Carta de Arquivo, revele e resolva seu efeito.\n4. Se encontrar Sem Registro, apenas marque aquela carta como investigada.\n5. Personagens só revelam sua identidade após uma identificação correta.\n6. Vence quem completar o objetivo do modo escolhido."); investigationOverlayView.AddButton("Fechar", investigationOverlayView.Hide); }
+        private void ShowRulesOverlay() { EnsureInvestigationOverlayView(); investigationOverlayView.Show("Resumo das Regras", "Durante a montagem, posicione seus Personagens e Cartas de Arquivo. Ao finalizar, as lacunas do arquivo são preenchidas automaticamente com Sem Registro.\n\nSem Registro não tem efeito. Ele apenas indica que aquela parte do arquivo não tinha um dossiê útil.\n\n1. Investigue cartas no arquivo adversário.\n2. Se encontrar um Dossiê, peça uma pista e tente identificar o personagem.\n3. Se encontrar uma Carta de Arquivo, revele e resolva seu efeito.\n4. Se encontrar Sem Registro, apenas marque aquela carta como investigada.\n5. Personagens só revelam sua identidade após uma identificação correta.\n6. Vence quem completar o objetivo do modo escolhido."); investigationOverlayView.AddButton("Fechar", investigationOverlayView.Hide); }
 
         private void HideSetupSensitiveUi()
         {
@@ -665,6 +678,49 @@ namespace CardgameProof.Core
             cards[idx].IsIdentified = true;
             cards[idx].IsRevealed = true;
             cards[idx].IsFaceUp = true;
+        }
+        private IEnumerator FillEmptyCellsWithNoRecordCoroutine(PlayerId owner, Action onCompleted)
+        {
+            isAutoFillingNoRecord = true;
+            if (finalizeSetupButton != null) finalizeSetupButton.interactable = false;
+            EnsureInvestigationOverlayView();
+            investigationOverlayView.Show("Arquivo", "Preenchendo lacunas do arquivo...");
+            float started = Time.realtimeSinceStartup;
+            int generated = 0;
+            int semIndex = 0;
+            for (int y = 0; y < ActiveModeConfig.BoardSize.y; y++)
+            {
+                for (int x = 0; x < ActiveModeConfig.BoardSize.x; x++)
+                {
+                    Vector2Int coord = new Vector2Int(x, y);
+                    if (boardController.GetPlacedCard(coord) != null) continue;
+                    var noRecord = new PlacedCardData
+                    {
+                        CardId = $"{owner}_sem_registro_auto_{semIndex++}",
+                        CardType = CardType.SemRegistro,
+                        Owner = owner,
+                        Coordinate = coord,
+                        IsFaceUp = false,
+                        IsInvestigated = false,
+                        IsRevealed = false,
+                        IsIdentified = false,
+                        EffectResolved = false
+                    };
+                    boardController.PlaceCard(noRecord);
+                    StorePlacedCardForCurrentPlayer(noRecord);
+                    generated++;
+                    yield return new WaitForSeconds(0.04f);
+                }
+            }
+            matchReportService.OnAutoNoRecordGenerated(owner, generated);
+            matchReportService.OnAutoFillDuration(Time.realtimeSinceStartup - started);
+            investigationOverlayView.Show("Arquivo", "Arquivo completo.");
+            investigationOverlayView.AddButton("Continuar", () =>
+            {
+                investigationOverlayView.Hide();
+                isAutoFillingNoRecord = false;
+                onCompleted?.Invoke();
+            });
         }
 
         private void EnsureBoardController() { if (boardController != null) return; GameObject boardObject = new GameObject("BoardController", typeof(RectTransform)); boardObject.transform.SetParent(sceneRoot.CenterBoardArea, false); boardController = boardObject.AddComponent<BoardController>(); }

@@ -43,6 +43,10 @@ namespace CardgameProof.Core
             public int ArchiveEffectsSuccess;
             public int ArchiveEffectsNoTarget;
             public int NoRecordRevealed;
+            public int AutoNoRecordP1;
+            public int AutoNoRecordP2;
+            public int AutoNoRecordTotal;
+            public float AutoFillDurationSeconds;
             public TimeSpan SetupP1;
             public TimeSpan SetupP2;
             public int Rotations;
@@ -72,6 +76,13 @@ namespace CardgameProof.Core
         public void OnArchiveRevealed(string effectName) { report.ArchiveRevealed++; if (effectName.Contains("lacuna")) report.ArchiveLacuna++; else if (effectName.Contains("referencia")) report.ArchiveReferencia++; else report.ArchiveFragmento++; }
         public void OnArchiveResolution(bool success) { if (success) report.ArchiveEffectsSuccess++; else report.ArchiveEffectsNoTarget++; }
         public void OnNoRecordRevealed() => report.NoRecordRevealed++;
+        public void OnAutoNoRecordGenerated(PlayerId player, int amount)
+        {
+            report.AutoNoRecordTotal += amount;
+            if (player == PlayerId.PlayerOne) report.AutoNoRecordP1 += amount;
+            else report.AutoNoRecordP2 += amount;
+        }
+        public void OnAutoFillDuration(float seconds) => report.AutoFillDurationSeconds += Mathf.Max(0f, seconds);
         public void OnRotate() => report.Rotations++;
         public void OnInvalidPlacement() => report.InvalidPlacements++;
         public void OnRepositionOrRemove() => report.RepositionsOrRemovals++;
@@ -108,7 +119,7 @@ namespace CardgameProof.Core
                    $"[Pesquisa]\nUsos do Guia de Apoio: {report.GuidebookOpens}\nFichas de Pesquisa usadas: {report.ResearchUsed}\nO guia foi usado antes de algum acerto? {(report.GuidebookBeforeCorrect ? "Sim" : "Não")}\n\n" +
                    $"[Cartas de Arquivo]\nCartas de Arquivo reveladas: {report.ArchiveRevealed}\nTipo mais revelado: {MostArchiveType()}\nEfeitos sem alvo válido: {report.ArchiveEffectsNoTarget}\n\n" +
                    $"[Sem Registro]\nSem Registro revelados: {report.NoRecordRevealed}\n% de investigações em Sem Registro: {PctNoRecord():0.0}%\n\n" +
-                   $"[Montagem]\nTempo de montagem do Jogador 1: {report.SetupP1:mm\\:ss}\nTempo de montagem do Jogador 2: {report.SetupP2:mm\\:ss}\nRotações de carta: {report.Rotations}\nPosicionamentos inválidos: {report.InvalidPlacements}\n\n" +
+                   $"[Montagem]\nTempo de montagem do Jogador 1: {report.SetupP1:mm\\:ss}\nTempo de montagem do Jogador 2: {report.SetupP2:mm\\:ss}\nSem Registro automáticos J1: {report.AutoNoRecordP1}\nSem Registro automáticos J2: {report.AutoNoRecordP2}\nSem Registro automáticos total: {report.AutoNoRecordTotal}\nDuração total do preenchimento automático: {report.AutoFillDurationSeconds:0.00}s\nRotações de carta: {report.Rotations}\nPosicionamentos inválidos: {report.InvalidPlacements}\n\n" +
                    $"{interpret}";
         }
         private float PctNoRecord() => report.TotalTurns <= 0 ? 0f : (report.NoRecordRevealed / Mathf.Max(1f, report.TotalTurns)) * 100f;
