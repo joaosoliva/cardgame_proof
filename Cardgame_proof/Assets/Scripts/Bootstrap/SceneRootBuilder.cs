@@ -11,6 +11,7 @@ namespace CardgameProof.Bootstrap
         public RectTransform ActionArea { get; private set; }
         public RectTransform BottomCardTray { get; private set; }
         public RectTransform OverlayLayer { get; private set; }
+        public RectTransform SafeAreaRoot { get; private set; }
 
         public void Build()
         {
@@ -21,21 +22,38 @@ namespace CardgameProof.Bootstrap
             }
 
             FullScreenRoot = CreateOrGetChild(parentRect, "FullScreenRoot", new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0f, 0f), new Vector2(0f, 0f));
+            SafeAreaRoot = CreateOrGetChild(FullScreenRoot, "SafeAreaRoot", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            ApplySafeArea(SafeAreaRoot);
 
             float topHeight = 220f;
             float actionHeight = 220f;
             float bottomHeight = 360f;
 
-            TopArea = CreateOrGetChild(FullScreenRoot, "TopArea", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(0f, topHeight));
+            TopArea = CreateOrGetChild(SafeAreaRoot, "TopArea", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(0f, topHeight));
 
-            BottomCardTray = CreateOrGetChild(FullScreenRoot, "BottomCardTray", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 0f), new Vector2(0f, bottomHeight));
+            BottomCardTray = CreateOrGetChild(SafeAreaRoot, "BottomCardTray", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 0f), new Vector2(0f, bottomHeight));
 
-            ActionArea = CreateOrGetChild(FullScreenRoot, "ActionArea", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, bottomHeight), new Vector2(0f, bottomHeight + actionHeight));
+            ActionArea = CreateOrGetChild(SafeAreaRoot, "ActionArea", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, bottomHeight), new Vector2(0f, bottomHeight + actionHeight));
 
-            CenterBoardArea = CreateOrGetChild(FullScreenRoot, "CenterBoardArea", new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0f, bottomHeight + actionHeight), new Vector2(0f, -topHeight));
+            CenterBoardArea = CreateOrGetChild(SafeAreaRoot, "CenterBoardArea", new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0f, bottomHeight + actionHeight), new Vector2(0f, -topHeight));
 
-            OverlayLayer = CreateOrGetChild(FullScreenRoot, "OverlayLayer", new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0f, 0f), new Vector2(0f, 0f));
+            OverlayLayer = CreateOrGetChild(SafeAreaRoot, "OverlayLayer", new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0f, 0f), new Vector2(0f, 0f));
             OverlayLayer.SetAsLastSibling();
+        }
+
+        private static void ApplySafeArea(RectTransform root)
+        {
+            Rect safeArea = Screen.safeArea;
+            Vector2 anchorMin = safeArea.position;
+            Vector2 anchorMax = safeArea.position + safeArea.size;
+            anchorMin.x /= Screen.width;
+            anchorMin.y /= Screen.height;
+            anchorMax.x /= Screen.width;
+            anchorMax.y /= Screen.height;
+            root.anchorMin = anchorMin;
+            root.anchorMax = anchorMax;
+            root.offsetMin = Vector2.zero;
+            root.offsetMax = Vector2.zero;
         }
 
         private static RectTransform CreateOrGetChild(RectTransform parent, string name, Vector2 anchorMin, Vector2 anchorMax, Vector2 offsetMin, Vector2 offsetMax)

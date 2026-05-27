@@ -10,25 +10,62 @@ namespace CardgameProof.Bootstrap
 
         private void Start()
         {
-            EnsurePortraitResolution();
-            EnsureEventSystem();
-
-            Canvas rootCanvas = EnsureRootCanvas();
-            SceneRootBuilder rootBuilder = rootCanvas.gameObject.GetComponent<SceneRootBuilder>();
-            if (rootBuilder == null)
+            try
             {
-                rootBuilder = rootCanvas.gameObject.AddComponent<SceneRootBuilder>();
-            }
-            rootBuilder.Build();
+                EnsurePortraitResolution();
+                EnsureEventSystem();
+                Core.AudioManager.EnsureInstance();
 
-            Core.GameController gameController = FindFirstObjectByType<Core.GameController>();
-            if (gameController == null)
+                Canvas rootCanvas = EnsureRootCanvas();
+                SceneRootBuilder rootBuilder = rootCanvas.gameObject.GetComponent<SceneRootBuilder>();
+                if (rootBuilder == null)
+                {
+                    rootBuilder = rootCanvas.gameObject.AddComponent<SceneRootBuilder>();
+                }
+                rootBuilder.Build();
+
+                Core.GameController gameController = FindFirstObjectByType<Core.GameController>();
+                if (gameController == null)
+                {
+                    GameObject controllerObject = new GameObject("GameController");
+                    gameController = controllerObject.AddComponent<Core.GameController>();
+                }
+
+                gameController.InitializeMainMenu(rootBuilder);
+            }
+            catch (System.Exception ex)
             {
-                GameObject controllerObject = new GameObject("GameController");
-                gameController = controllerObject.AddComponent<Core.GameController>();
+                ShowBootError(ex.Message);
             }
-
-            gameController.InitializeMainMenu(rootBuilder);
+        }
+        
+        private static void ShowBootError(string message)
+        {
+            Canvas canvas = EnsureRootCanvas();
+            GameObject panel = new GameObject("BootErrorPanel", typeof(RectTransform), typeof(Image), typeof(VerticalLayoutGroup));
+            RectTransform rt = panel.GetComponent<RectTransform>();
+            rt.SetParent(canvas.transform, false);
+            rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+            rt.offsetMin = new Vector2(32f, 64f); rt.offsetMax = new Vector2(-32f, -64f);
+            panel.GetComponent<Image>().color = new Color(0.2f, 0.05f, 0.05f, 0.95f);
+            VerticalLayoutGroup layout = panel.GetComponent<VerticalLayoutGroup>();
+            layout.padding = new RectOffset(24, 24, 24, 24);
+            layout.spacing = 16f;
+            CreateErrorText(panel.transform, "Falha ao inicializar o protótipo.", 48);
+            CreateErrorText(panel.transform, "Reinicie o app. Se persistir, verifique logs de build.", 32);
+            CreateErrorText(panel.transform, message, 24);
+        }
+        private static void CreateErrorText(Transform parent, string text, int size)
+        {
+            GameObject go = new GameObject("ErrorText", typeof(RectTransform), typeof(LayoutElement), typeof(Text));
+            go.transform.SetParent(parent, false);
+            go.GetComponent<LayoutElement>().preferredHeight = 180f;
+            Text t = go.GetComponent<Text>();
+            t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            t.fontSize = size;
+            t.alignment = TextAnchor.MiddleCenter;
+            t.color = Color.white;
+            t.text = text;
         }
 
         private static void EnsurePortraitResolution()
