@@ -182,6 +182,7 @@ namespace CardgameProof.Core
             currentSetupPlayer = player;
             matchReportService.StartSetup(player);
             SetPhase(GamePhase.Setup);
+            Debug.Log("[STATE] Enter setup");
             RestoreBoardVisualState();
             if (sceneRoot?.CenterBoardArea != null) sceneRoot.CenterBoardArea.gameObject.SetActive(true);
             BuildBoardForActiveMode();
@@ -352,6 +353,7 @@ namespace CardgameProof.Core
                 investigationOverlayView.AddButton("Fechar", investigationOverlayView.Hide);
                 return;
             }
+            Debug.Log("[STATE] Confirm setup");
             tutorialManager?.NotifyActionStarted(TutorialTrigger.SetupConfirmed);
             tutorialOverlay?.FadeTo(0f, 0.15f);
             tutorialManager?.Notify(TutorialTrigger.SetupConfirmed);
@@ -372,6 +374,7 @@ namespace CardgameProof.Core
         {
             HideReadyScreen();
             SetPhase(GamePhase.Investigation);
+            Debug.Log("[STATE] Enter investigation");
             RestoreBoardVisualState();
             if (sceneRoot?.CenterBoardArea != null) sceneRoot.CenterBoardArea.gameObject.SetActive(true);
             BuildInvestigationHud();
@@ -419,6 +422,7 @@ namespace CardgameProof.Core
                 return;
             }
             PlayerId opponent = currentTurnPlayer == PlayerId.PlayerOne ? PlayerId.PlayerTwo : PlayerId.PlayerOne;
+            Debug.Log("[INVESTIGATION] Card clicked");
             Debug.Log($"[INVESTIGATION] Player {currentTurnPlayer} clicked card {card.CardId} type {card.CardType} on Player {opponent} board.");
             Debug.Log($"[INVESTIGATION] Before: investigated={card.IsInvestigated}, revealed={card.IsRevealed}, identified={card.IsIdentified}, effectResolved={card.EffectResolved}");
             AudioManager.Instance?.PlayReveal();
@@ -582,7 +586,7 @@ Contribuição: {revealData.Contribution}" : "Identificação correta!",
             LogTelemetry("guess_wrong", $"character={characterId};guess={guessedName}"); investigationOverlayView.Show("Resultado", "Identificação incorreta."); investigationOverlayView.AddButton("Encerrar turno", EndTurnAfterOverlay);
         }
 
-        private void EndTurnAfterOverlay() { investigationOverlayView.Hide(); EndTurnWithPassScreen(); }
+        private void EndTurnAfterOverlay() { Debug.Log("[TURN] End turn"); investigationOverlayView.Hide(); EndTurnWithPassScreen(); }
         private void EndTurnWithPassScreen() { tutorialManager?.Notify(TutorialTrigger.TurnPassed); PlayerId next = currentTurnPlayer == PlayerId.PlayerOne ? PlayerId.PlayerTwo : PlayerId.PlayerOne; ShowReadyScreen("Passe o aparelho para o próximo jogador", "Estou pronto", () => { currentTurnPlayer = next; Debug.Log($"[STATE] CurrentPlayer: {currentTurnPlayer}"); matchReportService.TurnStart(currentTurnPlayer); HideReadyScreen(); ShowOpponentBoardForCurrentTurn(); UpdateHud(); }); }
 
         private void BuildInvestigationHud()
