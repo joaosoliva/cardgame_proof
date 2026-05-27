@@ -102,6 +102,7 @@ namespace CardgameProof.Core
 
         private void OnModeSelected(string modeId)
         {
+            AudioManager.Instance?.PlayButton();
             LoadPrototypeMode(modeId);
             if (ActiveModeConfig == null) return;
             TransitionToTutorialIntro();
@@ -192,7 +193,8 @@ namespace CardgameProof.Core
         {
             if (!boardController.TryGetCoordinateFromScreenPosition(eventData.position, out Vector2Int coord)) { cardView.ResetToTray(); return; }
             PlacedCardData data = cardView.CardData; data.Coordinate = coord;
-            if (!boardController.PlaceCard(data)) { cardView.ResetToTray(); Debug.Log("Jogada inválida"); return; }
+            if (!boardController.PlaceCard(data)) { cardView.ResetToTray(); Debug.Log("Jogada inválida"); AudioManager.Instance?.PlayInvalid(); return; }
+            AudioManager.Instance?.PlayCardPlace();
             cardView.gameObject.SetActive(false);
             StorePlacedCardForCurrentPlayer(data);
             UpdateFinalizeButtonState();
@@ -256,6 +258,7 @@ namespace CardgameProof.Core
             if (CurrentPhase != GamePhase.Investigation) return;
             PlacedCardData card = boardController.GetPlacedCard(coordinate);
             if (card == null || card.IsFaceUp) return;
+            AudioManager.Instance?.PlayReveal();
             if (card.CardType == CardType.Character && blockedCharacterGuesses[currentTurnPlayer].Contains(card.CardId)) return;
             card.IsFaceUp = true; boardController.RemoveCard(coordinate); boardController.PlaceCard(card);
             if (card.CardType == CardType.Archive) { EnsureInvestigationOverlayView(); ResolveArchiveCard(card); return; }
@@ -315,6 +318,7 @@ namespace CardgameProof.Core
             blockedCharacterGuesses[currentTurnPlayer].Remove(characterId);
             totalCluesRequested += 1;
             LogTelemetry("clue_requested", $"character={characterId};category={category}");
+            AudioManager.Instance?.PlayClue();
             investigationOverlayView.Show("Pista revelada", $"{GetCategoryLabel(category)}\n\n{GetClueText(characterId, category)}");
             investigationOverlayView.AddButton("Tentar identificar", () => ShowGuessOverlay(characterId));
             investigationOverlayView.AddButton("Encerrar turno", EndTurnAfterOverlay);
@@ -337,9 +341,11 @@ namespace CardgameProof.Core
                 scores[currentTurnPlayer] += 1;
                 identifiedCharacters[currentTurnPlayer].Add(characterId);
                 UpdateHud();
+                AudioManager.Instance?.PlayCorrect();
                 if (scores[currentTurnPlayer] >= ActiveModeConfig.ObjectiveIdentifications) { CompleteMatch(currentTurnPlayer); return; }
                 investigationOverlayView.Show("Resultado", "Identificação correta!"); investigationOverlayView.AddButton("Encerrar turno", EndTurnAfterOverlay); return;
             }
+            AudioManager.Instance?.PlayWrong();
             LogTelemetry("guess_wrong", $"character={characterId};guess={guessedName}"); blockedCharacterGuesses[currentTurnPlayer].Add(characterId); investigationOverlayView.Show("Resultado", "Ainda não. Você precisa de mais uma pista antes de tentar novamente."); investigationOverlayView.AddButton("Encerrar turno", EndTurnAfterOverlay);
         }
 
@@ -376,6 +382,7 @@ namespace CardgameProof.Core
             string winnerLabel = winner == PlayerId.PlayerOne ? "Jogador 1" : "Jogador 2";
             EnsureWinScreenView();
             winScreenView.Show($"Vitória do {winnerLabel}!", $"Personagens identificados: {scores[winner]}\nModo: {modeLabel}", RestartCurrentModeMatch, ReturnToMainMenu);
+            AudioManager.Instance?.PlayWin();
             LogTelemetry("match_finished", $"winner={winner};mode={ActiveModeConfig?.Id};duration={ActiveModeConfig?.DurationMinutes};final_scores={scores[PlayerId.PlayerOne]}-{scores[PlayerId.PlayerTwo]};total_clues_requested={totalCluesRequested};total_research_uses={totalResearchUses};total_guesses={totalGuesses}");
         }
 
@@ -435,7 +442,7 @@ namespace CardgameProof.Core
             EnsureInvestigationOverlayView();
             if (researchTokens[currentTurnPlayer] <= 0) { investigationOverlayView.Show("Guia de Apoio", "Você não tem Fichas de Pesquisa restantes."); investigationOverlayView.AddButton("Fechar", investigationOverlayView.Hide); return; }
             investigationOverlayView.Show("Guia de Apoio", "Gastar 1 Ficha de Pesquisa para abrir o guia?");
-            investigationOverlayView.AddButton("Confirmar", () => { researchTokens[currentTurnPlayer] = Mathf.Max(0, researchTokens[currentTurnPlayer] - 1); totalResearchUses += 1; UpdateHud(); investigationOverlayView.Hide(); ShowGuidebookOverlay(); });
+            investigationOverlayView.AddButton("Confirmar", () => { researchTokens[currentTurnPlayer] = Mathf.Max(0, researchTokens[currentTurnPlayer] - 1); totalResearchUses += 1; AudioManager.Instance?.PlayResearch(); UpdateHud(); investigationOverlayView.Hide(); ShowGuidebookOverlay(); });
             investigationOverlayView.AddButton("Cancelar", investigationOverlayView.Hide);
         }
         private void ShowGuidebookOverlay() { EnsureGuidebookOverlayView(); guidebookOverlayView.Show(PrototypeDatabase.Characters); }
@@ -464,7 +471,7 @@ namespace CardgameProof.Core
         {
             GameObject go = new GameObject(text + "Button", typeof(RectTransform), typeof(Image), typeof(Button), typeof(LayoutElement));
             go.transform.SetParent(parent, false); go.GetComponent<LayoutElement>().preferredHeight = 88f; go.GetComponent<Image>().color = new Color(0.16f, 0.43f, 0.84f, 1f);
-            Button b = go.GetComponent<Button>(); b.onClick.AddListener(() => onClick?.Invoke());
+            Button b = go.GetComponent<Button>(); b.onClick.AddListener(() => { AudioManager.Instance?.PlayButton(); onClick?.Invoke(); });
             GameObject label = new GameObject("Label", typeof(RectTransform), typeof(Text)); RectTransform lr = label.GetComponent<RectTransform>(); lr.SetParent(go.transform, false); lr.anchorMin = Vector2.zero; lr.anchorMax = Vector2.one;
             Text t = label.GetComponent<Text>(); t.text = text; t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); t.alignment = TextAnchor.MiddleCenter; t.fontSize = 28; t.color = Color.white;
             return b;

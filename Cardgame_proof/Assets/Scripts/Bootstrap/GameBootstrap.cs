@@ -12,6 +12,7 @@ namespace CardgameProof.Bootstrap
         {
             EnsurePortraitResolution();
             EnsureEventSystem();
+            Core.AudioManager.EnsureInstance();
 
             Canvas rootCanvas = EnsureRootCanvas();
             SceneRootBuilder rootBuilder = rootCanvas.gameObject.GetComponent<SceneRootBuilder>();
