@@ -91,7 +91,7 @@ namespace CardgameProof.Core
             mainMenuRoot.GetComponent<Image>().color = new Color(0.08f, 0.11f, 0.16f, 1f);
 
             VerticalLayoutGroup layout = menuRootObject.AddComponent<VerticalLayoutGroup>();
-            layout.childAlignment = TextAlignmentOptions.Center;
+            layout.childAlignment = TextAnchor.MiddleCenter;
             layout.padding = new RectOffset(56, 56, 120, 80);
             layout.spacing = 28f; layout.childControlWidth = true;
 
@@ -565,7 +565,55 @@ namespace CardgameProof.Core
             go.transform.SetParent(parent, false); go.GetComponent<LayoutElement>().preferredHeight = 88f; go.GetComponent<Image>().color = new Color(0.16f, 0.43f, 0.84f, 1f);
             Button b = go.GetComponent<Button>(); b.onClick.AddListener(() => { AudioManager.Instance?.PlayButton(); onClick?.Invoke(); });
             GameObject label = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI)); RectTransform lr = label.GetComponent<RectTransform>(); lr.SetParent(go.transform, false); lr.anchorMin = Vector2.zero; lr.anchorMax = Vector2.one;
+            TextMeshProUGUI t = label.GetComponent<TextMeshProUGUI>();
+            t.text = text;
+            t.fontSize = 28;
+            t.alignment = TextAlignmentOptions.Center;
+            t.color = Color.white;
             return b;
+        }
+
+        private static void CreateTitle(RectTransform parent, string textValue)
+        {
+            GameObject titleObj = new GameObject("MainMenuTitle", typeof(RectTransform), typeof(LayoutElement), typeof(TextMeshProUGUI));
+            titleObj.transform.SetParent(parent, false);
+            titleObj.GetComponent<LayoutElement>().preferredHeight = 280f;
+            TextMeshProUGUI text = titleObj.GetComponent<TextMeshProUGUI>();
+            text.text = textValue;
+            text.alignment = TextAlignmentOptions.Center;
+            text.fontSize = 54;
+            text.color = Color.white;
+            text.enableWordWrapping = true;
+        }
+
+        private static void CreateFooter(RectTransform parent, string textValue)
+        {
+            GameObject spacer = new GameObject("FooterSpacer", typeof(RectTransform), typeof(LayoutElement));
+            spacer.transform.SetParent(parent, false);
+            spacer.GetComponent<LayoutElement>().flexibleHeight = 1f;
+
+            GameObject footerObj = new GameObject("MainMenuFooter", typeof(RectTransform), typeof(LayoutElement), typeof(TextMeshProUGUI));
+            footerObj.transform.SetParent(parent, false);
+            footerObj.GetComponent<LayoutElement>().preferredHeight = 120f;
+            TextMeshProUGUI text = footerObj.GetComponent<TextMeshProUGUI>();
+            text.text = textValue;
+            text.alignment = TextAlignmentOptions.Center;
+            text.fontSize = 24;
+            text.color = new Color(0.84f, 0.88f, 0.92f, 1f);
+            text.enableWordWrapping = true;
+        }
+
+        private static TextMeshProUGUI CreateHudText(RectTransform parent, string value)
+        {
+            GameObject go = new GameObject("HudText", typeof(RectTransform), typeof(TextMeshProUGUI));
+            go.transform.SetParent(parent, false);
+            TextMeshProUGUI t = go.GetComponent<TextMeshProUGUI>();
+            t.fontSize = 28;
+            t.color = Color.white;
+            t.alignment = TextAlignmentOptions.MidlineLeft;
+            t.enableWordWrapping = true;
+            t.text = value;
+            return t;
         }
     }
 }
