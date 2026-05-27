@@ -343,9 +343,13 @@ namespace CardgameProof.Core
         private void ResolveGuess(string characterId, string guessedName)
         {
             totalGuesses += 1;
+			
+			CharacterData target = FindCharacterByCardId(characterId);
+			bool correct = target != null && string.Equals(target.DisplayName, guessedName, StringComparison.Ordinal);
+						
             matchReportService.OnGuess(correct, characterId);
-            CharacterData target = FindCharacterByCardId(characterId);
-            bool correct = target != null && string.Equals(target.DisplayName, guessedName, StringComparison.Ordinal);
+    
+
             LogTelemetry("guess_made", $"character={characterId};guess={guessedName}");
             if (correct)
             {
