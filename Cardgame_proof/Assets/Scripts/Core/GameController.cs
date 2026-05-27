@@ -50,6 +50,7 @@ namespace CardgameProof.Core
 
         private SceneRootBuilder sceneRoot;
         private TutorialOverlayView tutorialOverlay;
+        private BoardController boardController;
 
         public GameModeConfig ActiveModeConfig { get; private set; }
         public GamePhase CurrentPhase { get; private set; } = GamePhase.MainMenu;
@@ -77,6 +78,7 @@ namespace CardgameProof.Core
 
             sceneRoot = builtSceneRoot;
             EnsureTutorialOverlay();
+            EnsureBoardController();
 
             RectTransform fullRoot = sceneRoot.FullScreenRoot;
             Transform existing = fullRoot.Find("MainMenuRoot");
@@ -129,6 +131,7 @@ namespace CardgameProof.Core
             }
 
             TransitionToTutorialIntro();
+            BuildBoardForActiveMode();
             ShowTutorialSequence(DefaultTutorialSteps);
         }
 
@@ -154,6 +157,32 @@ namespace CardgameProof.Core
             overlayObject.transform.SetParent(sceneRoot.OverlayLayer, false);
             tutorialOverlay = overlayObject.AddComponent<TutorialOverlayView>();
             tutorialOverlay.Initialize(sceneRoot.OverlayLayer);
+        }
+
+
+        private void EnsureBoardController()
+        {
+            if (sceneRoot == null || sceneRoot.CenterBoardArea == null || boardController != null)
+            {
+                return;
+            }
+
+            GameObject boardObject = new GameObject("BoardController", typeof(RectTransform));
+            boardObject.transform.SetParent(sceneRoot.CenterBoardArea, false);
+            boardController = boardObject.AddComponent<BoardController>();
+            boardController.ShowDebugLabels = false;
+        }
+
+        private void BuildBoardForActiveMode()
+        {
+            EnsureBoardController();
+            if (boardController == null || ActiveModeConfig == null)
+            {
+                return;
+            }
+
+            boardController.BuildBoard(sceneRoot.CenterBoardArea, ActiveModeConfig.BoardSize);
+            boardController.RefreshVisualsForPhase(CurrentPhase);
         }
 
         private static void PlayButtonClickIfAudioManagerExists()
