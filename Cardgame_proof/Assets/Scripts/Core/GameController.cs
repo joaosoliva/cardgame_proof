@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 using CardgameProof.Bootstrap;
@@ -6,52 +7,190 @@ namespace CardgameProof.Core
 {
     public sealed class GameController : MonoBehaviour
     {
+        public GameModeConfig ActiveModeConfig { get; private set; }
+        public GamePhase CurrentPhase { get; private set; } = GamePhase.MainMenu;
+
+        public void LoadPrototypeMode(string modeId)
+        {
+            ActiveModeConfig = PrototypeDatabase.GetMode(modeId);
+            if (ActiveModeConfig == null)
+            {
+                Debug.LogWarning($"Prototype mode '{modeId}' not found.");
+                return;
+            }
+
+            Debug.Log($"Loaded prototype mode: {ActiveModeConfig.DisplayName} ({ActiveModeConfig.DurationMinutes} min)");
+            Debug.Log($"Prototype database has {PrototypeDatabase.Characters.Count} characters and {PrototypeDatabase.ArchiveCards.Count} archive card types.");
+        }
+
         public void InitializeMainMenu(SceneRootBuilder sceneRoot)
         {
-            if (sceneRoot == null || sceneRoot.TopArea == null)
+            if (sceneRoot == null || sceneRoot.FullScreenRoot == null)
             {
                 Debug.LogWarning("Main menu initialization skipped: SceneRootBuilder is not ready.");
                 return;
             }
 
-            RectTransform topArea = sceneRoot.TopArea;
-            Transform existing = topArea.Find("MainMenuTitle");
+            RectTransform fullRoot = sceneRoot.FullScreenRoot;
+            Transform existing = fullRoot.Find("MainMenuRoot");
             if (existing != null)
             {
                 return;
             }
 
-            GameObject titleObject = new GameObject("MainMenuTitle", typeof(RectTransform));
-            RectTransform titleRect = titleObject.GetComponent<RectTransform>();
-            titleRect.SetParent(topArea, false);
-            titleRect.anchorMin = new Vector2(0f, 0f);
-            titleRect.anchorMax = new Vector2(1f, 1f);
-            titleRect.offsetMin = new Vector2(24f, 24f);
-            titleRect.offsetMax = new Vector2(-24f, -24f);
+            GameObject menuRootObject = new GameObject("MainMenuRoot", typeof(RectTransform), typeof(Image));
+            RectTransform menuRoot = menuRootObject.GetComponent<RectTransform>();
+            menuRoot.SetParent(fullRoot, false);
+            menuRoot.anchorMin = Vector2.zero;
+            menuRoot.anchorMax = Vector2.one;
+            menuRoot.offsetMin = Vector2.zero;
+            menuRoot.offsetMax = Vector2.zero;
 
-            if (!TryCreateTextMeshPro(titleObject))
+            Image bg = menuRoot.GetComponent<Image>();
+            bg.color = new Color(0.08f, 0.11f, 0.16f, 1f);
+
+            VerticalLayoutGroup layout = menuRootObject.AddComponent<VerticalLayoutGroup>();
+            layout.childAlignment = TextAnchor.MiddleCenter;
+            layout.padding = new RectOffset(56, 56, 120, 80);
+            layout.spacing = 28f;
+            layout.childControlHeight = false;
+            layout.childControlWidth = true;
+            layout.childForceExpandHeight = false;
+            layout.childForceExpandWidth = true;
+
+            CreateTitle(menuRoot, "Nosso jogo, diversão ilimitada");
+            CreateModeButton(menuRoot, "Partida Rápida — 5 min", "5min");
+            CreateModeButton(menuRoot, "Partida Completa — 10 min", "10min");
+            CreateFooter(menuRoot, "Protótipo digital para teste de jogo físico");
+
+            CurrentPhase = GamePhase.MainMenu;
+        }
+
+        private void OnModeSelected(string modeId)
+        {
+            PlayButtonClickIfAudioManagerExists();
+            LoadPrototypeMode(modeId);
+            if (ActiveModeConfig == null)
             {
-                Text fallbackText = titleObject.AddComponent<Text>();
-                fallbackText.text = "Main Menu";
-                fallbackText.alignment = TextAnchor.MiddleLeft;
-                fallbackText.fontSize = 64;
-                fallbackText.color = Color.white;
-                fallbackText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                return;
+            }
+
+            TransitionToTutorialIntro();
+        }
+
+        private void TransitionToTutorialIntro()
+        {
+            CurrentPhase = GamePhase.TutorialIntro;
+            Debug.Log($"Transitioning to TutorialIntro with mode '{ActiveModeConfig.Id}' ({ActiveModeConfig.DisplayName}).");
+        }
+
+        private static void PlayButtonClickIfAudioManagerExists()
+        {
+            Type audioManagerType = Type.GetType("AudioManager");
+            if (audioManagerType == null)
+            {
+                return;
+            }
+
+            UnityEngine.Object manager = FindFirstObjectByType(audioManagerType);
+            if (manager == null)
+            {
+                return;
+            }
+
+            audioManagerType.GetMethod("PlayButtonClick")?.Invoke(manager, null);
+        }
+
+        private void CreateModeButton(RectTransform parent, string label, string modeId)
+        {
+            GameObject buttonObj = new GameObject($"{modeId}_Button", typeof(RectTransform), typeof(Image), typeof(Button), typeof(LayoutElement));
+            RectTransform buttonRect = buttonObj.GetComponent<RectTransform>();
+            buttonRect.SetParent(parent, false);
+
+            LayoutElement layout = buttonObj.GetComponent<LayoutElement>();
+            layout.preferredHeight = 180f;
+
+            Image image = buttonObj.GetComponent<Image>();
+            image.color = new Color(0.19f, 0.46f, 0.88f, 1f);
+
+            Button button = buttonObj.GetComponent<Button>();
+            string capturedModeId = modeId;
+            button.onClick.AddListener(() => OnModeSelected(capturedModeId));
+
+            GameObject labelObj = new GameObject("Label", typeof(RectTransform));
+            RectTransform labelRect = labelObj.GetComponent<RectTransform>();
+            labelRect.SetParent(buttonRect, false);
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.offsetMin = new Vector2(20f, 20f);
+            labelRect.offsetMax = new Vector2(-20f, -20f);
+
+            if (!TryCreateTextMeshPro(labelObj, label, 52f, 514))
+            {
+                Text text = labelObj.AddComponent<Text>();
+                text.text = label;
+                text.alignment = TextAnchor.MiddleCenter;
+                text.fontSize = 52;
+                text.color = Color.white;
+                text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                text.horizontalOverflow = HorizontalWrapMode.Wrap;
+                text.verticalOverflow = VerticalWrapMode.Overflow;
             }
         }
 
-        private static bool TryCreateTextMeshPro(GameObject go)
+        private static void CreateTitle(RectTransform parent, string textValue)
         {
-            System.Type tmpType = System.Type.GetType("TMPro.TextMeshProUGUI, Unity.TextMeshPro");
+            GameObject titleObj = new GameObject("MainMenuTitle", typeof(RectTransform), typeof(LayoutElement));
+            RectTransform titleRect = titleObj.GetComponent<RectTransform>();
+            titleRect.SetParent(parent, false);
+            LayoutElement layout = titleObj.GetComponent<LayoutElement>();
+            layout.preferredHeight = 280f;
+
+            if (!TryCreateTextMeshPro(titleObj, textValue, 82f, 514))
+            {
+                Text text = titleObj.AddComponent<Text>();
+                text.text = textValue;
+                text.alignment = TextAnchor.MiddleCenter;
+                text.fontSize = 82;
+                text.color = Color.white;
+                text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            }
+        }
+
+        private static void CreateFooter(RectTransform parent, string textValue)
+        {
+            GameObject spacer = new GameObject("FooterSpacer", typeof(RectTransform), typeof(LayoutElement));
+            spacer.transform.SetParent(parent, false);
+            spacer.GetComponent<LayoutElement>().flexibleHeight = 1f;
+
+            GameObject footerObj = new GameObject("MainMenuFooter", typeof(RectTransform), typeof(LayoutElement));
+            RectTransform footerRect = footerObj.GetComponent<RectTransform>();
+            footerRect.SetParent(parent, false);
+            footerObj.GetComponent<LayoutElement>().preferredHeight = 120f;
+
+            if (!TryCreateTextMeshPro(footerObj, textValue, 38f, 514))
+            {
+                Text text = footerObj.AddComponent<Text>();
+                text.text = textValue;
+                text.alignment = TextAnchor.MiddleCenter;
+                text.fontSize = 38;
+                text.color = new Color(0.84f, 0.88f, 0.92f, 1f);
+                text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            }
+        }
+
+        private static bool TryCreateTextMeshPro(GameObject go, string textValue, float fontSize, int alignment)
+        {
+            Type tmpType = Type.GetType("TMPro.TextMeshProUGUI, Unity.TextMeshPro");
             if (tmpType == null)
             {
                 return false;
             }
 
             Component tmpComponent = go.AddComponent(tmpType);
-            tmpType.GetProperty("text")?.SetValue(tmpComponent, "Main Menu");
-            tmpType.GetProperty("fontSize")?.SetValue(tmpComponent, 64f);
-            tmpType.GetProperty("alignment")?.SetValue(tmpComponent, 513);
+            tmpType.GetProperty("text")?.SetValue(tmpComponent, textValue);
+            tmpType.GetProperty("fontSize")?.SetValue(tmpComponent, fontSize);
+            tmpType.GetProperty("alignment")?.SetValue(tmpComponent, alignment);
             tmpType.GetProperty("color")?.SetValue(tmpComponent, Color.white);
             return true;
         }
