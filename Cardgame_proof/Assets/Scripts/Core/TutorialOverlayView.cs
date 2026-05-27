@@ -14,6 +14,8 @@ namespace CardgameProof.Core
         private Button confirmButton;
         private Image highlightFrame;
         private CanvasGroup blocker;
+        private string currentStepId;
+        private RectTransform cardRoot;
 
         public bool IsVisible => panelObject != null && panelObject.activeSelf;
 
@@ -29,17 +31,28 @@ namespace CardgameProof.Core
         {
             if (panelObject == null || step == null) return;
             panelObject.SetActive(true);
+            currentStepId = step.Id;
             titleText.text = step.Title;
             bodyText.text = step.Body;
             confirmButton.gameObject.SetActive(showContinueButton);
             confirmButton.onClick.RemoveAllListeners();
-            if (showContinueButton && onContinue != null) confirmButton.onClick.AddListener(() => onContinue());
+            if (showContinueButton && onContinue != null)
+            {
+                confirmButton.onClick.AddListener(() =>
+                {
+                    Debug.Log($"[TUTORIAL] Continue clicked on step: {currentStepId}");
+                    onContinue();
+                });
+            }
+            blocker.alpha = 1f;
+            blocker.interactable = blockOutsideTarget;
             blocker.blocksRaycasts = blockOutsideTarget;
             PositionCardNearTarget(target);
             UpdateHighlight(target);
+            LogTutorialUiState();
         }
 
-        public void Hide() { if (panelObject != null) panelObject.SetActive(false); }
+        public void Hide() { if (panelObject != null) { blocker.alpha = 0f; blocker.interactable = false; blocker.blocksRaycasts = false; highlightFrame.gameObject.SetActive(false); panelObject.SetActive(false); } }
 
         private void BuildUi(RectTransform parent)
         {
@@ -54,16 +67,23 @@ namespace CardgameProof.Core
             frameObj.transform.SetParent(panelRoot, false);
             highlightFrame = frameObj.GetComponent<Image>();
             highlightFrame.color = new Color(1f, 0.85f, 0.2f, 0.18f);
+            highlightFrame.raycastTarget = false;
             var outline = frameObj.AddComponent<Outline>();
             outline.effectColor = new Color(1f, 0.85f, 0.2f, 0.95f);
             outline.effectDistance = new Vector2(4f, -4f);
 
-            GameObject card = new GameObject("TutorialCard", typeof(RectTransform), typeof(Image));
+            GameObject card = new GameObject("TutorialCard", typeof(RectTransform), typeof(Image), typeof(CanvasGroup));
             RectTransform cardRect = card.GetComponent<RectTransform>();
+            cardRoot = cardRect;
             cardRect.SetParent(panelRoot, false);
             cardRect.anchorMin = new Vector2(0.1f, 0.08f); cardRect.anchorMax = new Vector2(0.9f, 0.34f);
             cardRect.offsetMin = Vector2.zero; cardRect.offsetMax = Vector2.zero;
-            card.GetComponent<Image>().color = new Color(0.94f, 0.96f, 1f, 1f);
+            Image cardImage = card.GetComponent<Image>();
+            cardImage.color = new Color(0.94f, 0.96f, 1f, 1f);
+            cardImage.raycastTarget = true;
+            CanvasGroup cardCg = card.GetComponent<CanvasGroup>();
+            cardCg.interactable = true;
+            cardCg.blocksRaycasts = true;
             VerticalLayoutGroup layout = card.AddComponent<VerticalLayoutGroup>();
             layout.padding = new RectOffset(24, 24, 18, 18); layout.spacing = 12f; layout.childControlHeight = false; layout.childControlWidth = true;
 
@@ -112,7 +132,21 @@ namespace CardgameProof.Core
             GameObject labelObj = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
             RectTransform labelRect = labelObj.GetComponent<RectTransform>(); labelRect.SetParent(buttonObj.transform, false); labelRect.anchorMin = Vector2.zero; labelRect.anchorMax = Vector2.one; labelRect.offsetMin = Vector2.zero; labelRect.offsetMax = Vector2.zero;
             TextMeshProUGUI labelText = labelObj.GetComponent<TextMeshProUGUI>(); labelText.text = label; labelText.alignment = TextAlignmentOptions.Center; labelText.fontSize = 32; labelText.color = Color.white;
+            labelText.raycastTarget = false;
             return button;
         }
+
+        private void LogTutorialUiState()
+        {
+            if (panelRoot == null || confirmButton == null) return;
+            Image dimImage = panelObject.GetComponent<Image>();
+            Image buttonImage = confirmButton.GetComponent<Image>();
+            Debug.Log($"[TUTORIAL_UI] dim sibling={panelRoot.GetSiblingIndex()} raycast={(dimImage != null && dimImage.raycastTarget)} blocks={blocker.blocksRaycasts}");
+            Debug.Log($"[TUTORIAL_UI] highlight sibling={highlightFrame.rectTransform.GetSiblingIndex()} active={highlightFrame.gameObject.activeSelf} raycast={highlightFrame.raycastTarget}");
+            Debug.Log($"[TUTORIAL_UI] card sibling={cardRoot.GetSiblingIndex()} raycast={cardRoot.GetComponent<Image>().raycastTarget}");
+            Debug.Log($"[TUTORIAL_UI] continue sibling={confirmButton.transform.GetSiblingIndex()} interactable={confirmButton.interactable} raycast={(buttonImage != null && buttonImage.raycastTarget)}");
+            Debug.Log($"[TUTORIAL_UI] blocker alpha={blocker.alpha} interactable={blocker.interactable} blocks={blocker.blocksRaycasts}");
+        }
+
     }
 }

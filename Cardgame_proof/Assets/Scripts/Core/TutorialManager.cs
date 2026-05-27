@@ -73,7 +73,7 @@ namespace CardgameProof.Core
                 if (!string.IsNullOrWhiteSpace(step.TargetKey))
                 {
                     targets.TryGetValue(step.TargetKey, out target);
-                    if (target == null) Debug.LogWarning($"[Tutorial] Target not found for key '{step.TargetKey}'. Fallback to continue mode.");
+                    if (target == null) Debug.LogWarning($"[TUTORIAL] Missing target for step {step.Id}. Showing fallback tutorial panel.");
                 }
 
                 bool requireContinue = step.ShowContinueButton || target == null;
