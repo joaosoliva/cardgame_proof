@@ -120,5 +120,9 @@ namespace CardgameProof.Core
         public PlayerId Owner;
         public Vector2Int Coordinate;
         public bool IsFaceUp;
+        public bool IsInvestigated;
+        public bool IsRevealed;
+        public bool IsIdentified;
+        public bool EffectResolved;
     }
 }
