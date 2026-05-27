@@ -30,6 +30,7 @@ namespace CardgameProof.Core
         private GuidebookOverlayView guidebookOverlayView;
         private WinScreenView winScreenView;
         private MatchReportView matchReportView;
+        private CardRevealOverlayView cardRevealOverlayView;
         private readonly MatchReportService matchReportService = new MatchReportService();
         private string lastReportText;
         private BoardController boardController;
@@ -52,6 +53,7 @@ namespace CardgameProof.Core
         private int totalResearchUses;
         private int totalGuesses;
         private bool isAutoFillingNoRecord;
+        private bool isRevealAnimationPlaying;
 
         private PlayerId currentSetupPlayer = PlayerId.PlayerOne;
         private PlayerId currentTurnPlayer = PlayerId.PlayerOne;
@@ -80,6 +82,7 @@ namespace CardgameProof.Core
             EnsureGuidebookOverlayView();
             EnsureWinScreenView();
             EnsureMatchReportView();
+            EnsureCardRevealOverlayView();
             EnsureBoardController();
             HideAllScreensAndGameplayUi();
 
@@ -405,7 +408,7 @@ namespace CardgameProof.Core
 
         private void OnInvestigationCellTapped(Vector2Int coordinate)
         {
-            if (CurrentPhase != GamePhase.Investigation) return;
+            if (CurrentPhase != GamePhase.Investigation || isRevealAnimationPlaying) return;
             PlacedCardData card = boardController.GetPlacedCard(coordinate);
             if (card == null) return;
             if (card.IsInvestigated || card.IsRevealed || card.IsFaceUp)
@@ -419,6 +422,7 @@ namespace CardgameProof.Core
             Debug.Log($"[INVESTIGATION] Player {currentTurnPlayer} clicked card {card.CardId} type {card.CardType} on Player {opponent} board.");
             Debug.Log($"[INVESTIGATION] Before: investigated={card.IsInvestigated}, revealed={card.IsRevealed}, identified={card.IsIdentified}, effectResolved={card.EffectResolved}");
             AudioManager.Instance?.PlayReveal();
+            tutorialOverlay?.FadeTo(0f, 0.1f);
             if (card.CardType == CardType.Character && blockedCharacterGuesses[currentTurnPlayer].Contains(card.CardId)) return;
             matchReportService.MarkFirstInvestigation();
             card.IsInvestigated = true;
@@ -437,9 +441,14 @@ namespace CardgameProof.Core
             boardController.RemoveCard(card.Coordinate); boardController.PlaceCard(card);
             Debug.Log($"[INVESTIGATION] After: investigated={card.IsInvestigated}, revealed={card.IsRevealed}, identified={card.IsIdentified}, effectResolved={card.EffectResolved}");
             matchReportService.OnNoRecordRevealed();
-            EnsureInvestigationOverlayView();
-            investigationOverlayView.Show("Sem Registro", "Nenhum dossiê útil foi encontrado nesta parte do arquivo.");
-            investigationOverlayView.AddButton("Encerrar turno", EndTurnAfterOverlay);
+            PlayCardReveal(new CardRevealPayload
+            {
+                RevealType = CardRevealType.NoRecord,
+                Title = "Sem Registro",
+                Body = "Nenhum dossiê útil foi encontrado nesta parte do arquivo.",
+                RequireTapToContinue = false,
+                AutoContinueDelay = 1f
+            }, EndTurnWithPassScreen);
         }
 
         private void ResolveArchiveCard(PlacedCardData card)
@@ -459,9 +468,20 @@ namespace CardgameProof.Core
             Debug.Log($"[INVESTIGATION] After: investigated={card.IsInvestigated}, revealed={card.IsRevealed}, identified={card.IsIdentified}, effectResolved={card.EffectResolved}");
             LogTelemetry("archive_card_found", $"card={card.CardId}");
             int effectType = ParseCardIndex(card.CardId) % 3;
-            if (effectType == 0) { matchReportService.OnArchiveRevealed("lacuna"); ResolveArchiveLacunaDeArquivo(card.CardId); }
-            else if (effectType == 1) { matchReportService.OnArchiveRevealed("referencia"); ResolveArchiveReferenciaCruzada(card); }
-            else { matchReportService.OnArchiveRevealed("fragmento"); ResolveArchiveFragmentoDocumento(card.CardId); }
+            string archiveTitle = effectType == 0 ? "Lacuna de Arquivo" : effectType == 1 ? "Referência Cruzada" : "Fragmento de Documento";
+            string archiveBody = effectType == 0 ? "Você ganhou +1 Ficha de Pesquisa." : effectType == 1 ? "Permite investigar o tipo de uma célula adjacente." : "Revela uma pista extra para um personagem já descoberto.";
+            PlayCardReveal(new CardRevealPayload
+            {
+                RevealType = CardRevealType.Archive,
+                Title = archiveTitle,
+                Body = archiveBody,
+                RequireTapToContinue = true
+            }, () =>
+            {
+                if (effectType == 0) { matchReportService.OnArchiveRevealed("lacuna"); ResolveArchiveLacunaDeArquivo(card.CardId); }
+                else if (effectType == 1) { matchReportService.OnArchiveRevealed("referencia"); ResolveArchiveReferenciaCruzada(card); }
+                else { matchReportService.OnArchiveRevealed("fragmento"); ResolveArchiveFragmentoDocumento(card.CardId); }
+            });
         }
         private void ResolveArchiveLacunaDeArquivo(string cardId) { researchTokens[currentTurnPlayer] += 1; UpdateHud(); investigationOverlayView.Show("Lacuna de Arquivo", "Você ganhou +1 Ficha de Pesquisa."); investigationOverlayView.AddButton("Continuar", EndTurnAfterOverlay); LogTelemetry("archive_effect_resolved", $"card={cardId};effect=lacuna_de_arquivo;result=token_plus_one"); }
         private void ResolveArchiveReferenciaCruzada(PlacedCardData archiveCard)
@@ -489,7 +509,7 @@ namespace CardgameProof.Core
             }
         }
 
-        private void ResolveCharacterCard(PlacedCardData card) { PersistInvestigatedCard(card); Debug.Log($"[INVESTIGATION] After: investigated={card.IsInvestigated}, revealed={card.IsRevealed}, identified={card.IsIdentified}, effectResolved={card.EffectResolved}"); matchReportService.MarkFirstCharacterFound(); ShowClueSelectionOverlay(card.CardId); }
+        private void ResolveCharacterCard(PlacedCardData card) { PersistInvestigatedCard(card); Debug.Log($"[INVESTIGATION] After: investigated={card.IsInvestigated}, revealed={card.IsRevealed}, identified={card.IsIdentified}, effectResolved={card.EffectResolved}"); matchReportService.MarkFirstCharacterFound(); PlayCardReveal(new CardRevealPayload { RevealType = CardRevealType.CharacterFound, Title = "Dossiê encontrado", Body = "Você encontrou um personagem. Escolha uma pista para investigar.", RequireTapToContinue = true }, () => ShowClueSelectionOverlay(card.CardId)); }
         private void ShowClueSelectionOverlay(string characterId)
         {
             EnsureInvestigationOverlayView();
@@ -541,8 +561,24 @@ namespace CardgameProof.Core
                 MarkCharacterIdentified(characterId);
                 UpdateHud();
                 AudioManager.Instance?.PlayCorrect();
-                if (scores[currentTurnPlayer] >= ActiveModeConfig.ObjectiveIdentifications) { CompleteMatch(currentTurnPlayer); return; }
-                investigationOverlayView.Show("Resultado", "Identificação correta!"); investigationOverlayView.AddButton("Encerrar turno", EndTurnAfterOverlay); return;
+                CharacterData revealData = FindCharacterByCardId(characterId);
+                PlayCardReveal(new CardRevealPayload
+                {
+                    RevealType = CardRevealType.CharacterIdentified,
+                    Title = revealData != null ? revealData.DisplayName : "Identificação correta",
+                    Body = revealData != null ? $"Área: {revealData.Area}
+Época: {revealData.Era}
+Região: {revealData.Region}
+Contribuição: {revealData.Contribution}" : "Identificação correta!",
+                    RequireTapToContinue = true,
+                    Celebratory = true
+                }, () =>
+                {
+                    if (scores[currentTurnPlayer] >= ActiveModeConfig.ObjectiveIdentifications) { CompleteMatch(currentTurnPlayer); return; }
+                    EnsureInvestigationOverlayView();
+                    investigationOverlayView.Show("Resultado", "Identificação correta!"); investigationOverlayView.AddButton("Encerrar turno", EndTurnAfterOverlay);
+                });
+                return;
             }
             AudioManager.Instance?.PlayWrong();
             LogTelemetry("guess_wrong", $"character={characterId};guess={guessedName}"); blockedCharacterGuesses[currentTurnPlayer].Add(characterId); investigationOverlayView.Show("Resultado", "Ainda não. Você precisa de mais uma pista antes de tentar novamente."); investigationOverlayView.AddButton("Encerrar turno", EndTurnAfterOverlay);
@@ -885,7 +921,21 @@ namespace CardgameProof.Core
             }
         }
 
+
+        private void PlayCardReveal(CardRevealPayload payload, Action onComplete)
+        {
+            EnsureCardRevealOverlayView();
+            isRevealAnimationPlaying = true;
+            cardRevealOverlayView.PlayReveal(payload, () =>
+            {
+                isRevealAnimationPlaying = false;
+                tutorialOverlay?.RestoreAfterActionIfStillActive();
+                onComplete?.Invoke();
+            });
+        }
+
 private void EnsureBoardController() { if (boardController != null) return; GameObject boardObject = new GameObject("BoardController", typeof(RectTransform)); boardObject.transform.SetParent(sceneRoot.CenterBoardArea, false); boardController = boardObject.AddComponent<BoardController>(); }
+        private void EnsureCardRevealOverlayView() { if (cardRevealOverlayView != null) return; GameObject go = new GameObject("CardRevealOverlayView"); go.transform.SetParent(sceneRoot.OverlayLayer, false); cardRevealOverlayView = go.AddComponent<CardRevealOverlayView>(); cardRevealOverlayView.Initialize(sceneRoot.OverlayLayer); }
         private void EnsureTutorialOverlay() { if (tutorialOverlay != null) return; Debug.Log("[UI] Creating TutorialOverlayView"); GameObject overlayObject = new GameObject("TutorialOverlayView"); overlayObject.transform.SetParent(sceneRoot.OverlayLayer, false); tutorialOverlay = overlayObject.AddComponent<TutorialOverlayView>(); tutorialOverlay.Initialize(sceneRoot.OverlayLayer);
             tutorialManager = new TutorialManager(tutorialOverlay); }
         private void EnsureInvestigationOverlayView() { if (investigationOverlayView != null) return; Debug.Log("[UI] Creating InvestigationOverlayView"); GameObject go = new GameObject("InvestigationOverlayView"); go.transform.SetParent(sceneRoot.OverlayLayer, false); investigationOverlayView = go.AddComponent<InvestigationOverlayView>(); investigationOverlayView.Initialize(sceneRoot.OverlayLayer); }
