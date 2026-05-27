@@ -701,48 +701,187 @@ namespace CardgameProof.Core
         {
             isAutoFillingNoRecord = true;
             if (finalizeSetupButton != null) finalizeSetupButton.interactable = false;
-            EnsureInvestigationOverlayView();
-            investigationOverlayView.Show("Arquivo", "Preenchendo lacunas do arquivo...");
+            SetSetupInteractionEnabled(false);
+
+            List<Vector2Int> emptyCells = CollectEmptyBoardCells();
+            Debug.Log($"[NO_RECORD_FILL] Starting auto-fill for Player {owner}. Empty cells: {emptyCells.Count}");
+
+            GameObject labelObj = CreateNoRecordFillLabel("Preenchendo o arquivo com cartas Sem Registro...");
+            TextMeshProUGUI fillLabel = labelObj != null ? labelObj.GetComponentInChildren<TextMeshProUGUI>() : null;
             float started = Time.realtimeSinceStartup;
             int generated = 0;
             int semIndex = 0;
+
+            foreach (Vector2Int coord in emptyCells)
+            {
+                yield return AnimateNoRecordSpawn(coord);
+
+                var noRecord = new PlacedCardData
+                {
+                    CardId = $"{owner}_sem_registro_auto_{semIndex++}",
+                    CardType = CardType.SemRegistro,
+                    Owner = owner,
+                    Coordinate = coord,
+                    IsFaceUp = false,
+                    IsInvestigated = false,
+                    IsRevealed = false,
+                    IsIdentified = false,
+                    EffectResolved = false
+                };
+                boardController.PlaceCard(noRecord);
+                StorePlacedCardForCurrentPlayer(noRecord);
+                generated++;
+                Debug.Log($"[NO_RECORD_FILL] Placed Sem Registro at cell {coord.x},{coord.y}");
+                yield return new WaitForSeconds(0.05f);
+            }
+
+            float duration = Time.realtimeSinceStartup - started;
+            matchReportService.OnAutoNoRecordGenerated(owner, generated);
+            matchReportService.OnAutoFillDuration(duration);
+            Debug.Log($"[NO_RECORD_FILL] Completed auto-fill for Player {owner} in {duration:F2} seconds");
+
+            if (fillLabel != null) fillLabel.text = "Arquivo completo.";
+            tutorialOverlay?.Hide();
+            tutorialManager?.Notify(TutorialTrigger.AutoNoRecordFillCompleted);
+            yield return new WaitForSeconds(0.65f);
+            if (labelObj != null) Destroy(labelObj);
+
+            isAutoFillingNoRecord = false;
+            SetSetupInteractionEnabled(true);
+            onCompleted?.Invoke();
+        }
+
+        private List<Vector2Int> CollectEmptyBoardCells()
+        {
+            List<Vector2Int> cells = new List<Vector2Int>();
             for (int y = 0; y < ActiveModeConfig.BoardSize.y; y++)
             {
                 for (int x = 0; x < ActiveModeConfig.BoardSize.x; x++)
                 {
                     Vector2Int coord = new Vector2Int(x, y);
-                    if (boardController.GetPlacedCard(coord) != null) continue;
-                    var noRecord = new PlacedCardData
-                    {
-                        CardId = $"{owner}_sem_registro_auto_{semIndex++}",
-                        CardType = CardType.SemRegistro,
-                        Owner = owner,
-                        Coordinate = coord,
-                        IsFaceUp = false,
-                        IsInvestigated = false,
-                        IsRevealed = false,
-                        IsIdentified = false,
-                        EffectResolved = false
-                    };
-                    boardController.PlaceCard(noRecord);
-                    StorePlacedCardForCurrentPlayer(noRecord);
-                    generated++;
-                    yield return new WaitForSeconds(0.04f);
+                    if (boardController.GetPlacedCard(coord) == null) cells.Add(coord);
                 }
             }
-            matchReportService.OnAutoNoRecordGenerated(owner, generated);
-            tutorialManager?.Notify(TutorialTrigger.AutoNoRecordFillCompleted);
-            matchReportService.OnAutoFillDuration(Time.realtimeSinceStartup - started);
-            investigationOverlayView.Show("Arquivo", "Arquivo completo.");
-            investigationOverlayView.AddButton("Continuar", () =>
-            {
-                investigationOverlayView.Hide();
-                isAutoFillingNoRecord = false;
-                onCompleted?.Invoke();
-            });
+            return cells;
         }
 
-        private void EnsureBoardController() { if (boardController != null) return; GameObject boardObject = new GameObject("BoardController", typeof(RectTransform)); boardObject.transform.SetParent(sceneRoot.CenterBoardArea, false); boardController = boardObject.AddComponent<BoardController>(); }
+        private IEnumerator AnimateNoRecordSpawn(Vector2Int coord)
+        {
+            RectTransform overlay = sceneRoot?.OverlayLayer;
+            if (overlay == null) yield break;
+
+            GameObject fly = new GameObject("NoRecordFlyCard", typeof(RectTransform), typeof(CanvasGroup), typeof(Image));
+            RectTransform rect = fly.GetComponent<RectTransform>();
+            rect.SetParent(overlay, false);
+            rect.sizeDelta = new Vector2(88f, 120f);
+            fly.GetComponent<Image>().color = new Color(0.2f, 0.27f, 0.36f, 1f);
+            CanvasGroup cg = fly.GetComponent<CanvasGroup>();
+            cg.alpha = 0f;
+
+            GameObject q = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
+            q.transform.SetParent(rect, false);
+            var qt = q.GetComponent<TextMeshProUGUI>();
+            qt.text = "?"; qt.alignment = TextAlignmentOptions.Center; qt.fontSize = 40; qt.color = Color.white;
+            var qrt = q.GetComponent<RectTransform>();
+            qrt.anchorMin = Vector2.zero; qrt.anchorMax = Vector2.one; qrt.offsetMin = Vector2.zero; qrt.offsetMax = Vector2.zero;
+
+            Vector2 source = GetNoRecordSpawnSourceInOverlay();
+            Vector2 target = GetBoardCellCenterInOverlay(coord);
+            rect.anchoredPosition = source;
+            rect.localScale = Vector3.one * 0.75f;
+
+            float elapsed = 0f; const float duration = 0.22f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / duration);
+                rect.anchoredPosition = Vector2.Lerp(source, target, t);
+                rect.localScale = Vector3.one * Mathf.Lerp(0.75f, 1f, t);
+                cg.alpha = Mathf.Lerp(0f, 1f, t);
+                yield return null;
+            }
+
+            Destroy(fly);
+        }
+
+        private Vector2 GetNoRecordSpawnSourceInOverlay()
+        {
+            RectTransform overlay = sceneRoot.OverlayLayer;
+            RectTransform tray = trayRoot != null ? trayRoot : sceneRoot.BottomCardTray;
+            if (tray == null) return new Vector2(0f, -720f);
+
+            Vector3 world = tray.TransformPoint(new Vector3(0f, tray.rect.height * 0.5f, 0f));
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(overlay, RectTransformUtility.WorldToScreenPoint(null, world), null, out Vector2 local);
+            return local;
+        }
+
+        private Vector2 GetBoardCellCenterInOverlay(Vector2Int coord)
+        {
+            RectTransform overlay = sceneRoot.OverlayLayer;
+            if (boardController.TryGetCellRectTransform(coord, out RectTransform cellRect))
+            {
+                Vector3 world = cellRect.TransformPoint(cellRect.rect.center);
+                RectTransformUtility.ScreenPointToLocalPointInRectangle(overlay, RectTransformUtility.WorldToScreenPoint(null, world), null, out Vector2 local);
+                return local;
+            }
+            return Vector2.zero;
+        }
+
+        private GameObject CreateNoRecordFillLabel(string text)
+        {
+            RectTransform overlay = sceneRoot?.OverlayLayer;
+            if (overlay == null) return null;
+
+            GameObject panel = new GameObject("NoRecordFillLabel", typeof(RectTransform), typeof(Image));
+            RectTransform rect = panel.GetComponent<RectTransform>();
+            rect.SetParent(overlay, false);
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = new Vector2(860f, 130f);
+            rect.anchoredPosition = new Vector2(0f, 420f);
+            panel.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.72f);
+
+            GameObject labelObj = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
+            RectTransform lrt = labelObj.GetComponent<RectTransform>();
+            lrt.SetParent(rect, false);
+            lrt.anchorMin = Vector2.zero; lrt.anchorMax = Vector2.one; lrt.offsetMin = new Vector2(22f, 12f); lrt.offsetMax = new Vector2(-22f, -12f);
+            TextMeshProUGUI label = labelObj.GetComponent<TextMeshProUGUI>();
+            label.text = text;
+            label.alignment = TextAlignmentOptions.Center;
+            label.fontSize = 34;
+            label.color = Color.white;
+            label.enableWordWrapping = true;
+
+            return panel;
+        }
+
+        private void SetSetupInteractionEnabled(bool enabled)
+        {
+            if (trayRoot != null)
+            {
+                CanvasGroup trayCg = trayRoot.GetComponent<CanvasGroup>();
+                if (trayCg == null) trayCg = trayRoot.gameObject.AddComponent<CanvasGroup>();
+                trayCg.interactable = enabled;
+                trayCg.blocksRaycasts = enabled;
+            }
+
+            if (placedActionsRoot != null)
+            {
+                CanvasGroup actionsCg = placedActionsRoot.GetComponent<CanvasGroup>();
+                if (actionsCg == null) actionsCg = placedActionsRoot.gameObject.AddComponent<CanvasGroup>();
+                actionsCg.interactable = enabled;
+                actionsCg.blocksRaycasts = enabled;
+            }
+
+            if (sceneRoot?.CenterBoardArea != null)
+            {
+                CanvasGroup boardCg = sceneRoot.CenterBoardArea.GetComponent<CanvasGroup>();
+                if (boardCg == null) boardCg = sceneRoot.CenterBoardArea.gameObject.AddComponent<CanvasGroup>();
+                boardCg.interactable = enabled;
+                boardCg.blocksRaycasts = enabled;
+            }
+        }
+
+private void EnsureBoardController() { if (boardController != null) return; GameObject boardObject = new GameObject("BoardController", typeof(RectTransform)); boardObject.transform.SetParent(sceneRoot.CenterBoardArea, false); boardController = boardObject.AddComponent<BoardController>(); }
         private void EnsureTutorialOverlay() { if (tutorialOverlay != null) return; Debug.Log("[UI] Creating TutorialOverlayView"); GameObject overlayObject = new GameObject("TutorialOverlayView"); overlayObject.transform.SetParent(sceneRoot.OverlayLayer, false); tutorialOverlay = overlayObject.AddComponent<TutorialOverlayView>(); tutorialOverlay.Initialize(sceneRoot.OverlayLayer);
             tutorialManager = new TutorialManager(tutorialOverlay); }
         private void EnsureInvestigationOverlayView() { if (investigationOverlayView != null) return; Debug.Log("[UI] Creating InvestigationOverlayView"); GameObject go = new GameObject("InvestigationOverlayView"); go.transform.SetParent(sceneRoot.OverlayLayer, false); investigationOverlayView = go.AddComponent<InvestigationOverlayView>(); investigationOverlayView.Initialize(sceneRoot.OverlayLayer); }

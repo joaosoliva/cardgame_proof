@@ -235,5 +235,17 @@ namespace CardgameProof.Core
                 pair.Value.SetSelected(coordinate.HasValue && pair.Key == coordinate.Value);
             }
         }
+
+        public bool TryGetCellRectTransform(Vector2Int coordinate, out RectTransform cellRect)
+        {
+            if (boardViews.TryGetValue(coordinate, out BoardCellView view) && view != null)
+            {
+                cellRect = view.GetComponent<RectTransform>();
+                return cellRect != null;
+            }
+
+            cellRect = null;
+            return false;
+        }
     }
 }
