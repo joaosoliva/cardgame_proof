@@ -11,11 +11,14 @@ namespace CardgameProof.Core
 
         private RectTransform boardRoot;
         private GridLayoutGroup grid;
+        private Camera uiCamera;
+
+        public System.Action<Vector2Int> OnPlacedCardTapped;
 
         public bool ShowDebugLabels { get; set; }
         public Vector2Int BoardSize { get; private set; }
 
-        public void BuildBoard(RectTransform parent, Vector2Int boardSize)
+        public void BuildBoard(RectTransform parent, Vector2Int boardSize, Camera camera = null)
         {
             if (parent == null)
             {
@@ -23,6 +26,7 @@ namespace CardgameProof.Core
             }
 
             BoardSize = boardSize;
+            uiCamera = camera;
             ClearBoard();
 
             GameObject rootObj = new GameObject("BoardRoot", typeof(RectTransform), typeof(Image));
@@ -185,8 +189,35 @@ namespace CardgameProof.Core
             return controller != null && (controller.CurrentPhase == GamePhase.Setup || controller.CurrentPhase == GamePhase.TutorialIntro);
         }
 
+        public bool TryGetCoordinateFromScreenPosition(Vector2 screenPosition, out Vector2Int coordinate)
+        {
+            foreach (var pair in boardViews)
+            {
+                RectTransform rect = pair.Value.GetComponent<RectTransform>();
+                if (RectTransformUtility.RectangleContainsScreenPoint(rect, screenPosition, uiCamera))
+                {
+                    coordinate = pair.Key;
+                    return true;
+                }
+            }
+
+            coordinate = default;
+            return false;
+        }
+
+        public PlacedCardData GetPlacedCard(Vector2Int coordinate)
+        {
+            return boardData.TryGetValue(coordinate, out BoardCellData cell) ? cell.Occupant : null;
+        }
+
         private void OnCellTapped(Vector2Int coordinate)
         {
+            if (boardData.TryGetValue(coordinate, out BoardCellData cell) && cell.IsOccupied && cell.Occupant != null)
+            {
+                OnPlacedCardTapped?.Invoke(coordinate);
+                return;
+            }
+
             if (ShowDebugLabels)
             {
                 Debug.Log($"Cell tapped: {coordinate}");

@@ -39,6 +39,15 @@ namespace CardgameProof.Core
             },
             new TutorialStep
             {
+                Id = "rotate_reposition",
+                Title = "Girar e reposicionar",
+                Body = "Toque em uma carta posicionada para girar, remover ou ajustar sua posição antes de confirmar.",
+                Phase = GamePhase.Setup,
+                TargetKey = "placed_card_actions",
+                OnlyShowOnce = true
+            },
+            new TutorialStep
+            {
                 Id = "archive_cards",
                 Title = "Cartas de Arquivo",
                 Body = "Cartas de arquivo não são vazias. Elas representam lacunas, fragmentos ou referências e sempre geram alguma informação ou recurso.",
@@ -51,6 +60,12 @@ namespace CardgameProof.Core
         private SceneRootBuilder sceneRoot;
         private TutorialOverlayView tutorialOverlay;
         private BoardController boardController;
+        private RectTransform trayRoot;
+        private RectTransform placedActionsRoot;
+        private Button finalizeSetupButton;
+        private SetupCardView selectedTrayCard;
+        private Vector2Int? selectedPlacedCoordinate;
+        private readonly List<SetupCardView> trayCards = new List<SetupCardView>();
 
         public GameModeConfig ActiveModeConfig { get; private set; }
         public GamePhase CurrentPhase { get; private set; } = GamePhase.MainMenu;
@@ -132,6 +147,7 @@ namespace CardgameProof.Core
 
             TransitionToTutorialIntro();
             BuildBoardForActiveMode();
+            InitializeSetupPhase();
             ShowTutorialSequence(DefaultTutorialSteps);
         }
 
@@ -181,7 +197,8 @@ namespace CardgameProof.Core
                 return;
             }
 
-            boardController.BuildBoard(sceneRoot.CenterBoardArea, ActiveModeConfig.BoardSize);
+            boardController.BuildBoard(sceneRoot.CenterBoardArea, ActiveModeConfig.BoardSize, null);
+            boardController.OnPlacedCardTapped = OnPlacedCardTapped;
             boardController.RefreshVisualsForPhase(CurrentPhase);
         }
 
@@ -278,6 +295,134 @@ namespace CardgameProof.Core
                 text.color = new Color(0.84f, 0.88f, 0.92f, 1f);
                 text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             }
+        }
+
+
+        private void InitializeSetupPhase()
+        {
+            CurrentPhase = GamePhase.Setup;
+            BuildBottomTray();
+            BuildPlacedCardActions();
+            GenerateCurrentPlayerSetupCards(PlayerId.PlayerOne);
+            UpdateFinalizeButtonState();
+        }
+
+        private void BuildBottomTray()
+        {
+            if (sceneRoot == null || sceneRoot.BottomCardTray == null) return;
+            if (trayRoot != null) Destroy(trayRoot.gameObject);
+
+            GameObject tray = new GameObject("SetupBottomTray", typeof(RectTransform), typeof(Image), typeof(HorizontalLayoutGroup));
+            trayRoot = tray.GetComponent<RectTransform>();
+            trayRoot.SetParent(sceneRoot.BottomCardTray, false);
+            trayRoot.anchorMin = Vector2.zero; trayRoot.anchorMax = Vector2.one;
+            trayRoot.offsetMin = new Vector2(20f,20f); trayRoot.offsetMax = new Vector2(-20f,-20f);
+            tray.GetComponent<Image>().color = new Color(0f,0f,0f,0.18f);
+            HorizontalLayoutGroup h = tray.GetComponent<HorizontalLayoutGroup>();
+            h.spacing=16f; h.childControlWidth=true; h.childControlHeight=false; h.childForceExpandWidth=true; h.childForceExpandHeight=false;
+            h.padding = new RectOffset(16,16,16,16);
+        }
+
+        private void BuildPlacedCardActions()
+        {
+            if (sceneRoot == null || sceneRoot.ActionArea == null) return;
+            if (placedActionsRoot != null) Destroy(placedActionsRoot.gameObject);
+
+            GameObject root = new GameObject("PlacedCardActions", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+            placedActionsRoot = root.GetComponent<RectTransform>();
+            placedActionsRoot.SetParent(sceneRoot.ActionArea, false);
+            placedActionsRoot.anchorMin = Vector2.zero; placedActionsRoot.anchorMax = Vector2.one;
+            placedActionsRoot.offsetMin = new Vector2(20f,20f); placedActionsRoot.offsetMax = new Vector2(-20f,-20f);
+            HorizontalLayoutGroup h = root.GetComponent<HorizontalLayoutGroup>(); h.spacing=16f; h.childForceExpandWidth=true;
+
+            CreateActionButton(placedActionsRoot, "Girar", () => { if(selectedPlacedCoordinate.HasValue) boardController.RotateCard(selectedPlacedCoordinate.Value); });
+            CreateActionButton(placedActionsRoot, "Remover", OnRemoveSelectedPlacedCard);
+            CreateActionButton(placedActionsRoot, "Confirmar", () => selectedPlacedCoordinate = null);
+            finalizeSetupButton = CreateActionButton(placedActionsRoot, "Finalizar montagem", () => Debug.Log("Montagem finalizada"));
+        }
+
+        private void GenerateCurrentPlayerSetupCards(PlayerId player)
+        {
+            foreach (var card in trayCards) if (card!=null) Destroy(card.gameObject);
+            trayCards.Clear();
+            if (ActiveModeConfig == null || trayRoot == null) return;
+
+            int total = ActiveModeConfig.CharactersPerPlayer + ActiveModeConfig.ArchiveCardsPerPlayer;
+            for (int i=0;i<total;i++)
+            {
+                CardType type = i < ActiveModeConfig.CharactersPerPlayer ? CardType.Character : CardType.Archive;
+                var placed = new PlacedCardData{ CardId=$"{player}_{type}_{i}", CardType=type, Owner=player, Coordinate=Vector2Int.zero, IsFaceUp=false};
+                GameObject go = new GameObject($"SetupCard_{i}", typeof(RectTransform), typeof(Image), typeof(LayoutElement), typeof(CanvasGroup));
+                go.transform.SetParent(trayRoot, false);
+                SetupCardView view = go.AddComponent<SetupCardView>();
+                view.Initialize(FindFirstObjectByType<Canvas>(), placed, OnSetupCardDrop);
+                trayCards.Add(view);
+            }
+        }
+
+        private void OnSetupCardDrop(SetupCardView cardView, UnityEngine.EventSystems.PointerEventData eventData)
+        {
+            if (boardController == null) return;
+            if (!boardController.TryGetCoordinateFromScreenPosition(eventData.position, out Vector2Int coord))
+            {
+                cardView.ResetToTray();
+                Debug.Log("Posição inválida para carta.");
+                return;
+            }
+
+            PlacedCardData data = cardView.CardData;
+            data.Coordinate = coord;
+            if (!boardController.PlaceCard(data))
+            {
+                cardView.ResetToTray();
+                Debug.Log("Jogada inválida: espaço ocupado ou fora do tabuleiro.");
+                return;
+            }
+
+            cardView.gameObject.SetActive(false);
+            UpdateFinalizeButtonState();
+        }
+
+        private void OnPlacedCardTapped(Vector2Int coordinate)
+        {
+            selectedPlacedCoordinate = coordinate;
+        }
+
+        private void OnRemoveSelectedPlacedCard()
+        {
+            if (!selectedPlacedCoordinate.HasValue || boardController == null) return;
+            PlacedCardData placed = boardController.GetPlacedCard(selectedPlacedCoordinate.Value);
+            if (placed == null) return;
+            if (!boardController.RemoveCard(selectedPlacedCoordinate.Value)) return;
+
+            SetupCardView trayCard = trayCards.Find(c => c != null && c.CardData.CardId == placed.CardId);
+            if (trayCard != null) trayCard.gameObject.SetActive(true);
+            selectedPlacedCoordinate = null;
+            UpdateFinalizeButtonState();
+        }
+
+        private void UpdateFinalizeButtonState()
+        {
+            if (finalizeSetupButton == null) return;
+            int active = 0;
+            foreach (var c in trayCards) if (c != null && c.gameObject.activeSelf) active++;
+            finalizeSetupButton.interactable = active == 0;
+        }
+
+        private static Button CreateActionButton(RectTransform parent, string text, Action onClick)
+        {
+            GameObject go = new GameObject(text+"Button", typeof(RectTransform), typeof(Image), typeof(Button), typeof(LayoutElement));
+            go.transform.SetParent(parent, false);
+            go.GetComponent<LayoutElement>().preferredHeight = 120f;
+            go.GetComponent<Image>().color = new Color(0.16f,0.43f,0.84f,1f);
+            Button b = go.GetComponent<Button>();
+            b.onClick.AddListener(() => onClick?.Invoke());
+
+            GameObject label = new GameObject("Label", typeof(RectTransform), typeof(Text));
+            RectTransform lr = label.GetComponent<RectTransform>();
+            lr.SetParent(go.transform, false); lr.anchorMin=Vector2.zero; lr.anchorMax=Vector2.one;
+            Text t = label.GetComponent<Text>(); t.text=text; t.font=Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); t.alignment=TextAnchor.MiddleCenter; t.fontSize=36; t.color=Color.white;
+            return b;
         }
 
         private static bool TryCreateTextMeshPro(GameObject go, string textValue, float fontSize, int alignment)
