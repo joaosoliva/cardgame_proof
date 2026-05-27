@@ -2,6 +2,7 @@ using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using TMPro;
 
 namespace CardgameProof.Core
 {
@@ -25,7 +26,11 @@ namespace CardgameProof.Core
             rect = GetComponent<RectTransform>();
             if (rect == null) rect = gameObject.AddComponent<RectTransform>();
 
-            if (GetComponent<Image>() == null) gameObject.AddComponent<Image>().color = new Color(0.17f, 0.2f, 0.3f, 1f);
+            Image bg = GetComponent<Image>();
+            if (bg == null) bg = gameObject.AddComponent<Image>();
+            bg.color = CardData.CardType == CardType.Character
+                ? new Color(0.96f, 0.82f, 0.54f, 1f)
+                : new Color(0.66f, 0.78f, 0.91f, 1f);
             if (GetComponent<LayoutElement>() == null) gameObject.AddComponent<LayoutElement>().preferredHeight = 148f;
 
             canvasGroup = GetComponent<CanvasGroup>();
@@ -63,7 +68,7 @@ namespace CardgameProof.Core
 
         private void CreateLabel(string name, string value, float yNorm, int size)
         {
-            GameObject go = new GameObject(name, typeof(RectTransform), typeof(Text));
+            GameObject go = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
             RectTransform rt = go.GetComponent<RectTransform>();
             rt.SetParent(transform, false);
             rt.anchorMin = new Vector2(0.08f, yNorm - 0.2f);
@@ -71,12 +76,12 @@ namespace CardgameProof.Core
             rt.offsetMin = Vector2.zero;
             rt.offsetMax = Vector2.zero;
 
-            Text t = go.GetComponent<Text>();
+            TextMeshProUGUI t = go.GetComponent<TextMeshProUGUI>();
             t.text = value;
-            t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             t.fontSize = size;
-            t.alignment = TextAnchor.MiddleLeft;
-            t.color = Color.white;
+            t.alignment = TextAlignmentOptions.MidlineLeft;
+            t.color = new Color(0.12f, 0.12f, 0.12f, 1f);
+            t.enableWordWrapping = true;
         }
     }
 }

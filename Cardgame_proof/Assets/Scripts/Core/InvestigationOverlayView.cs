@@ -2,14 +2,15 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 namespace CardgameProof.Core
 {
     public sealed class InvestigationOverlayView : MonoBehaviour
     {
         private GameObject root;
-        private Text titleText;
-        private Text bodyText;
+        private TextMeshProUGUI titleText;
+        private TextMeshProUGUI bodyText;
         private RectTransform contentRoot;
         private readonly List<GameObject> dynamicRows = new List<GameObject>();
 
@@ -75,19 +76,22 @@ namespace CardgameProof.Core
             button.interactable = interactable;
             button.onClick.AddListener(() => onClick?.Invoke());
 
-            GameObject labelObj = new GameObject("Label", typeof(RectTransform), typeof(Text));
+            GameObject labelObj = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
             RectTransform lr = labelObj.GetComponent<RectTransform>();
             lr.SetParent(go.transform, false); lr.anchorMin = Vector2.zero; lr.anchorMax = Vector2.one;
-            Text text = labelObj.GetComponent<Text>();
-            text.text = label; text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); text.fontSize = 28; text.alignment = TextAnchor.MiddleCenter; text.color = Color.white;
+            TextMeshProUGUI text = labelObj.GetComponent<TextMeshProUGUI>();
+            text.text = label;
+            text.fontSize = 28;
+            text.alignment = TextAlignmentOptions.Center;
+            text.color = Color.white;
             dynamicRows.Add(go);
             return button;
         }
 
         public void AddLabel(string text)
         {
-            Text row = CreateText(contentRoot, text, 28, 70f);
-            row.alignment = TextAnchor.MiddleLeft;
+            TextMeshProUGUI row = CreateText(contentRoot, text, 28, 70f);
+            row.alignment = TextAlignmentOptions.MidlineLeft;
             dynamicRows.Add(row.gameObject);
         }
 
@@ -97,13 +101,12 @@ namespace CardgameProof.Core
             dynamicRows.Clear();
         }
 
-        private static Text CreateText(Transform parent, string text, int size, float height)
+        private static TextMeshProUGUI CreateText(Transform parent, string text, int size, float height)
         {
-            GameObject go = new GameObject("Text", typeof(RectTransform), typeof(LayoutElement), typeof(Text));
+            GameObject go = new GameObject("Text", typeof(RectTransform), typeof(LayoutElement), typeof(TextMeshProUGUI));
             go.transform.SetParent(parent, false);
             go.GetComponent<LayoutElement>().preferredHeight = height;
-            Text t = go.GetComponent<Text>();
-            t.text = text; t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); t.fontSize = size; t.alignment = TextAnchor.MiddleCenter; t.color = Color.white;
+            TextMeshProUGUI t = go.GetComponent<TextMeshProUGUI>();
             return t;
         }
     }

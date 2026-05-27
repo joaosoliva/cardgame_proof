@@ -1,14 +1,15 @@
 using System;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 namespace CardgameProof.Core
 {
     public sealed class WinScreenView : MonoBehaviour
     {
         private GameObject root;
-        private Text titleText;
-        private Text detailsText;
+        private TextMeshProUGUI titleText;
+        private TextMeshProUGUI detailsText;
         private Button reportButton;
         private Button playAgainButton;
         private Button menuButton;
@@ -64,15 +65,14 @@ namespace CardgameProof.Core
             if (root != null) root.SetActive(false);
         }
 
-        private static Text CreateText(Transform parent, string value, int size, float height)
+        private static TextMeshProUGUI CreateText(Transform parent, string value, int size, float height)
         {
-            GameObject go = new GameObject("Text", typeof(RectTransform), typeof(LayoutElement), typeof(Text));
+            GameObject go = new GameObject("Text", typeof(RectTransform), typeof(LayoutElement), typeof(TextMeshProUGUI));
             go.transform.SetParent(parent, false);
             go.GetComponent<LayoutElement>().preferredHeight = height;
-            Text text = go.GetComponent<Text>();
-            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            TextMeshProUGUI text = go.GetComponent<TextMeshProUGUI>();
             text.fontSize = size;
-            text.alignment = TextAnchor.MiddleCenter;
+            text.alignment = TextAlignmentOptions.Center;
             text.color = Color.white;
             text.text = value;
             return text;
@@ -86,13 +86,12 @@ namespace CardgameProof.Core
             go.GetComponent<Image>().color = new Color(0.16f, 0.43f, 0.84f, 1f);
             Button b = go.GetComponent<Button>();
 
-            GameObject textObj = new GameObject("Label", typeof(RectTransform), typeof(Text));
+            GameObject textObj = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
             RectTransform tr = textObj.GetComponent<RectTransform>();
             tr.SetParent(go.transform, false); tr.anchorMin = Vector2.zero; tr.anchorMax = Vector2.one;
-            Text t = textObj.GetComponent<Text>();
-            t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            TextMeshProUGUI t = textObj.GetComponent<TextMeshProUGUI>();
             t.fontSize = 34;
-            t.alignment = TextAnchor.MiddleCenter;
+            t.alignment = TextAlignmentOptions.Center;
             t.color = Color.white;
             t.text = label;
             return b;

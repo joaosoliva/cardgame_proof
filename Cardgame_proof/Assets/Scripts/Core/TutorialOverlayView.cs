@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 namespace CardgameProof.Core
 {
@@ -11,8 +12,8 @@ namespace CardgameProof.Core
 
         private RectTransform panelRoot;
         private GameObject panelObject;
-        private Text titleText;
-        private Text bodyText;
+        private TextMeshProUGUI titleText;
+        private TextMeshProUGUI bodyText;
         private Button confirmButton;
 
         private IReadOnlyList<TutorialStep> currentSequence;
@@ -100,28 +101,27 @@ namespace CardgameProof.Core
             layout.childControlWidth = true;
             layout.childForceExpandHeight = false;
 
-            titleText = CreateText(cardRect, "Title", 50, TextAnchor.MiddleCenter, Color.black, 130f);
-            bodyText = CreateText(cardRect, "Body", 36, TextAnchor.UpperLeft, new Color(0.12f, 0.12f, 0.12f), 330f);
+            titleText = CreateText(cardRect, "Title", 50, TextAlignmentOptions.Center, Color.black, 130f);
+            bodyText = CreateText(cardRect, "Body", 36, TextAlignmentOptions.TopLeft, new Color(0.12f, 0.12f, 0.12f), 330f);
 
             confirmButton = CreateButton(cardRect, "Entendi", 120f);
             confirmButton.onClick.AddListener(AdvanceOrClose);
         }
 
-        private static Text CreateText(RectTransform parent, string name, int fontSize, TextAnchor alignment, Color color, float preferredHeight)
+        private static TextMeshProUGUI CreateText(RectTransform parent, string name, int fontSize, TextAlignmentOptions alignment, Color color, float preferredHeight)
         {
-            GameObject textObj = new GameObject(name, typeof(RectTransform), typeof(LayoutElement), typeof(Text));
+            GameObject textObj = new GameObject(name, typeof(RectTransform), typeof(LayoutElement), typeof(TextMeshProUGUI));
             textObj.transform.SetParent(parent, false);
 
             LayoutElement layout = textObj.GetComponent<LayoutElement>();
             layout.preferredHeight = preferredHeight;
 
-            Text text = textObj.GetComponent<Text>();
+            TextMeshProUGUI text = textObj.GetComponent<TextMeshProUGUI>();
             text.alignment = alignment;
             text.fontSize = fontSize;
             text.color = color;
-            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            text.horizontalOverflow = HorizontalWrapMode.Wrap;
-            text.verticalOverflow = VerticalWrapMode.Overflow;
+            text.horizontalOverflow = TextWrappingModes.Normal;
+            text.verticalOverflow = TextOverflowModes.Overflow;
             return text;
         }
 
@@ -138,7 +138,7 @@ namespace CardgameProof.Core
 
             Button button = buttonObj.GetComponent<Button>();
 
-            GameObject labelObj = new GameObject("Label", typeof(RectTransform), typeof(Text));
+            GameObject labelObj = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
             RectTransform labelRect = labelObj.GetComponent<RectTransform>();
             labelRect.SetParent(buttonObj.transform, false);
             labelRect.anchorMin = Vector2.zero;
@@ -146,12 +146,11 @@ namespace CardgameProof.Core
             labelRect.offsetMin = Vector2.zero;
             labelRect.offsetMax = Vector2.zero;
 
-            Text labelText = labelObj.GetComponent<Text>();
+            TextMeshProUGUI labelText = labelObj.GetComponent<TextMeshProUGUI>();
             labelText.text = label;
-            labelText.alignment = TextAnchor.MiddleCenter;
+            labelText.alignment = TextAlignmentOptions.Center;
             labelText.fontSize = 40;
             labelText.color = Color.white;
-            labelText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
             return button;
         }

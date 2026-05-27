@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using TMPro;
 
 namespace CardgameProof.Bootstrap
 {
@@ -11,6 +12,7 @@ namespace CardgameProof.Bootstrap
         private void Start()
         {
             Debug.Log("[Bootstrap] GameBootstrap.Start begin");
+            ValidateTextMeshProResources();
             EnsurePortraitResolution();
             EnsureEventSystem();
             Core.AudioManager audioManager = Core.AudioManager.EnsureInstance();
@@ -41,6 +43,14 @@ namespace CardgameProof.Bootstrap
 
             Debug.Log("[Bootstrap] Initializing main menu flow");
             gameController.InitializeMainMenu(rootBuilder);
+        }
+
+        private static void ValidateTextMeshProResources()
+        {
+            if (TMP_Settings.instance == null || TMP_Settings.defaultFontAsset == null)
+            {
+                Debug.LogError("TextMeshPro resources missing. Import TMP Essential Resources from Window > TextMeshPro > Import TMP Essential Resources.");
+            }
         }
 
         private static void EnsurePortraitResolution()

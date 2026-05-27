@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 namespace CardgameProof.Core
 {
@@ -35,7 +36,7 @@ namespace CardgameProof.Core
             panelLayout.childControlHeight = false;
             panelLayout.childControlWidth = true;
 
-            CreateText(panel.transform, "Guia de Apoio", 44, 80f, TextAnchor.MiddleCenter);
+            CreateText(panel.transform, "Guia de Apoio", 44, 80f, TextAlignmentOptions.Center);
 
             GameObject scrollGo = new GameObject("ScrollView", typeof(RectTransform), typeof(Image), typeof(ScrollRect), typeof(LayoutElement));
             scrollGo.transform.SetParent(panel.transform, false);
@@ -106,9 +107,9 @@ namespace CardgameProof.Core
                 boxLayout.childControlHeight = false;
                 boxLayout.childControlWidth = true;
 
-                CreateText(box.transform, character.DisplayName, 30, 52f, TextAnchor.MiddleLeft);
-                CreateText(box.transform, $"Área: {character.Area}", 26, 44f, TextAnchor.MiddleLeft);
-                CreateText(box.transform, character.GuidebookBioPtBr, 24, 132f, TextAnchor.UpperLeft);
+                CreateText(box.transform, character.DisplayName, 30, 52f, TextAlignmentOptions.MidlineLeft);
+                CreateText(box.transform, $"Área: {character.Area}", 26, 44f, TextAlignmentOptions.MidlineLeft);
+                CreateText(box.transform, character.GuidebookBioPtBr, 24, 132f, TextAlignmentOptions.TopLeft);
                 entries.Add(box);
             }
         }
@@ -119,13 +120,12 @@ namespace CardgameProof.Core
             if (root != null) root.SetActive(false);
         }
 
-        private static Text CreateText(Transform parent, string value, int size, float height, TextAnchor anchor)
+        private static TextMeshProUGUI CreateText(Transform parent, string value, int size, float height, TextAlignmentOptions anchor)
         {
-            GameObject go = new GameObject("Text", typeof(RectTransform), typeof(LayoutElement), typeof(Text));
+            GameObject go = new GameObject("Text", typeof(RectTransform), typeof(LayoutElement), typeof(TextMeshProUGUI));
             go.transform.SetParent(parent, false);
             go.GetComponent<LayoutElement>().preferredHeight = height;
-            Text text = go.GetComponent<Text>();
-            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            TextMeshProUGUI text = go.GetComponent<TextMeshProUGUI>();
             text.fontSize = size;
             text.alignment = anchor;
             text.color = Color.white;
@@ -141,13 +141,12 @@ namespace CardgameProof.Core
             go.GetComponent<Image>().color = new Color(0.16f, 0.43f, 0.84f, 1f);
             Button button = go.GetComponent<Button>();
 
-            GameObject labelObj = new GameObject("Label", typeof(RectTransform), typeof(Text));
+            GameObject labelObj = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
             RectTransform lr = labelObj.GetComponent<RectTransform>();
             lr.SetParent(go.transform, false); lr.anchorMin = Vector2.zero; lr.anchorMax = Vector2.one;
-            Text text = labelObj.GetComponent<Text>();
-            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            TextMeshProUGUI text = labelObj.GetComponent<TextMeshProUGUI>();
             text.fontSize = 32;
-            text.alignment = TextAnchor.MiddleCenter;
+            text.alignment = TextAlignmentOptions.Center;
             text.color = Color.white;
             text.text = label;
             return button;

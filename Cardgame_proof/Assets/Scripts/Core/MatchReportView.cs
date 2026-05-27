@@ -1,13 +1,14 @@
 using System;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 namespace CardgameProof.Core
 {
     public sealed class MatchReportView : MonoBehaviour
     {
         private GameObject root;
-        private Text bodyText;
+        private TextMeshProUGUI bodyText;
         private Button copyButton;
         private Button backButton;
         private string currentSummary;
@@ -25,7 +26,7 @@ namespace CardgameProof.Core
             RectTransform pr = panel.GetComponent<RectTransform>();
             pr.SetParent(rt, false); pr.anchorMin = new Vector2(0.05f, 0.05f); pr.anchorMax = new Vector2(0.95f, 0.95f);
 
-            bodyText = CreateText(panel.transform, "Relatório", 24, 1200f, TextAnchor.UpperLeft);
+            bodyText = CreateText(panel.transform, "Relatório", 24, 1200f, TextAlignmentOptions.TopLeft);
             copyButton = CreateButton(panel.transform, "Copiar resumo");
             backButton = CreateButton(panel.transform, "Voltar ao resultado");
             root.SetActive(false);
@@ -42,12 +43,11 @@ namespace CardgameProof.Core
         }
         public void Hide() { if (root != null) root.SetActive(false); }
 
-        private static Text CreateText(Transform parent, string value, int size, float height, TextAnchor anchor)
+        private static TextMeshProUGUI CreateText(Transform parent, string value, int size, float height, TextAlignmentOptions anchor)
         {
-            GameObject go = new GameObject("Text", typeof(RectTransform), typeof(LayoutElement), typeof(Text));
+            GameObject go = new GameObject("Text", typeof(RectTransform), typeof(LayoutElement), typeof(TextMeshProUGUI));
             go.transform.SetParent(parent, false);
             go.GetComponent<LayoutElement>().preferredHeight = height;
-            Text t = go.GetComponent<Text>(); t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); t.fontSize = size; t.color = Color.white; t.text = value; t.alignment = anchor;
             return t;
         }
         private static Button CreateButton(Transform parent, string label)
@@ -55,9 +55,12 @@ namespace CardgameProof.Core
             GameObject go = new GameObject("Button", typeof(RectTransform), typeof(LayoutElement), typeof(Image), typeof(Button));
             go.transform.SetParent(parent, false); go.GetComponent<LayoutElement>().preferredHeight = 90f; go.GetComponent<Image>().color = new Color(0.16f, 0.43f, 0.84f, 1f);
             Button b = go.GetComponent<Button>();
-            Text t = new GameObject("Label", typeof(RectTransform), typeof(Text)).GetComponent<Text>();
+            TextMeshProUGUI t = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI)).GetComponent<TextMeshProUGUI>();
             t.rectTransform.SetParent(go.transform, false); t.rectTransform.anchorMin = Vector2.zero; t.rectTransform.anchorMax = Vector2.one;
-            t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); t.fontSize = 28; t.alignment = TextAnchor.MiddleCenter; t.color = Color.white; t.text = label;
+            t.fontSize = 28;
+            t.alignment = TextAlignmentOptions.Center;
+            t.color = Color.white;
+            t.text = label;
             return b;
         }
     }

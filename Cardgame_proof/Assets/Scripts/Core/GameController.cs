@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 using CardgameProof.Bootstrap;
 
 namespace CardgameProof.Core
@@ -48,10 +49,10 @@ namespace CardgameProof.Core
         private PlayerId currentTurnPlayer = PlayerId.PlayerOne;
 
         private RectTransform hudRoot;
-        private Text hudCurrentPlayer;
-        private Text hudObjective;
-        private Text hudScore;
-        private Text hudResearch;
+        private TextMeshProUGUI hudCurrentPlayer;
+        private TextMeshProUGUI hudObjective;
+        private TextMeshProUGUI hudScore;
+        private TextMeshProUGUI hudResearch;
 
         public GameModeConfig ActiveModeConfig { get; private set; }
         public GamePhase CurrentPhase { get; private set; } = GamePhase.MainMenu;
@@ -90,7 +91,7 @@ namespace CardgameProof.Core
             mainMenuRoot.GetComponent<Image>().color = new Color(0.08f, 0.11f, 0.16f, 1f);
 
             VerticalLayoutGroup layout = menuRootObject.AddComponent<VerticalLayoutGroup>();
-            layout.childAlignment = TextAnchor.MiddleCenter;
+            layout.childAlignment = TextAlignmentOptions.Center;
             layout.padding = new RectOffset(56, 56, 120, 80);
             layout.spacing = 28f; layout.childControlWidth = true;
 
@@ -111,9 +112,13 @@ namespace CardgameProof.Core
             Button button = buttonObj.GetComponent<Button>();
             button.onClick.AddListener(() => OnModeSelected(modeId));
 
-            GameObject labelObj = new GameObject("Label", typeof(RectTransform), typeof(Text));
+            GameObject labelObj = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
             RectTransform lr = labelObj.GetComponent<RectTransform>(); lr.SetParent(buttonObj.transform, false); lr.anchorMin = Vector2.zero; lr.anchorMax = Vector2.one;
-            Text t = labelObj.GetComponent<Text>(); t.text = label; t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); t.fontSize = 52; t.alignment = TextAnchor.MiddleCenter; t.color = Color.white;
+            TextMeshProUGUI t = labelObj.GetComponent<TextMeshProUGUI>();
+            t.text = label;
+            t.fontSize = 52;
+            t.alignment = TextAlignmentOptions.Center;
+            t.color = Color.white;
         }
 
         private void OnModeSelected(string modeId)
@@ -460,7 +465,6 @@ namespace CardgameProof.Core
             return "Pista indisponível no protótipo.";
         }
 
-        private static Text CreateHudText(RectTransform parent, string value) { GameObject go = new GameObject("HudText", typeof(RectTransform), typeof(Text)); go.transform.SetParent(parent, false); Text t = go.GetComponent<Text>(); t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); t.fontSize = 28; t.color = Color.white; t.text = value; return t; }
         private HashSet<ClueCategory> GetKnownClues(PlayerId player, string characterId) { if (!discoveredClues[player].TryGetValue(characterId, out HashSet<ClueCategory> clues)) { clues = new HashSet<ClueCategory>(); discoveredClues[player][characterId] = clues; } return clues; }
         private CharacterData FindCharacterByCardId(string characterId) { foreach (CharacterData character in PrototypeDatabase.Characters) if (characterId.Contains(character.Id, StringComparison.OrdinalIgnoreCase)) return character; return null; }
         private ClueCategory GetLastKnownClue(string characterId) { foreach (ClueCategory category in GetKnownClues(currentTurnPlayer, characterId)) return category; return ClueCategory.Area; }
@@ -560,11 +564,8 @@ namespace CardgameProof.Core
             GameObject go = new GameObject(text + "Button", typeof(RectTransform), typeof(Image), typeof(Button), typeof(LayoutElement));
             go.transform.SetParent(parent, false); go.GetComponent<LayoutElement>().preferredHeight = 88f; go.GetComponent<Image>().color = new Color(0.16f, 0.43f, 0.84f, 1f);
             Button b = go.GetComponent<Button>(); b.onClick.AddListener(() => { AudioManager.Instance?.PlayButton(); onClick?.Invoke(); });
-            GameObject label = new GameObject("Label", typeof(RectTransform), typeof(Text)); RectTransform lr = label.GetComponent<RectTransform>(); lr.SetParent(go.transform, false); lr.anchorMin = Vector2.zero; lr.anchorMax = Vector2.one;
-            Text t = label.GetComponent<Text>(); t.text = text; t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); t.alignment = TextAnchor.MiddleCenter; t.fontSize = 28; t.color = Color.white;
+            GameObject label = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI)); RectTransform lr = label.GetComponent<RectTransform>(); lr.SetParent(go.transform, false); lr.anchorMin = Vector2.zero; lr.anchorMax = Vector2.one;
             return b;
         }
-        private static void CreateTitle(RectTransform parent, string textValue) { GameObject titleObj = new GameObject("MainMenuTitle", typeof(RectTransform), typeof(LayoutElement), typeof(Text)); titleObj.transform.SetParent(parent, false); titleObj.GetComponent<LayoutElement>().preferredHeight = 280f; Text text = titleObj.GetComponent<Text>(); text.text = textValue; text.alignment = TextAnchor.MiddleCenter; text.fontSize = 82; text.color = Color.white; text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); }
-        private static void CreateFooter(RectTransform parent, string textValue) { GameObject spacer = new GameObject("FooterSpacer", typeof(RectTransform), typeof(LayoutElement)); spacer.transform.SetParent(parent, false); spacer.GetComponent<LayoutElement>().flexibleHeight = 1f; GameObject footerObj = new GameObject("MainMenuFooter", typeof(RectTransform), typeof(LayoutElement), typeof(Text)); footerObj.transform.SetParent(parent, false); footerObj.GetComponent<LayoutElement>().preferredHeight = 120f; Text text = footerObj.GetComponent<Text>(); text.text = textValue; text.alignment = TextAnchor.MiddleCenter; text.fontSize = 38; text.color = new Color(0.84f, 0.88f, 0.92f, 1f); text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); }
     }
 }

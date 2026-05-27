@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 namespace CardgameProof.Core
 {
@@ -15,7 +16,7 @@ namespace CardgameProof.Core
     public sealed class BoardCellView : MonoBehaviour
     {
         private Image background;
-        private Text debugLabel;
+        private TextMeshProUGUI debugLabel;
         private Button tapButton;
 
         public Vector2Int Coordinate { get; private set; }
@@ -47,7 +48,7 @@ namespace CardgameProof.Core
 
             if (showDebugLabels)
             {
-                GameObject labelObj = new GameObject("DebugLabel", typeof(RectTransform), typeof(Text));
+                GameObject labelObj = new GameObject("DebugLabel", typeof(RectTransform), typeof(TextMeshProUGUI));
                 RectTransform labelRect = labelObj.GetComponent<RectTransform>();
                 labelRect.SetParent(transform, false);
                 labelRect.anchorMin = Vector2.zero;
@@ -55,9 +56,8 @@ namespace CardgameProof.Core
                 labelRect.offsetMin = Vector2.zero;
                 labelRect.offsetMax = Vector2.zero;
 
-                debugLabel = labelObj.GetComponent<Text>();
-                debugLabel.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-                debugLabel.alignment = TextAnchor.MiddleCenter;
+                debugLabel = labelObj.GetComponent<TextMeshProUGUI>();
+                debugLabel.alignment = TextAlignmentOptions.Center;
                 debugLabel.fontSize = 24;
                 debugLabel.color = new Color(0.05f, 0.05f, 0.05f, 0.8f);
                 debugLabel.text = $"{coordinate.x},{coordinate.y}";
