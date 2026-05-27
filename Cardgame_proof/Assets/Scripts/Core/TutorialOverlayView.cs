@@ -40,7 +40,7 @@ namespace CardgameProof.Core
             {
                 confirmButton.onClick.AddListener(() =>
                 {
-                    Debug.Log($"[TUTORIAL] Continue clicked on step: {currentStepId}");
+                    Debug.Log($"[TUTORIAL] Continue clicked: {currentStepId}");
                     onContinue();
                 });
             }
