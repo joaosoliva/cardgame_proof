@@ -17,7 +17,10 @@ namespace CardgameProof.Core
     {
         private Image background;
         private TextMeshProUGUI debugLabel;
+        private TextMeshProUGUI hiddenLabel;
         private Button tapButton;
+        private bool isSelected;
+        private BoardCellVisualState currentState = BoardCellVisualState.Empty;
 
         public Vector2Int Coordinate { get; private set; }
 
@@ -63,6 +66,18 @@ namespace CardgameProof.Core
                 debugLabel.text = $"{coordinate.x},{coordinate.y}";
             }
 
+            GameObject hiddenObj = new GameObject("HiddenLabel", typeof(RectTransform), typeof(TextMeshProUGUI));
+            RectTransform hiddenRect = hiddenObj.GetComponent<RectTransform>();
+            hiddenRect.SetParent(transform, false);
+            hiddenRect.anchorMin = Vector2.zero; hiddenRect.anchorMax = Vector2.one;
+            hiddenRect.offsetMin = Vector2.zero; hiddenRect.offsetMax = Vector2.zero;
+            hiddenLabel = hiddenObj.GetComponent<TextMeshProUGUI>();
+            hiddenLabel.text = "?";
+            hiddenLabel.alignment = TextAlignmentOptions.Center;
+            hiddenLabel.fontSize = 40;
+            hiddenLabel.color = new Color(0.95f, 0.95f, 0.98f, 1f);
+            hiddenLabel.gameObject.SetActive(false);
+
             SetState(BoardCellVisualState.Empty, true);
         }
 
@@ -72,6 +87,7 @@ namespace CardgameProof.Core
             {
                 return;
             }
+            currentState = state;
 
             Color color;
             switch (state)
@@ -91,6 +107,10 @@ namespace CardgameProof.Core
             }
 
             background.color = color;
+            if (hiddenLabel != null)
+            {
+                hiddenLabel.gameObject.SetActive(state == BoardCellVisualState.Hidden);
+            }
 
             Outline outline = gameObject.GetComponent<Outline>();
             if (showGridLines)
@@ -100,13 +120,19 @@ namespace CardgameProof.Core
                     outline = gameObject.AddComponent<Outline>();
                 }
 
-                outline.effectColor = new Color(0f, 0f, 0f, 0.35f);
+                outline.effectColor = isSelected ? new Color(0.98f, 0.83f, 0.29f, 1f) : new Color(0f, 0f, 0f, 0.35f);
                 outline.effectDistance = new Vector2(1f, -1f);
             }
             else if (outline != null)
             {
                 Destroy(outline);
             }
+        }
+
+        public void SetSelected(bool selected)
+        {
+            isSelected = selected;
+            SetState(currentState, true);
         }
     }
 }

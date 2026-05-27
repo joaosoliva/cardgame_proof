@@ -219,7 +219,7 @@ namespace CardgameProof.Core
 
             RectTransform r1 = CreateActionButton(placedActionsRoot, "Girar", () => { if (selectedPlacedCoordinate.HasValue) { boardController.RotateCard(selectedPlacedCoordinate.Value); matchReportService.OnRotate(); } }).GetComponent<RectTransform>();
             RectTransform r2 = CreateActionButton(placedActionsRoot, "Remover", OnRemoveSelectedPlacedCard).GetComponent<RectTransform>();
-            RectTransform r3 = CreateActionButton(placedActionsRoot, "Confirmar", () => selectedPlacedCoordinate = null).GetComponent<RectTransform>();
+            RectTransform r3 = CreateActionButton(placedActionsRoot, "Confirmar", () => { selectedPlacedCoordinate = null; boardController.SetSelectedCoordinate(null); }).GetComponent<RectTransform>();
             finalizeSetupButton = CreateActionButton(placedActionsRoot, "Finalizar montagem", OnFinalizeSetupPressed);
             RectTransform r4 = finalizeSetupButton.GetComponent<RectTransform>();
             PositionActionButton(r1, x + (width + spacing) * 0f, width);
@@ -256,7 +256,7 @@ namespace CardgameProof.Core
             UpdateFinalizeButtonState();
         }
 
-        private void OnPlacedCardTapped(Vector2Int coordinate) => selectedPlacedCoordinate = coordinate;
+        private void OnPlacedCardTapped(Vector2Int coordinate) { selectedPlacedCoordinate = coordinate; boardController.SetSelectedCoordinate(coordinate); }
         private void OnRemoveSelectedPlacedCard()
         {
             if (!selectedPlacedCoordinate.HasValue) return;
@@ -267,6 +267,7 @@ namespace CardgameProof.Core
             SetupCardView trayCard = trayCards.Find(c => c != null && c.CardData.CardId == placed.CardId);
             if (trayCard != null) trayCard.gameObject.SetActive(true);
             selectedPlacedCoordinate = null;
+            boardController.SetSelectedCoordinate(null);
             UpdateFinalizeButtonState();
         }
         private void UpdateFinalizeButtonState() { int active = 0; foreach (var c in trayCards) if (c != null && c.gameObject.activeSelf) active++; finalizeSetupButton.interactable = active == 0; }

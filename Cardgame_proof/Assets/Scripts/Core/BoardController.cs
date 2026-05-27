@@ -12,6 +12,7 @@ namespace CardgameProof.Core
         private RectTransform boardRoot;
         private GridLayoutGroup grid;
         private Camera uiCamera;
+        private Vector2Int? selectedCoordinate;
 
         public System.Action<Vector2Int> OnPlacedCardTapped;
 
@@ -90,6 +91,7 @@ namespace CardgameProof.Core
 
             boardRoot = null;
             grid = null;
+            selectedCoordinate = null;
         }
 
         public bool ValidatePlacement(PlacedCardData cardData)
@@ -214,6 +216,7 @@ namespace CardgameProof.Core
         {
             if (boardData.TryGetValue(coordinate, out BoardCellData cell) && cell.IsOccupied && cell.Occupant != null)
             {
+                SetSelectedCoordinate(coordinate);
                 OnPlacedCardTapped?.Invoke(coordinate);
                 return;
             }
@@ -221,6 +224,15 @@ namespace CardgameProof.Core
             if (ShowDebugLabels)
             {
                 Debug.Log($"Cell tapped: {coordinate}");
+            }
+        }
+
+        public void SetSelectedCoordinate(Vector2Int? coordinate)
+        {
+            selectedCoordinate = coordinate;
+            foreach (var pair in boardViews)
+            {
+                pair.Value.SetSelected(coordinate.HasValue && pair.Key == coordinate.Value);
             }
         }
     }
