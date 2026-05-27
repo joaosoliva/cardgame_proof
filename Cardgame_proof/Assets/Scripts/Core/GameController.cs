@@ -21,6 +21,7 @@ namespace CardgameProof.Core
         private TutorialOverlayView tutorialOverlay;
         private ReadyScreenView readyScreenView;
         private BoardController boardController;
+        private InvestigationOverlayView investigationOverlayView;
 
         private RectTransform trayRoot;
         private RectTransform placedActionsRoot;
@@ -54,6 +55,7 @@ namespace CardgameProof.Core
 
             EnsureTutorialOverlay();
             EnsureReadyScreenView();
+            EnsureInvestigationOverlayView();
             EnsureBoardController();
 
             RectTransform fullRoot = sceneRoot.FullScreenRoot;
@@ -267,6 +269,7 @@ namespace CardgameProof.Core
         {
             PlacedCardData card = boardController.GetPlacedCard(coordinate);
             if (card == null || card.IsFaceUp) return;
+            if (card.CardType == CardType.Character && blockedCharacterGuesses[currentTurnPlayer].Contains(card.CardId)) return;
 
             card.IsFaceUp = true;
             boardController.RemoveCard(coordinate);
@@ -291,40 +294,81 @@ namespace CardgameProof.Core
 
         private void ResolveCharacterCard(PlacedCardData card)
         {
-            string characterId = card.CardId;
-            ClueCategory category = ClueCategory.Area;
-            string clueText = GetClueText(characterId, category);
-            if (!discoveredClues[currentTurnPlayer].ContainsKey(characterId)) discoveredClues[currentTurnPlayer][characterId] = new HashSet<ClueCategory>();
-            discoveredClues[currentTurnPlayer][characterId].Add(category);
-            blockedCharacterGuesses[currentTurnPlayer].Remove(characterId);
-            Debug.Log($"Dossiê encontrado. Pista ({category}): {clueText}");
-
-            bool guessed = TryPrototypeGuess(characterId);
-            if (!guessed) EndTurnWithPassScreen();
+            ShowClueSelectionOverlay(card.CardId);
         }
 
-        private bool TryPrototypeGuess(string characterId)
+        private void ShowClueSelectionOverlay(string characterId)
         {
-            bool correct = UnityEngine.Random.value > 0.5f;
-            if (!correct)
+            EnsureInvestigationOverlayView();
+            HashSet<ClueCategory> knownClues = GetKnownClues(currentTurnPlayer, characterId);
+            investigationOverlayView.Show("Escolha uma pista", "Selecione uma categoria para revelar uma nova pista.");
+
+            AddClueCategoryButton(characterId, ClueCategory.Area, "Área", knownClues.Contains(ClueCategory.Area));
+            AddClueCategoryButton(characterId, ClueCategory.Era, "Época", knownClues.Contains(ClueCategory.Era));
+            AddClueCategoryButton(characterId, ClueCategory.Region, "Região", knownClues.Contains(ClueCategory.Region));
+            AddClueCategoryButton(characterId, ClueCategory.Contribution, "Contribuição", knownClues.Contains(ClueCategory.Contribution));
+            AddClueCategoryButton(characterId, ClueCategory.ContextLegacy, "Contexto/Legado", knownClues.Contains(ClueCategory.ContextLegacy));
+        }
+
+        private void AddClueCategoryButton(string characterId, ClueCategory category, string label, bool alreadyKnown)
+        {
+            string buttonText = alreadyKnown ? $"{label} (já conhecida)" : label;
+            investigationOverlayView.AddButton(buttonText, () => OnClueSelected(characterId, category), !alreadyKnown);
+        }
+
+        private void OnClueSelected(string characterId, ClueCategory category)
+        {
+            HashSet<ClueCategory> knownClues = GetKnownClues(currentTurnPlayer, characterId);
+            knownClues.Add(category);
+            blockedCharacterGuesses[currentTurnPlayer].Remove(characterId);
+            string clueText = GetClueText(characterId, category);
+            LogTelemetry("clue_requested", $"character={characterId};category={category}");
+
+            investigationOverlayView.Show("Pista revelada", $"{GetCategoryLabel(category)}
+
+{clueText}");
+            investigationOverlayView.AddButton("Tentar identificar", () => ShowGuessOverlay(characterId));
+            investigationOverlayView.AddButton("Encerrar turno", EndTurnAfterOverlay);
+        }
+
+        private void ShowGuessOverlay(string characterId)
+        {
+            investigationOverlayView.Show("Escolha a personagem", "Selecione um nome e confirme sua identificação.");
+            foreach (CharacterData character in PrototypeDatabase.Characters)
             {
-                blockedCharacterGuesses[currentTurnPlayer].Add(characterId);
-                Debug.Log("Palpite incorreto. Descubra outra pista antes de tentar este personagem novamente.");
-                return false;
+                string selectedName = character.DisplayName;
+                investigationOverlayView.AddButton(selectedName, () => ResolveGuess(characterId, selectedName));
+            }
+            investigationOverlayView.AddButton("Voltar", () => OnClueSelected(characterId, GetLastKnownClue(characterId)));
+        }
+
+        private void ResolveGuess(string characterId, string guessedName)
+        {
+            CharacterData target = FindCharacterByCardId(characterId);
+            bool correct = target != null && string.Equals(target.DisplayName, guessedName, StringComparison.Ordinal);
+            LogTelemetry("guess_made", $"character={characterId};guess={guessedName}");
+
+            if (correct)
+            {
+                LogTelemetry("guess_correct", $"character={characterId};guess={guessedName}");
+                scores[currentTurnPlayer] += 1;
+                identifiedCharacters[currentTurnPlayer].Add(characterId);
+                UpdateHud();
+                investigationOverlayView.Show("Resultado", "Identificação correta!");
+                investigationOverlayView.AddButton("Encerrar turno", EndTurnAfterOverlay);
+                return;
             }
 
-            scores[currentTurnPlayer] += 1;
-            identifiedCharacters[currentTurnPlayer].Add(characterId);
-            Debug.Log("Palpite correto! +1 ponto.");
-            UpdateHud();
+            LogTelemetry("guess_wrong", $"character={characterId};guess={guessedName}");
+            blockedCharacterGuesses[currentTurnPlayer].Add(characterId);
+            investigationOverlayView.Show("Resultado", "Ainda não. Você precisa de mais uma pista antes de tentar novamente.");
+            investigationOverlayView.AddButton("Encerrar turno", EndTurnAfterOverlay);
+        }
 
-            if (scores[currentTurnPlayer] >= ActiveModeConfig.ObjectiveIdentifications)
-            {
-                Debug.Log($"Vitória de {currentTurnPlayer}!");
-                return true;
-            }
-
-            return false;
+        private void EndTurnAfterOverlay()
+        {
+            investigationOverlayView.Hide();
+            EndTurnWithPassScreen();
         }
 
         private void EndTurnWithPassScreen()
@@ -396,6 +440,49 @@ namespace CardgameProof.Core
             return t;
         }
 
+
+        private HashSet<ClueCategory> GetKnownClues(PlayerId player, string characterId)
+        {
+            if (!discoveredClues[player].TryGetValue(characterId, out HashSet<ClueCategory> clues))
+            {
+                clues = new HashSet<ClueCategory>();
+                discoveredClues[player][characterId] = clues;
+            }
+            return clues;
+        }
+
+        private CharacterData FindCharacterByCardId(string characterId)
+        {
+            foreach (CharacterData character in PrototypeDatabase.Characters)
+            {
+                if (characterId.Contains(character.Id, StringComparison.OrdinalIgnoreCase)) return character;
+            }
+            return null;
+        }
+
+        private ClueCategory GetLastKnownClue(string characterId)
+        {
+            foreach (ClueCategory category in GetKnownClues(currentTurnPlayer, characterId)) return category;
+            return ClueCategory.Area;
+        }
+
+        private static string GetCategoryLabel(ClueCategory category)
+        {
+            return category switch
+            {
+                ClueCategory.Area => "Área",
+                ClueCategory.Era => "Época",
+                ClueCategory.Region => "Região",
+                ClueCategory.Contribution => "Contribuição",
+                _ => "Contexto/Legado"
+            };
+        }
+
+        private static void LogTelemetry(string eventName, string payload)
+        {
+            Debug.Log($"telemetry:{eventName}:{payload}");
+        }
+
         private void HideSetupSensitiveUi()
         {
             if (trayRoot != null) trayRoot.gameObject.SetActive(false);
@@ -427,6 +514,15 @@ namespace CardgameProof.Core
             overlayObject.transform.SetParent(sceneRoot.OverlayLayer, false);
             tutorialOverlay = overlayObject.AddComponent<TutorialOverlayView>();
             tutorialOverlay.Initialize(sceneRoot.OverlayLayer);
+        }
+
+        private void EnsureInvestigationOverlayView()
+        {
+            if (investigationOverlayView != null) return;
+            GameObject go = new GameObject("InvestigationOverlayView");
+            go.transform.SetParent(sceneRoot.OverlayLayer, false);
+            investigationOverlayView = go.AddComponent<InvestigationOverlayView>();
+            investigationOverlayView.Initialize(sceneRoot.OverlayLayer);
         }
 
         private void EnsureReadyScreenView()
