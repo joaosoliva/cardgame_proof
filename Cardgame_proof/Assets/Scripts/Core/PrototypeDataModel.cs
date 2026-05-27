@@ -17,7 +17,8 @@ namespace CardgameProof.Core
     public enum CardType
     {
         Character,
-        Archive
+        Archive,
+        SemRegistro
     }
 
     public enum PlayerId

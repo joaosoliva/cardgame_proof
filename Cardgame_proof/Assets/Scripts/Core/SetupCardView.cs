@@ -69,6 +69,14 @@ namespace CardgameProof.Core
                 return;
             }
 
+            if (CardData.CardType == CardType.SemRegistro)
+            {
+                CreateLabel("Title", "Sem Registro", 0.78f, 26);
+                CreateLabel("Type", "Nada encontrado nesta posição.", 0.53f, 20);
+                CreateLabel("Effect", "Nenhum efeito.", 0.30f, 18);
+                return;
+            }
+
             ArchiveCardData archive = FindArchiveFromCardId(CardData.CardId);
             CreateLabel("Title", archive?.Title ?? "Dado não cadastrado", 0.78f, 26);
             CreateLabel("Type", "Arquivo", 0.53f, 20);

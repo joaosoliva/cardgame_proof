@@ -13,7 +13,7 @@ namespace CardgameProof.Core
         {
             new TutorialStep { Id = "welcome_archive", Title = "Bem-vindo ao Arquivo", Body = "Neste jogo, vocês investigam personagens importantes da ciência e da academia. O objetivo é descobrir quem está escondido no arquivo do outro jogador.", Phase = GamePhase.TutorialIntro, TargetKey = "main_menu", OnlyShowOnce = true },
             new TutorialStep { Id = "build_archive", Title = "Monte seu arquivo", Body = "Arraste suas cartas para a grade. Personagens e cartas de arquivo ficarão escondidos do adversário.", Phase = GamePhase.Setup, TargetKey = "board_grid", OnlyShowOnce = true },
-            new TutorialStep { Id = "rotate_reposition", Title = "Girar e reposicionar", Body = "Toque em uma carta posicionada para girar, remover ou ajustar sua posição antes de confirmar.", Phase = GamePhase.Setup, TargetKey = "placed_card_actions", OnlyShowOnce = true }
+            new TutorialStep { Id = "sem_registro", Title = "Sem Registro", Body = "Algumas cartas representam partes do arquivo onde nada útil foi encontrado. Elas revelam apenas 'Sem Registro' e ajudam a reduzir o espaço de busca.", Phase = GamePhase.Setup, TargetKey = "placed_card_actions", OnlyShowOnce = true }
         };
 
         private SceneRootBuilder sceneRoot;
@@ -214,29 +214,32 @@ namespace CardgameProof.Core
             placedActionsRoot.offsetMin = new Vector2(16f, 12f); placedActionsRoot.offsetMax = new Vector2(-16f, -12f);
 
             float spacing = 14f;
-            float width = (sceneRoot.ActionArea.rect.width - 32f - (spacing * 3f)) / 4f;
+            float width = (sceneRoot.ActionArea.rect.width - 32f - (spacing * 2f)) / 3f;
             if (width < 200f) width = 200f;
-            float x = width * -1.5f - spacing * 1.5f;
+            float x = width * -1f - spacing;
 
-            RectTransform r1 = CreateActionButton(placedActionsRoot, "Girar", () => { if (selectedPlacedCoordinate.HasValue) { boardController.RotateCard(selectedPlacedCoordinate.Value); matchReportService.OnRotate(); } }).GetComponent<RectTransform>();
-            RectTransform r2 = CreateActionButton(placedActionsRoot, "Remover", OnRemoveSelectedPlacedCard).GetComponent<RectTransform>();
-            RectTransform r3 = CreateActionButton(placedActionsRoot, "Confirmar", () => { selectedPlacedCoordinate = null; boardController.SetSelectedCoordinate(null); }).GetComponent<RectTransform>();
+            RectTransform r1 = CreateActionButton(placedActionsRoot, "Remover", OnRemoveSelectedPlacedCard).GetComponent<RectTransform>();
+            RectTransform r2 = CreateActionButton(placedActionsRoot, "Confirmar", () => { selectedPlacedCoordinate = null; boardController.SetSelectedCoordinate(null); }).GetComponent<RectTransform>();
             finalizeSetupButton = CreateActionButton(placedActionsRoot, "Finalizar montagem", OnFinalizeSetupPressed);
-            RectTransform r4 = finalizeSetupButton.GetComponent<RectTransform>();
+            RectTransform r3 = finalizeSetupButton.GetComponent<RectTransform>();
             PositionActionButton(r1, x + (width + spacing) * 0f, width);
             PositionActionButton(r2, x + (width + spacing) * 1f, width);
             PositionActionButton(r3, x + (width + spacing) * 2f, width);
-            PositionActionButton(r4, x + (width + spacing) * 3f, width);
         }
 
         private void GenerateCurrentPlayerSetupCards(PlayerId player)
         {
             foreach (var card in trayCards) if (card != null) Destroy(card.gameObject);
             trayCards.Clear();
-            int total = ActiveModeConfig.CharactersPerPlayer + ActiveModeConfig.ArchiveCardsPerPlayer;
+            int totalBoardCells = ActiveModeConfig.BoardSize.x * ActiveModeConfig.BoardSize.y;
+            int semRegistroCount = Mathf.Max(0, totalBoardCells - ActiveModeConfig.CharactersPerPlayer - ActiveModeConfig.ArchiveCardsPerPlayer);
+            int total = ActiveModeConfig.CharactersPerPlayer + ActiveModeConfig.ArchiveCardsPerPlayer + semRegistroCount;
             for (int i = 0; i < total; i++)
             {
-                CardType type = i < ActiveModeConfig.CharactersPerPlayer ? CardType.Character : CardType.Archive;
+                CardType type;
+                if (i < ActiveModeConfig.CharactersPerPlayer) type = CardType.Character;
+                else if (i < ActiveModeConfig.CharactersPerPlayer + ActiveModeConfig.ArchiveCardsPerPlayer) type = CardType.Archive;
+                else type = CardType.SemRegistro;
                 string cardId = BuildPrototypeCardIdForSetup(player, type, i);
                 var placed = new PlacedCardData { CardId = cardId, CardType = type, Owner = player, Coordinate = Vector2Int.zero, IsFaceUp = false };
                 GameObject go = new GameObject($"SetupCard_{i}", typeof(RectTransform), typeof(Image), typeof(LayoutElement), typeof(CanvasGroup));
@@ -259,6 +262,12 @@ namespace CardgameProof.Core
                     return $"{player}_character_missing_{setupIndex}";
                 }
                 return $"{player}_{character.Id}_{setupIndex}";
+            }
+
+            if (type == CardType.SemRegistro)
+            {
+                int semIndex = setupIndex - ActiveModeConfig.CharactersPerPlayer - ActiveModeConfig.ArchiveCardsPerPlayer;
+                return $"{player}_sem_registro_{semIndex}";
             }
 
             int archiveIndex = setupIndex - ActiveModeConfig.CharactersPerPlayer;
@@ -362,13 +371,28 @@ namespace CardgameProof.Core
         {
             if (CurrentPhase != GamePhase.Investigation) return;
             PlacedCardData card = boardController.GetPlacedCard(coordinate);
-            if (card == null || card.IsFaceUp) return;
+            if (card == null) return;
+            if (card.IsFaceUp)
+            {
+                EnsureInvestigationOverlayView();
+                investigationOverlayView.Show("Investigação", "Esta parte do arquivo já foi investigada.");
+                investigationOverlayView.AddButton("Fechar", investigationOverlayView.Hide);
+                return;
+            }
             AudioManager.Instance?.PlayReveal();
             if (card.CardType == CardType.Character && blockedCharacterGuesses[currentTurnPlayer].Contains(card.CardId)) return;
             matchReportService.MarkFirstInvestigation();
             card.IsFaceUp = true; boardController.RemoveCard(coordinate); boardController.PlaceCard(card);
             if (card.CardType == CardType.Archive) { EnsureInvestigationOverlayView(); ResolveArchiveCard(card); return; }
+            if (card.CardType == CardType.SemRegistro) { ResolveSemRegistroCard(card); return; }
             ResolveCharacterCard(card);
+        }
+        private void ResolveSemRegistroCard(PlacedCardData card)
+        {
+            matchReportService.OnNoRecordRevealed();
+            EnsureInvestigationOverlayView();
+            investigationOverlayView.Show("Sem Registro", "Nenhum dossiê útil foi encontrado nesta parte do arquivo.");
+            investigationOverlayView.AddButton("Encerrar turno", EndTurnAfterOverlay);
         }
 
         private void ResolveArchiveCard(PlacedCardData card)
@@ -580,7 +604,7 @@ namespace CardgameProof.Core
             investigationOverlayView.AddButton("Cancelar", investigationOverlayView.Hide);
         }
         private void ShowGuidebookOverlay() { EnsureGuidebookOverlayView(); guidebookOverlayView.Show(PrototypeDatabase.Characters); }
-        private void ShowRulesOverlay() { EnsureInvestigationOverlayView(); investigationOverlayView.Show("Resumo das Regras", "1. Investigue posições no arquivo adversário.\n2. Ao encontrar um personagem, peça uma pista.\n3. Use as pistas para identificar quem é.\n4. Você pode gastar Fichas de Pesquisa para consultar o Guia de Apoio.\n5. Cartas de Arquivo dão efeitos úteis.\n6. Vence quem completar o objetivo do modo escolhido."); investigationOverlayView.AddButton("Fechar", investigationOverlayView.Hide); }
+        private void ShowRulesOverlay() { EnsureInvestigationOverlayView(); investigationOverlayView.Show("Resumo das Regras", "1. Investigue cartas no arquivo adversário.\n2. Se encontrar um Dossiê, peça uma pista e tente identificar o personagem.\n3. Se encontrar uma Carta de Arquivo, revele e resolva seu efeito.\n4. Se encontrar Sem Registro, apenas marque aquela carta como investigada.\n5. Personagens só revelam sua identidade após uma identificação correta.\n6. Vence quem completar o objetivo do modo escolhido."); investigationOverlayView.AddButton("Fechar", investigationOverlayView.Hide); }
 
         private void HideSetupSensitiveUi()
         {

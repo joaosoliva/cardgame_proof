@@ -42,6 +42,7 @@ namespace CardgameProof.Core
             public int ArchiveFragmento;
             public int ArchiveEffectsSuccess;
             public int ArchiveEffectsNoTarget;
+            public int NoRecordRevealed;
             public TimeSpan SetupP1;
             public TimeSpan SetupP2;
             public int Rotations;
@@ -70,6 +71,7 @@ namespace CardgameProof.Core
         public void OnGuess(bool correct, string characterId) { if (!report.FirstGuess.HasValue) report.FirstGuess = DateTime.UtcNow - report.StartTimeUtc; if (correct) { if (!report.FirstCorrect.HasValue) report.FirstCorrect = DateTime.UtcNow - report.StartTimeUtc; report.CharactersCorrect++; } else report.WrongGuesses++; }
         public void OnArchiveRevealed(string effectName) { report.ArchiveRevealed++; if (effectName.Contains("lacuna")) report.ArchiveLacuna++; else if (effectName.Contains("referencia")) report.ArchiveReferencia++; else report.ArchiveFragmento++; }
         public void OnArchiveResolution(bool success) { if (success) report.ArchiveEffectsSuccess++; else report.ArchiveEffectsNoTarget++; }
+        public void OnNoRecordRevealed() => report.NoRecordRevealed++;
         public void OnRotate() => report.Rotations++;
         public void OnInvalidPlacement() => report.InvalidPlacements++;
         public void OnRepositionOrRemove() => report.RepositionsOrRemovals++;
@@ -97,15 +99,19 @@ namespace CardgameProof.Core
             if (report.InvalidPlacements >= 3) interpret += "Leitura: a montagem do tabuleiro gerou confusão. Talvez seja necessário melhorar o feedback visual de posicionamento.\n";
             if (report.ArchiveEffectsNoTarget >= 2) interpret += "Leitura: algumas Cartas de Arquivo não conseguiram resolver seus efeitos. Talvez os efeitos precisem ser mais simples ou flexíveis.\n";
             if (report.TotalDuration.TotalMinutes <= 5 && report.CharactersCorrect > 0) interpret += "Leitura: o ritmo da partida parece adequado para demonstração curta.\n";
+            if (report.NoRecordRevealed >= 3 && !report.FirstCharacterFound.HasValue) interpret += "Leitura: muitos Sem Registro apareceram antes do primeiro dossiê. Talvez o grid esteja grande demais ou a densidade de cartas úteis esteja baixa.\n";
+            if (report.NoRecordRevealed > 0) interpret += "Leitura: Sem Registro funcionou como feedback de investigação sem recompensar diretamente o erro.\n";
 
             return $"[Resultado]\nModo jogado: {report.ModeName}\nVencedor: {report.Winner}\nPlacar final: J1 {report.ScoreP1} x {report.ScoreP2} J2\nDuração total da partida: {report.TotalDuration:mm\\:ss}\nTotal de turnos: {report.TotalTurns}\n\n" +
                    $"[Ritmo da partida]\nPrimeira investigação: {Fmt(report.FirstInvestigation)}\nPrimeiro personagem encontrado: {Fmt(report.FirstCharacterFound)}\nPrimeira pista solicitada: {Fmt(report.FirstClue)}\nPrimeira tentativa de identificação: {Fmt(report.FirstGuess)}\nPrimeira identificação correta: {Fmt(report.FirstCorrect)}\n\n" +
                    $"[Dedução]\nPersonagens encontrados: {report.CharactersFound}\nPersonagens identificados corretamente: {report.CharactersCorrect}\nTentativas erradas: {report.WrongGuesses}\nMédia de pistas antes do acerto: {report.AvgCluesBeforeCorrect:0.00}\nCategoria de pista mais usada: {topClue}\n\n" +
                    $"[Pesquisa]\nUsos do Guia de Apoio: {report.GuidebookOpens}\nFichas de Pesquisa usadas: {report.ResearchUsed}\nO guia foi usado antes de algum acerto? {(report.GuidebookBeforeCorrect ? "Sim" : "Não")}\n\n" +
                    $"[Cartas de Arquivo]\nCartas de Arquivo reveladas: {report.ArchiveRevealed}\nTipo mais revelado: {MostArchiveType()}\nEfeitos sem alvo válido: {report.ArchiveEffectsNoTarget}\n\n" +
+                   $"[Sem Registro]\nSem Registro revelados: {report.NoRecordRevealed}\n% de investigações em Sem Registro: {PctNoRecord():0.0}%\n\n" +
                    $"[Montagem]\nTempo de montagem do Jogador 1: {report.SetupP1:mm\\:ss}\nTempo de montagem do Jogador 2: {report.SetupP2:mm\\:ss}\nRotações de carta: {report.Rotations}\nPosicionamentos inválidos: {report.InvalidPlacements}\n\n" +
                    $"{interpret}";
         }
+        private float PctNoRecord() => report.TotalTurns <= 0 ? 0f : (report.NoRecordRevealed / Mathf.Max(1f, report.TotalTurns)) * 100f;
 
         private string MostArchiveType()
         {
