@@ -22,6 +22,7 @@ namespace CardgameProof.Core
         private ReadyScreenView readyScreenView;
         private BoardController boardController;
         private InvestigationOverlayView investigationOverlayView;
+        private GuidebookOverlayView guidebookOverlayView;
 
         private RectTransform trayRoot;
         private RectTransform placedActionsRoot;
@@ -402,8 +403,8 @@ namespace CardgameProof.Core
             RectTransform buttonsRow = new GameObject("HUDButtons", typeof(RectTransform), typeof(HorizontalLayoutGroup)).GetComponent<RectTransform>();
             buttonsRow.SetParent(hudRoot, false);
             buttonsRow.GetComponent<HorizontalLayoutGroup>().spacing = 12f;
-            CreateActionButton(buttonsRow, "Guia", () => Debug.Log("Abrir guia"));
-            CreateActionButton(buttonsRow, "Regras", () => Debug.Log("Abrir regras"));
+            CreateActionButton(buttonsRow, "Guia de Apoio", OnGuidebookButtonPressed);
+            CreateActionButton(buttonsRow, "Regras", ShowRulesOverlay);
         }
 
         private void UpdateHud()
@@ -412,7 +413,7 @@ namespace CardgameProof.Core
             hudCurrentPlayer.text = $"Jogador atual: {(currentTurnPlayer == PlayerId.PlayerOne ? "Jogador 1" : "Jogador 2")}";
             hudObjective.text = $"Objetivo: identificar {ActiveModeConfig.ObjectiveIdentifications}";
             hudScore.text = $"Placar J1 {scores[PlayerId.PlayerOne]} x {scores[PlayerId.PlayerTwo]} J2";
-            hudResearch.text = $"Pesquisa restante: J1 {researchTokens[PlayerId.PlayerOne]} | J2 {researchTokens[PlayerId.PlayerTwo]}";
+            hudResearch.text = $"Fichas de Pesquisa: {researchTokens[currentTurnPlayer]}";
         }
 
         private string GetClueText(string characterId, ClueCategory category)
@@ -483,6 +484,43 @@ namespace CardgameProof.Core
             Debug.Log($"telemetry:{eventName}:{payload}");
         }
 
+        private void OnGuidebookButtonPressed()
+        {
+            EnsureInvestigationOverlayView();
+            int tokens = researchTokens[currentTurnPlayer];
+            if (tokens <= 0)
+            {
+                investigationOverlayView.Show("Guia de Apoio", "Você não tem Fichas de Pesquisa restantes.");
+                investigationOverlayView.AddButton("Fechar", investigationOverlayView.Hide);
+                return;
+            }
+
+            investigationOverlayView.Show("Guia de Apoio", "Gastar 1 Ficha de Pesquisa para abrir o guia?");
+            investigationOverlayView.AddButton("Confirmar", () =>
+            {
+                researchTokens[currentTurnPlayer] = Mathf.Max(0, researchTokens[currentTurnPlayer] - 1);
+                UpdateHud();
+                investigationOverlayView.Hide();
+                ShowGuidebookOverlay();
+            });
+            investigationOverlayView.AddButton("Cancelar", investigationOverlayView.Hide);
+        }
+
+        private void ShowGuidebookOverlay()
+        {
+            EnsureGuidebookOverlayView();
+            guidebookOverlayView.Show(PrototypeDatabase.Characters);
+        }
+
+        private void ShowRulesOverlay()
+        {
+            EnsureInvestigationOverlayView();
+            investigationOverlayView.Show(
+                "Resumo das Regras",
+                "1. Investigue posições no arquivo adversário.\n2. Ao encontrar um personagem, peça uma pista.\n3. Use as pistas para identificar quem é.\n4. Você pode gastar Fichas de Pesquisa para consultar o Guia de Apoio.\n5. Cartas de Arquivo dão efeitos úteis.\n6. Vence quem completar o objetivo do modo escolhido.");
+            investigationOverlayView.AddButton("Fechar", investigationOverlayView.Hide);
+        }
+
         private void HideSetupSensitiveUi()
         {
             if (trayRoot != null) trayRoot.gameObject.SetActive(false);
@@ -523,6 +561,15 @@ namespace CardgameProof.Core
             go.transform.SetParent(sceneRoot.OverlayLayer, false);
             investigationOverlayView = go.AddComponent<InvestigationOverlayView>();
             investigationOverlayView.Initialize(sceneRoot.OverlayLayer);
+        }
+
+        private void EnsureGuidebookOverlayView()
+        {
+            if (guidebookOverlayView != null) return;
+            GameObject go = new GameObject("GuidebookOverlayView");
+            go.transform.SetParent(sceneRoot.OverlayLayer, false);
+            guidebookOverlayView = go.AddComponent<GuidebookOverlayView>();
+            guidebookOverlayView.Initialize(sceneRoot.OverlayLayer);
         }
 
         private void EnsureReadyScreenView()
