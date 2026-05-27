@@ -52,6 +52,11 @@ namespace CardgameProof.Core
             public int Rotations;
             public int InvalidPlacements;
             public int RepositionsOrRemovals;
+            public int GuessAttemptsFromFreshDiscovery;
+            public int GuessAttemptsFromPersistentAction;
+            public int RepeatedGuessesAfterWrong;
+            public int TurnsWithoutHiddenCards;
+            public int EndgameSafeguardTriggered;
         }
 
         private readonly Report report = new Report();
@@ -86,6 +91,10 @@ namespace CardgameProof.Core
         public void OnRotate() => report.Rotations++;
         public void OnInvalidPlacement() => report.InvalidPlacements++;
         public void OnRepositionOrRemove() => report.RepositionsOrRemovals++;
+        public void OnGuessAttemptSource(bool fromFreshDiscovery) { if (fromFreshDiscovery) report.GuessAttemptsFromFreshDiscovery++; else report.GuessAttemptsFromPersistentAction++; }
+        public void OnRepeatedGuessAfterWrongAttempt(string characterId) { if (report.WrongGuesses > 0) report.RepeatedGuessesAfterWrong++; }
+        public void OnNoHiddenCardsTurn() => report.TurnsWithoutHiddenCards++;
+        public void OnEndgameSafeguardTriggered() => report.EndgameSafeguardTriggered++;
 
         public Report Finish(string winner, int p1, int p2)
         {
@@ -112,13 +121,15 @@ namespace CardgameProof.Core
             if (report.TotalDuration.TotalMinutes <= 5 && report.CharactersCorrect > 0) interpret += "Leitura: o ritmo da partida parece adequado para demonstração curta.\n";
             if (report.NoRecordRevealed >= 3 && !report.FirstCharacterFound.HasValue) interpret += "Leitura: muitos Sem Registro apareceram antes do primeiro dossiê. Talvez o grid esteja grande demais ou a densidade de cartas úteis esteja baixa.\n";
             if (report.NoRecordRevealed > 0) interpret += "Leitura: Sem Registro funcionou como feedback de investigação sem recompensar diretamente o erro.\n";
+            if (report.EndgameSafeguardTriggered > 0) interpret += "Leitura: o jogo entrou em modo de resolução porque não havia mais cartas ocultas úteis. Isso evitou soft lock.\n";
+            if (report.WrongGuesses >= 3) interpret += "Leitura: os jogadores estão tentando identificar com poucas pistas. Talvez o Guia de Apoio precise ser mais útil ou destacado.\n";
 
             return $"[Resultado]\nModo jogado: {report.ModeName}\nVencedor: {report.Winner}\nPlacar final: J1 {report.ScoreP1} x {report.ScoreP2} J2\nDuração total da partida: {report.TotalDuration:mm\\:ss}\nTotal de turnos: {report.TotalTurns}\n\n" +
                    $"[Ritmo da partida]\nPrimeira investigação: {Fmt(report.FirstInvestigation)}\nPrimeiro personagem encontrado: {Fmt(report.FirstCharacterFound)}\nPrimeira pista solicitada: {Fmt(report.FirstClue)}\nPrimeira tentativa de identificação: {Fmt(report.FirstGuess)}\nPrimeira identificação correta: {Fmt(report.FirstCorrect)}\n\n" +
-                   $"[Dedução]\nPersonagens encontrados: {report.CharactersFound}\nPersonagens identificados corretamente: {report.CharactersCorrect}\nTentativas erradas: {report.WrongGuesses}\nMédia de pistas antes do acerto: {report.AvgCluesBeforeCorrect:0.00}\nCategoria de pista mais usada: {topClue}\n\n" +
+                   $"[Dedução]\nPersonagens encontrados: {report.CharactersFound}\nPersonagens identificados corretamente: {report.CharactersCorrect}\nTentativas erradas: {report.WrongGuesses}\nTentativas de identificação (descoberta fresca): {report.GuessAttemptsFromFreshDiscovery}\nTentativas de identificação (ação persistente): {report.GuessAttemptsFromPersistentAction}\nRepetições após erro: {report.RepeatedGuessesAfterWrong}\nMédia de pistas antes do acerto: {report.AvgCluesBeforeCorrect:0.00}\nCategoria de pista mais usada: {topClue}\n\n" +
                    $"[Pesquisa]\nUsos do Guia de Apoio: {report.GuidebookOpens}\nFichas de Pesquisa usadas: {report.ResearchUsed}\nO guia foi usado antes de algum acerto? {(report.GuidebookBeforeCorrect ? "Sim" : "Não")}\n\n" +
                    $"[Cartas de Arquivo]\nCartas de Arquivo reveladas: {report.ArchiveRevealed}\nTipo mais revelado: {MostArchiveType()}\nEfeitos sem alvo válido: {report.ArchiveEffectsNoTarget}\n\n" +
-                   $"[Sem Registro]\nSem Registro revelados: {report.NoRecordRevealed}\n% de investigações em Sem Registro: {PctNoRecord():0.0}%\n\n" +
+                   $"[Sem Registro]\nSem Registro revelados: {report.NoRecordRevealed}\n% de investigações em Sem Registro: {PctNoRecord():0.0}%\nTurnos sem cartas ocultas restantes: {report.TurnsWithoutHiddenCards}\nSafeguard anti-soft-lock acionado: {report.EndgameSafeguardTriggered}\n\n" +
                    $"[Montagem]\nTempo de montagem do Jogador 1: {report.SetupP1:mm\\:ss}\nTempo de montagem do Jogador 2: {report.SetupP2:mm\\:ss}\nSem Registro automáticos J1: {report.AutoNoRecordP1}\nSem Registro automáticos J2: {report.AutoNoRecordP2}\nSem Registro automáticos total: {report.AutoNoRecordTotal}\nDuração total do preenchimento automático: {report.AutoFillDurationSeconds:0.00}s\nRotações de carta: {report.Rotations}\nPosicionamentos inválidos: {report.InvalidPlacements}\n\n" +
                    $"{interpret}";
         }
