@@ -78,7 +78,7 @@ namespace CardgameProof.Core
             {
                 mainMenuRoot = fullRoot.Find("MainMenuRoot") as RectTransform;
                 if (mainMenuRoot != null) mainMenuRoot.gameObject.SetActive(true);
-                CurrentPhase = GamePhase.MainMenu;
+                SetPhase(GamePhase.MainMenu);
                 Debug.Log("[GameController] Entered MainMenu phase");
                 return;
             }
@@ -99,7 +99,7 @@ namespace CardgameProof.Core
             CreateModeButton(mainMenuRoot, "Partida Rápida — 5 min", "quick_5");
             CreateModeButton(mainMenuRoot, "Partida Completa — 10 min", "full_10");
             CreateFooter(mainMenuRoot, "Protótipo digital para teste de jogo físico");
-            CurrentPhase = GamePhase.MainMenu;
+            SetPhase(GamePhase.MainMenu);
             Debug.Log("[GameController] Entered MainMenu phase");
         }
 
@@ -154,7 +154,7 @@ namespace CardgameProof.Core
 
         public void LoadPrototypeMode(string modeId) => ActiveModeConfig = PrototypeDatabase.GetMode(modeId);
         public void ShowTutorialSequence(IReadOnlyList<TutorialStep> sequence) { EnsureTutorialOverlay(); tutorialOverlay?.ShowSequence(sequence); }
-        private void TransitionToTutorialIntro() => CurrentPhase = GamePhase.TutorialIntro;
+        private void TransitionToTutorialIntro() => SetPhase(GamePhase.TutorialIntro);
 
         private void StartPassAndPlaySetup()
         {
@@ -168,7 +168,8 @@ namespace CardgameProof.Core
         {
             currentSetupPlayer = player;
             matchReportService.StartSetup(player);
-            CurrentPhase = GamePhase.Setup;
+            SetPhase(GamePhase.Setup);
+            RestoreBoardVisualState();
             if (sceneRoot?.CenterBoardArea != null) sceneRoot.CenterBoardArea.gameObject.SetActive(true);
             BuildBoardForActiveMode();
             BuildBottomTray();
@@ -275,7 +276,8 @@ namespace CardgameProof.Core
         private void StartInvestigationPhase()
         {
             HideReadyScreen();
-            CurrentPhase = GamePhase.Investigation;
+            SetPhase(GamePhase.Investigation);
+            RestoreBoardVisualState();
             if (sceneRoot?.CenterBoardArea != null) sceneRoot.CenterBoardArea.gameObject.SetActive(true);
             BuildInvestigationHud();
             scores[PlayerId.PlayerOne] = 0; scores[PlayerId.PlayerTwo] = 0;
@@ -293,6 +295,7 @@ namespace CardgameProof.Core
 
         private void ShowOpponentBoardForCurrentTurn()
         {
+            RestoreBoardVisualState();
             PlayerId opponent = currentTurnPlayer == PlayerId.PlayerOne ? PlayerId.PlayerTwo : PlayerId.PlayerOne;
             boardController.ClearBoard();
             boardController.BuildBoard(sceneRoot.CenterBoardArea, ActiveModeConfig.BoardSize, null);
@@ -406,7 +409,7 @@ namespace CardgameProof.Core
         }
 
         private void EndTurnAfterOverlay() { investigationOverlayView.Hide(); EndTurnWithPassScreen(); }
-        private void EndTurnWithPassScreen() { PlayerId next = currentTurnPlayer == PlayerId.PlayerOne ? PlayerId.PlayerTwo : PlayerId.PlayerOne; ShowReadyScreen("Passe o aparelho para o próximo jogador", "Estou pronto", () => { currentTurnPlayer = next; matchReportService.TurnStart(currentTurnPlayer); HideReadyScreen(); ShowOpponentBoardForCurrentTurn(); UpdateHud(); }); }
+        private void EndTurnWithPassScreen() { PlayerId next = currentTurnPlayer == PlayerId.PlayerOne ? PlayerId.PlayerTwo : PlayerId.PlayerOne; ShowReadyScreen("Passe o aparelho para o próximo jogador", "Estou pronto", () => { currentTurnPlayer = next; Debug.Log($"[STATE] CurrentPlayer: {currentTurnPlayer}"); matchReportService.TurnStart(currentTurnPlayer); HideReadyScreen(); ShowOpponentBoardForCurrentTurn(); UpdateHud(); }); }
 
         private void BuildInvestigationHud()
         {
@@ -432,7 +435,7 @@ namespace CardgameProof.Core
 
         private void CompleteMatch(PlayerId winner)
         {
-            CurrentPhase = GamePhase.End;
+            SetPhase(GamePhase.End);
             investigationOverlayView.Hide(); guidebookOverlayView.Hide(); HideReadyScreen();
             string modeLabel = ActiveModeConfig != null ? ActiveModeConfig.DisplayName : "Modo desconhecido";
             string winnerLabel = winner == PlayerId.PlayerOne ? "Jogador 1" : "Jogador 2";
@@ -451,7 +454,7 @@ namespace CardgameProof.Core
             if (sceneRoot?.FullScreenRoot == null) return;
             for (int i = sceneRoot.FullScreenRoot.childCount - 1; i >= 0; i--) Destroy(sceneRoot.FullScreenRoot.GetChild(i).gameObject);
             mainMenuRoot = null;
-            CurrentPhase = GamePhase.MainMenu;
+            SetPhase(GamePhase.MainMenu);
             InitializeMainMenu(sceneRoot);
         }
 
@@ -511,7 +514,9 @@ namespace CardgameProof.Core
             if (trayRoot != null) trayRoot.gameObject.SetActive(false);
             if (placedActionsRoot != null) placedActionsRoot.gameObject.SetActive(false);
             CanvasGroup cg = sceneRoot.CenterBoardArea.GetComponent<CanvasGroup>(); if (cg == null) cg = sceneRoot.CenterBoardArea.gameObject.AddComponent<CanvasGroup>();
-            cg.alpha = 0.05f;
+            cg.alpha = 1f;
+            cg.interactable = true;
+            cg.blocksRaycasts = true;
         }
         private void StorePlacedCardForCurrentPlayer(PlacedCardData placed) { playerBoardStates[currentSetupPlayer].RemoveAll(c => c.CardId == placed.CardId); playerBoardStates[currentSetupPlayer].Add(new PlacedCardData { CardId = placed.CardId, CardType = placed.CardType, Owner = placed.Owner, Coordinate = placed.Coordinate, IsFaceUp = placed.IsFaceUp }); }
         private void RemoveStoredPlacedCardForCurrentPlayer(string cardId) => playerBoardStates[currentSetupPlayer].RemoveAll(c => c.CardId == cardId);
@@ -614,6 +619,25 @@ namespace CardgameProof.Core
             t.enableWordWrapping = true;
             t.text = value;
             return t;
+        }
+
+        private void SetPhase(GamePhase newPhase)
+        {
+            GamePhase previous = CurrentPhase;
+            CurrentPhase = newPhase;
+            Debug.Log($"[STATE] {previous} -> {newPhase}");
+            Debug.Log($"[STATE] CurrentPlayer: {currentTurnPlayer}");
+            Debug.Log($"[STATE] SelectedMode: {ActiveModeConfig?.Id ?? "none"}");
+        }
+
+        private void RestoreBoardVisualState()
+        {
+            if (sceneRoot?.CenterBoardArea == null) return;
+            CanvasGroup cg = sceneRoot.CenterBoardArea.GetComponent<CanvasGroup>();
+            if (cg == null) return;
+            cg.alpha = 1f;
+            cg.interactable = true;
+            cg.blocksRaycasts = true;
         }
     }
 }
