@@ -278,8 +278,8 @@ namespace CardgameProof.Core
 
             if (card.CardType == CardType.Archive)
             {
+                EnsureInvestigationOverlayView();
                 ResolveArchiveCard(card);
-                if (!ContinueTurnAfterArchiveCard) EndTurnWithPassScreen();
                 return;
             }
 
@@ -288,9 +288,84 @@ namespace CardgameProof.Core
 
         private void ResolveArchiveCard(PlacedCardData card)
         {
-            Debug.Log($"Arquivo revelado: {card.CardId}. Efeito simples aplicado.");
-            researchTokens[currentTurnPlayer] = Mathf.Max(0, researchTokens[currentTurnPlayer] - 1);
+            LogTelemetry("archive_card_found", $"card={card.CardId}");
+            int archiveIndex = ParseCardIndex(card.CardId);
+            int effectType = archiveIndex % 3;
+            switch (effectType)
+            {
+                case 0:
+                    ResolveArchiveLacunaDeArquivo(card.CardId);
+                    break;
+                case 1:
+                    ResolveArchiveReferenciaCruzada(card);
+                    break;
+                default:
+                    ResolveArchiveFragmentoDocumento(card.CardId);
+                    break;
+            }
+        }
+
+        private void ResolveArchiveLacunaDeArquivo(string cardId)
+        {
+            researchTokens[currentTurnPlayer] += 1;
             UpdateHud();
+            investigationOverlayView.Show("Lacuna de Arquivo", "Você ganhou +1 Ficha de Pesquisa.");
+            investigationOverlayView.AddButton("Continuar", EndTurnAfterOverlay);
+            LogTelemetry("archive_effect_resolved", $"card={cardId};effect=lacuna_de_arquivo;result=token_plus_one");
+        }
+
+        private void ResolveArchiveReferenciaCruzada(PlacedCardData archiveCard)
+        {
+            List<Vector2Int> candidates = GetAdjacentHiddenCoordinates(archiveCard.Coordinate);
+            if (candidates.Count == 0)
+            {
+                ShowNoValidTargetArchiveEffect("referencia_cruzada", archiveCard.CardId);
+                return;
+            }
+
+            investigationOverlayView.Show("Referência Cruzada", "Escolha uma célula adjacente para investigar o tipo da carta.");
+            foreach (Vector2Int coord in candidates)
+            {
+                Vector2Int captured = coord;
+                investigationOverlayView.AddButton($"Célula {captured.x},{captured.y}", () =>
+                {
+                    PlacedCardData adjacent = boardController.GetPlacedCard(captured);
+                    string result = adjacent != null && adjacent.CardType == CardType.Character ? "Personagem" : "Arquivo";
+                    investigationOverlayView.Show("Referência Cruzada", $"A célula {captured.x},{captured.y} contém: {result}.");
+                    investigationOverlayView.AddButton("Continuar", EndTurnAfterOverlay);
+                    LogTelemetry("archive_effect_resolved", $"card={archiveCard.CardId};effect=referencia_cruzada;result={result}");
+                });
+            }
+        }
+
+        private void ResolveArchiveFragmentoDocumento(string cardId)
+        {
+            List<string> targets = GetDiscoveredButUnidentifiedCharacters();
+            if (targets.Count == 0)
+            {
+                ShowNoValidTargetArchiveEffect("fragmento_documento", cardId);
+                return;
+            }
+
+            investigationOverlayView.Show("Fragmento de Documento", "Escolha um personagem já descoberto para revelar uma pista extra.");
+            foreach (string characterId in targets)
+            {
+                string captured = characterId;
+                CharacterData character = FindCharacterByCardId(characterId);
+                string label = character != null ? character.DisplayName : characterId;
+                investigationOverlayView.AddButton(label, () =>
+                {
+                    if (!TryRevealExtraClue(captured, out ClueCategory category, out string clueText))
+                    {
+                        ShowNoValidTargetArchiveEffect("fragmento_documento", cardId);
+                        return;
+                    }
+
+                    investigationOverlayView.Show("Fragmento de Documento", $"{GetCategoryLabel(category)}\n\n{clueText}");
+                    investigationOverlayView.AddButton("Continuar", EndTurnAfterOverlay);
+                    LogTelemetry("archive_effect_resolved", $"card={cardId};effect=fragmento_documento;target={captured};category={category}");
+                });
+            }
         }
 
         private void ResolveCharacterCard(PlacedCardData card)
@@ -482,6 +557,65 @@ namespace CardgameProof.Core
         private static void LogTelemetry(string eventName, string payload)
         {
             Debug.Log($"telemetry:{eventName}:{payload}");
+        }
+
+        private static int ParseCardIndex(string cardId)
+        {
+            if (string.IsNullOrEmpty(cardId)) return 0;
+            int underscore = cardId.LastIndexOf('_');
+            if (underscore < 0 || underscore >= cardId.Length - 1) return 0;
+            return int.TryParse(cardId.Substring(underscore + 1), out int value) ? value : 0;
+        }
+
+        private List<Vector2Int> GetAdjacentHiddenCoordinates(Vector2Int from)
+        {
+            List<Vector2Int> list = new List<Vector2Int>();
+            Vector2Int[] directions = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
+            foreach (Vector2Int direction in directions)
+            {
+                Vector2Int next = from + direction;
+                if (next.x < 0 || next.y < 0 || next.x >= ActiveModeConfig.BoardSize.x || next.y >= ActiveModeConfig.BoardSize.y) continue;
+                PlacedCardData candidate = boardController.GetPlacedCard(next);
+                if (candidate != null && !candidate.IsFaceUp) list.Add(next);
+            }
+            return list;
+        }
+
+        private List<string> GetDiscoveredButUnidentifiedCharacters()
+        {
+            List<string> characters = new List<string>();
+            foreach (var pair in discoveredClues[currentTurnPlayer])
+            {
+                if (identifiedCharacters[currentTurnPlayer].Contains(pair.Key)) continue;
+                characters.Add(pair.Key);
+            }
+            return characters;
+        }
+
+        private bool TryRevealExtraClue(string characterId, out ClueCategory category, out string clueText)
+        {
+            HashSet<ClueCategory> known = GetKnownClues(currentTurnPlayer, characterId);
+            ClueCategory[] order = { ClueCategory.Area, ClueCategory.Era, ClueCategory.Region, ClueCategory.Contribution, ClueCategory.ContextLegacy };
+            foreach (ClueCategory c in order)
+            {
+                if (known.Contains(c)) continue;
+                known.Add(c);
+                blockedCharacterGuesses[currentTurnPlayer].Remove(characterId);
+                category = c;
+                clueText = GetClueText(characterId, c);
+                return true;
+            }
+
+            category = ClueCategory.Area;
+            clueText = string.Empty;
+            return false;
+        }
+
+        private void ShowNoValidTargetArchiveEffect(string effectName, string cardId)
+        {
+            investigationOverlayView.Show("Efeito de Arquivo", "Sem alvo válido. A investigação continua.");
+            investigationOverlayView.AddButton("Continuar", EndTurnAfterOverlay);
+            LogTelemetry("archive_effect_resolved", $"card={cardId};effect={effectName};result=sem_alvo_valido");
         }
 
         private void OnGuidebookButtonPressed()
