@@ -12,12 +12,12 @@ namespace CardgameProof.Core
     {
         private static readonly IReadOnlyList<TutorialStep> DefaultTutorialSteps = new List<TutorialStep>
         {
-            new TutorialStep { Id = "welcome", Title = "Bem-vindo ao Arquivo", Body = "Você vai montar um arquivo secreto e depois investigar o arquivo do outro jogador.", Phase = GamePhase.Setup, TargetKey = null, OnlyShowOnce = true, CompleteTrigger = TutorialTrigger.ContinueButton, ShowContinueButton = true, BlockOutsideTarget = true },
-            new TutorialStep { Id = "character_card_intro", Title = "Dossiês de Personagem", Body = "Arraste um Dossiê de Personagem para a grade.", Phase = GamePhase.Setup, TargetKey = "character_card_hand", CompleteTrigger = TutorialTrigger.CharacterCardPlaced, ShowContinueButton = false },
-            new TutorialStep { Id = "archive_card_intro", Title = "Cartas de Arquivo", Body = "Agora arraste uma Carta de Arquivo para a grade.", Phase = GamePhase.Setup, TargetKey = "archive_card_hand", CompleteTrigger = TutorialTrigger.ArchiveCardPlaced, ShowContinueButton = false },
-            new TutorialStep { Id = "setup_goal", Title = "Monte seu arquivo", Body = "Posicione o restante das cartas para liberar a finalização.", Phase = GamePhase.Setup, TargetKey = "board_grid", CompleteTrigger = TutorialTrigger.AllRequiredCardsPlaced, ShowContinueButton = false },
-            new TutorialStep { Id = "confirm_setup", Title = "Finalizar montagem", Body = "Toque em Finalizar montagem para completar o arquivo.", Phase = GamePhase.Setup, TargetKey = "confirm_setup_button", CompleteTrigger = TutorialTrigger.SetupConfirmed, ShowContinueButton = false },
-            new TutorialStep { Id = "auto_no_record", Title = "Sem Registro", Body = "As lacunas são preenchidas automaticamente com cartas Sem Registro.", Phase = GamePhase.Setup, TargetKey = "board_grid", CompleteTrigger = TutorialTrigger.AutoNoRecordFillCompleted, ShowContinueButton = false }
+            new TutorialStep { Id = "welcome", Title = "Bem-vindo ao Arquivo", Body = "Você vai montar um arquivo secreto e depois investigar o arquivo do outro jogador.", Phase = GamePhase.Setup, TargetKey = null, OnlyShowOnce = true, CompleteTrigger = TutorialTrigger.ContinueButton, ShowContinueButton = true, BlockOutsideTarget = true, PreferredPlacement = TutorialPanelPlacement.Center },
+            new TutorialStep { Id = "character_card_intro", Title = "Dossiês de Personagem", Body = "Arraste um Dossiê para a grade.", Phase = GamePhase.Setup, TargetKey = "character_card_hand", CompleteTrigger = TutorialTrigger.CharacterCardPlaced, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.Top, FadeDuringAction = true, CompactMode = true },
+            new TutorialStep { Id = "archive_card_intro", Title = "Cartas de Arquivo", Body = "Arraste uma Carta de Arquivo para a grade.", Phase = GamePhase.Setup, TargetKey = "archive_card_hand", CompleteTrigger = TutorialTrigger.ArchiveCardPlaced, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.Top, FadeDuringAction = true, CompactMode = true },
+            new TutorialStep { Id = "setup_goal", Title = "Monte seu arquivo", Body = "Posicione o restante das cartas.", Phase = GamePhase.Setup, TargetKey = "board_grid", CompleteTrigger = TutorialTrigger.AllRequiredCardsPlaced, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.UpperBoard, CompactMode = true },
+            new TutorialStep { Id = "confirm_setup", Title = "Finalizar montagem", Body = "Toque em Finalizar montagem.", Phase = GamePhase.Setup, TargetKey = "confirm_setup_button", CompleteTrigger = TutorialTrigger.SetupConfirmed, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.Top, FadeDuringAction = true, CompactMode = true },
+            new TutorialStep { Id = "auto_no_record", Title = "Sem Registro", Body = "As lacunas são preenchidas automaticamente com cartas Sem Registro.", Phase = GamePhase.Setup, TargetKey = "board_grid", CompleteTrigger = TutorialTrigger.AutoNoRecordFillCompleted, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.Top, CompactMode = true }
         };
 
 
@@ -309,10 +309,12 @@ namespace CardgameProof.Core
         {
             if (!boardController.TryGetCoordinateFromScreenPosition(eventData.position, out Vector2Int coord)) { cardView.ResetToTray(); return; }
             PlacedCardData data = cardView.CardData; data.Coordinate = coord;
-            if (!boardController.PlaceCard(data)) { cardView.ResetToTray(); Debug.Log("Jogada inválida"); AudioManager.Instance?.PlayInvalid(); matchReportService.OnInvalidPlacement(); return; }
+            tutorialManager?.NotifyActionStarted(data.CardType == CardType.Character ? TutorialTrigger.CharacterCardPlaced : TutorialTrigger.ArchiveCardPlaced);
+            if (!boardController.PlaceCard(data)) { tutorialManager?.NotifyActionEnded(data.CardType == CardType.Character ? TutorialTrigger.CharacterCardPlaced : TutorialTrigger.ArchiveCardPlaced); cardView.ResetToTray(); Debug.Log("Jogada inválida"); AudioManager.Instance?.PlayInvalid(); matchReportService.OnInvalidPlacement(); return; }
             AudioManager.Instance?.PlayCardPlace();
             cardView.gameObject.SetActive(false);
             StorePlacedCardForCurrentPlayer(data);
+            tutorialManager?.NotifyActionEnded(data.CardType == CardType.Character ? TutorialTrigger.CharacterCardPlaced : TutorialTrigger.ArchiveCardPlaced);
             tutorialManager?.Notify(data.CardType == CardType.Character ? TutorialTrigger.CharacterCardPlaced : TutorialTrigger.ArchiveCardPlaced);
             tutorialManager?.Notify(TutorialTrigger.AnyCardPlaced);
             UpdateFinalizeButtonState();
@@ -347,6 +349,8 @@ namespace CardgameProof.Core
                 investigationOverlayView.AddButton("Fechar", investigationOverlayView.Hide);
                 return;
             }
+            tutorialManager?.NotifyActionStarted(TutorialTrigger.SetupConfirmed);
+            tutorialOverlay?.FadeTo(0f, 0.15f);
             tutorialManager?.Notify(TutorialTrigger.SetupConfirmed);
             matchReportService.EndSetup(currentSetupPlayer);
             HideSetupSensitiveUi();

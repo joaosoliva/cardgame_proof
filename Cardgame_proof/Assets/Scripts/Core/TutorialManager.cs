@@ -26,6 +26,7 @@ namespace CardgameProof.Core
 
     public sealed class TutorialManager
     {
+        private TutorialStep activeStep;
         private readonly TutorialOverlayView overlay;
         private readonly Dictionary<string, RectTransform> targets = new Dictionary<string, RectTransform>();
         private readonly HashSet<string> shown = new HashSet<string>();
@@ -77,11 +78,27 @@ namespace CardgameProof.Core
                 }
 
                 bool requireContinue = step.ShowContinueButton || target == null;
+                activeStep = step;
                 overlay.ShowStep(step, requireContinue, requireContinue ? (Action)(() => Notify(TutorialTrigger.ContinueButton)) : null, target, step.BlockOutsideTarget);
                 return;
             }
 
             overlay.Hide();
+        }
+
+
+        public void NotifyActionStarted(TutorialTrigger trigger)
+        {
+            if (activeStep == null || !activeStep.FadeDuringAction) return;
+            if (activeStep.CompleteTrigger != trigger && activeStep.CompleteTrigger != TutorialTrigger.AnyCardPlaced) return;
+            overlay.TemporarilyFadeDuringAction();
+        }
+
+        public void NotifyActionEnded(TutorialTrigger trigger)
+        {
+            if (activeStep == null || !activeStep.FadeDuringAction) return;
+            if (activeStep.CompleteTrigger != trigger && activeStep.CompleteTrigger != TutorialTrigger.AnyCardPlaced) return;
+            overlay.RestoreAfterActionIfStillActive();
         }
     }
 }

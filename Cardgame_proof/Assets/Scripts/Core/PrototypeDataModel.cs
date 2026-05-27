@@ -100,6 +100,18 @@ namespace CardgameProof.Core
     }
 
 
+
+    public enum TutorialPanelPlacement
+    {
+        Auto,
+        Top,
+        UpperBoard,
+        LowerBoard,
+        Bottom,
+        Center,
+        NearTarget
+    }
+
     [Serializable]
     public sealed class TutorialStep
     {
@@ -114,6 +126,11 @@ namespace CardgameProof.Core
         public bool BlockOutsideTarget;
         public bool ShowContinueButton = true;
         public string RequiredCardType;
+        public TutorialPanelPlacement PreferredPlacement = TutorialPanelPlacement.Auto;
+        public bool AvoidTargetOverlap = true;
+        public bool FadeDuringAction;
+        public bool HideDuringDrag;
+        public bool CompactMode;
     }
 
     [Serializable]
