@@ -77,36 +77,15 @@ namespace CardgameProof.Core
 
         public static readonly IReadOnlyList<ArchiveCardData> ArchiveCards = new List<ArchiveCardData>
         {
-            new ArchiveCardData
-            {
-                Id = "archive_area",
-                CardType = CardType.Archive,
-                Title = "Arquivo de Área",
-                Description = "Revela uma pista sobre o campo de atuação da personagem.",
-                ClueCategory = ClueCategory.Area,
-                Prompt = "A área principal desta personagem é científica, tecnológica ou de cuidado em saúde?"
-            },
-            new ArchiveCardData
-            {
-                Id = "archive_era",
-                CardType = CardType.Archive,
-                Title = "Arquivo de Era",
-                Description = "Revela uma pista temporal sobre o período histórico da personagem.",
-                ClueCategory = ClueCategory.Era,
-                Prompt = "Em que período histórico essa personagem se destacou?"
-            },
-            new ArchiveCardData
-            {
-                Id = "archive_region",
-                CardType = CardType.Archive,
-                Title = "Arquivo de Região",
-                Description = "Revela uma pista geográfica sobre a trajetória da personagem.",
-                ClueCategory = ClueCategory.Region,
-                Prompt = "Qual região está mais associada à vida e ao trabalho da personagem?"
-            }
+            new ArchiveCardData { Id = "archive_cross_ref", CardType = CardType.Archive, Title = "Referência Cruzada", Description = "Escolha um Dossiê encontrado. Revele uma pista extra dele.", ClueCategory = ClueCategory.Area, Prompt = "Revela uma pista extra." },
+            new ArchiveCardData { Id = "archive_fragment", CardType = CardType.Archive, Title = "Fragmento de Documento", Description = "Revele uma pista aleatória de um Dossiê encontrado.", ClueCategory = ClueCategory.Contribution, Prompt = "Revela pista aleatória." },
+            new ArchiveCardData { Id = "archive_index", CardType = CardType.Archive, Title = "Índice do Arquivo", Description = "Escolha um Dossiê encontrado. Revele Área ou Época.", ClueCategory = ClueCategory.Era, Prompt = "Revela área/época." },
+            new ArchiveCardData { Id = "archive_footnote", CardType = CardType.Archive, Title = "Nota de Rodapé", Description = "Escolha uma pista já revelada. Mostre dica curta de interpretação.", ClueCategory = ClueCategory.ContextLegacy, Prompt = "Dica de interpretação." },
+            new ArchiveCardData { Id = "archive_targeted", CardType = CardType.Archive, Title = "Pista Direcionada", Description = "Escolha um Dossiê encontrado e uma categoria de pista. Revele essa pista.", ClueCategory = ClueCategory.Region, Prompt = "Revela categoria escolhida." },
+            new ArchiveCardData { Id = "archive_organized", CardType = CardType.Archive, Title = "Arquivo Organizado", Description = "Investigue outra carta imediatamente.", ClueCategory = ClueCategory.Area, Prompt = "Ação extra." }
         };
 
-        public static readonly IReadOnlyDictionary<string, GameModeConfig> GameModes =
+                public static readonly IReadOnlyDictionary<string, GameModeConfig> GameModes =
             new Dictionary<string, GameModeConfig>
             {
                 ["5min"] = new GameModeConfig
@@ -115,10 +94,10 @@ namespace CardgameProof.Core
                     DisplayName = "Partida Rápida (5 min)",
                     DurationMinutes = 5,
                     TotalCharacters = 4,
-                    CharactersPerPlayer = 2,
-                    ArchiveCardsPerPlayer = 2,
+                    CharactersPerPlayer = 3,
+                    ArchiveCardsPerPlayer = 3,
                     ResearchTokensPerPlayer = 1,
-                    BoardSize = new Vector2Int(4, 4),
+                    BoardSize = new Vector2Int(3, 3),
                     ObjectiveIdentifications = 1
                 },
                 ["10min"] = new GameModeConfig
@@ -126,9 +105,9 @@ namespace CardgameProof.Core
                     Id = "10min",
                     DisplayName = "Partida Estendida (10 min)",
                     DurationMinutes = 10,
-                    TotalCharacters = 6,
-                    CharactersPerPlayer = 3,
-                    ArchiveCardsPerPlayer = 3,
+                    TotalCharacters = 8,
+                    CharactersPerPlayer = 4,
+                    ArchiveCardsPerPlayer = 6,
                     ResearchTokensPerPlayer = 2,
                     BoardSize = new Vector2Int(4, 4),
                     ObjectiveIdentifications = 2

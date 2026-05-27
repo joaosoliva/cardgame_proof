@@ -423,7 +423,6 @@ namespace CardgameProof.Core
             Debug.Log($"[INVESTIGATION] Before: investigated={card.IsInvestigated}, revealed={card.IsRevealed}, identified={card.IsIdentified}, effectResolved={card.EffectResolved}");
             AudioManager.Instance?.PlayReveal();
             tutorialOverlay?.FadeTo(0f, 0.1f);
-            if (card.CardType == CardType.Character && blockedCharacterGuesses[currentTurnPlayer].Contains(card.CardId)) return;
             matchReportService.MarkFirstInvestigation();
             card.IsInvestigated = true;
             tutorialManager?.Notify(TutorialTrigger.CellInvestigated);
@@ -509,12 +508,12 @@ namespace CardgameProof.Core
             }
         }
 
-        private void ResolveCharacterCard(PlacedCardData card) { PersistInvestigatedCard(card); Debug.Log($"[INVESTIGATION] After: investigated={card.IsInvestigated}, revealed={card.IsRevealed}, identified={card.IsIdentified}, effectResolved={card.EffectResolved}"); matchReportService.MarkFirstCharacterFound(); PlayCardReveal(new CardRevealPayload { RevealType = CardRevealType.CharacterFound, Title = "Dossiê encontrado", Body = "Você encontrou um personagem. Escolha uma pista para investigar.", RequireTapToContinue = true }, () => ShowClueSelectionOverlay(card.CardId)); }
+        private void ResolveCharacterCard(PlacedCardData card) { PersistInvestigatedCard(card); Debug.Log($"[INVESTIGATION] After: investigated={card.IsInvestigated}, revealed={card.IsRevealed}, identified={card.IsIdentified}, effectResolved={card.EffectResolved}"); matchReportService.MarkFirstCharacterFound(); HashSet<ClueCategory> known = GetKnownClues(currentTurnPlayer, card.CardId); if (known.Count == 0) { ClueCategory free = ClueCategory.Area; known.Add(free); matchReportService.OnClueRequested(card.CardId, free); } PlayCardReveal(new CardRevealPayload { RevealType = CardRevealType.CharacterFound, Title = "Dossiê encontrado", Body = "Você encontrou um personagem. Escolha uma pista para investigar.", RequireTapToContinue = true }, () => ShowClueSelectionOverlay(card.CardId)); }
         private void ShowClueSelectionOverlay(string characterId)
         {
             EnsureInvestigationOverlayView();
             HashSet<ClueCategory> knownClues = GetKnownClues(currentTurnPlayer, characterId);
-            investigationOverlayView.Show("Escolha uma pista", "Selecione uma categoria para revelar uma nova pista.");
+            investigationOverlayView.Show("Escolha uma pista", "A primeira pista foi gratuita. Você já pode tentar identificar ou revelar mais pistas.");
             AddClueCategoryButton(characterId, ClueCategory.Area, "Área", knownClues.Contains(ClueCategory.Area));
             AddClueCategoryButton(characterId, ClueCategory.Era, "Época", knownClues.Contains(ClueCategory.Era));
             AddClueCategoryButton(characterId, ClueCategory.Region, "Região", knownClues.Contains(ClueCategory.Region));
@@ -525,7 +524,6 @@ namespace CardgameProof.Core
         private void OnClueSelected(string characterId, ClueCategory category)
         {
             GetKnownClues(currentTurnPlayer, characterId).Add(category);
-            blockedCharacterGuesses[currentTurnPlayer].Remove(characterId);
             totalCluesRequested += 1;
             matchReportService.OnClueRequested(characterId, category);
             LogTelemetry("clue_requested", $"character={characterId};category={category}");
@@ -581,7 +579,7 @@ Contribuição: {revealData.Contribution}" : "Identificação correta!",
                 return;
             }
             AudioManager.Instance?.PlayWrong();
-            LogTelemetry("guess_wrong", $"character={characterId};guess={guessedName}"); blockedCharacterGuesses[currentTurnPlayer].Add(characterId); investigationOverlayView.Show("Resultado", "Ainda não. Você precisa de mais uma pista antes de tentar novamente."); investigationOverlayView.AddButton("Encerrar turno", EndTurnAfterOverlay);
+            LogTelemetry("guess_wrong", $"character={characterId};guess={guessedName}"); investigationOverlayView.Show("Resultado", "Identificação incorreta."); investigationOverlayView.AddButton("Encerrar turno", EndTurnAfterOverlay);
         }
 
         private void EndTurnAfterOverlay() { investigationOverlayView.Hide(); EndTurnWithPassScreen(); }
@@ -703,7 +701,7 @@ Contribuição: {revealData.Contribution}" : "Identificação correta!",
             investigationOverlayView.AddButton("Cancelar", investigationOverlayView.Hide);
         }
         private void ShowGuidebookOverlay() { tutorialManager?.Notify(TutorialTrigger.GuideOpened); EnsureGuidebookOverlayView(); guidebookOverlayView.Show(PrototypeDatabase.Characters, researchTokens[currentTurnPlayer]); }
-        private void ShowRulesOverlay() { EnsureInvestigationOverlayView(); investigationOverlayView.Show("Resumo das Regras", "Durante a montagem, posicione seus Personagens e Cartas de Arquivo. Ao finalizar, as lacunas do arquivo são preenchidas automaticamente com Sem Registro.\n\nSem Registro não tem efeito. Ele apenas indica que aquela parte do arquivo não tinha um dossiê útil.\n\n1. Investigue cartas no arquivo adversário.\n2. Se encontrar um Dossiê, peça uma pista e tente identificar o personagem.\n3. Se encontrar uma Carta de Arquivo, revele e resolva seu efeito.\n4. Se encontrar Sem Registro, apenas marque aquela carta como investigada.\n5. Personagens só revelam sua identidade após uma identificação correta.\n6. Vence quem completar o objetivo do modo escolhido."); investigationOverlayView.AddButton("Fechar", investigationOverlayView.Hide); }
+        private void ShowRulesOverlay() { EnsureInvestigationOverlayView(); investigationOverlayView.Show("Resumo das Regras", "Durante a montagem, posicione seus Personagens e Cartas de Arquivo. Ao finalizar, as lacunas do arquivo são preenchidas automaticamente com Sem Registro.\n\nSem Registro não tem efeito. Ele apenas indica que aquela parte do arquivo não tinha um dossiê útil.\n\n1. Investigue cartas no arquivo adversário.\n2. Se encontrar um Dossiê, a primeira pista é gratuita e você já pode tentar identificar.\n3. Se encontrar uma Carta de Arquivo, revele e resolva seu efeito.\n4. Se encontrar Sem Registro, apenas marque aquela carta como investigada.\n5. Personagens só revelam sua identidade após uma identificação correta.\n6. Vence quem completar o objetivo do modo escolhido."); investigationOverlayView.AddButton("Fechar", investigationOverlayView.Hide); }
 
         private void HideSetupSensitiveUi()
         {
@@ -776,6 +774,11 @@ Contribuição: {revealData.Contribution}" : "Identificação correta!",
             }
 
             float duration = Time.realtimeSinceStartup - started;
+            int expectedNoRecord = (ActiveModeConfig.BoardSize.x * ActiveModeConfig.BoardSize.y) - ActiveModeConfig.CharactersPerPlayer - ActiveModeConfig.ArchiveCardsPerPlayer;
+            if (expectedNoRecord != generated)
+            {
+                Debug.LogWarning($"[NO_RECORD_FILL] Expected {expectedNoRecord} Sem Registro, generated {generated}.");
+            }
             matchReportService.OnAutoNoRecordGenerated(owner, generated);
             matchReportService.OnAutoFillDuration(duration);
             Debug.Log($"[NO_RECORD_FILL] Completed auto-fill for Player {owner} in {duration:F2} seconds");
