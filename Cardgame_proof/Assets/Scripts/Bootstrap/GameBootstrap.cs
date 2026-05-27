@@ -10,6 +10,7 @@ namespace CardgameProof.Bootstrap
 
         private void Start()
         {
+            Debug.Log("[Bootstrap] GameBootstrap.Start begin");
             EnsurePortraitResolution();
             EnsureEventSystem();
             Core.AudioManager.EnsureInstance();
@@ -21,6 +22,7 @@ namespace CardgameProof.Bootstrap
                 rootBuilder = rootCanvas.gameObject.AddComponent<SceneRootBuilder>();
             }
             rootBuilder.Build();
+            Debug.Log("[Bootstrap] SceneRootBuilder.Build complete");
 
             Core.GameController gameController = FindFirstObjectByType<Core.GameController>();
             if (gameController == null)
@@ -29,6 +31,7 @@ namespace CardgameProof.Bootstrap
                 gameController = controllerObject.AddComponent<Core.GameController>();
             }
 
+            Debug.Log("[Bootstrap] Initializing main menu flow");
             gameController.InitializeMainMenu(rootBuilder);
         }
 

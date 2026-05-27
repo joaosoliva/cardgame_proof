@@ -14,6 +14,7 @@ namespace CardgameProof.Core
         public void Initialize(RectTransform parent)
         {
             if (root != null || parent == null) return;
+            Debug.Log("[UI] Creating GuidebookOverlayView");
 
             root = new GameObject("GuidebookOverlay", typeof(RectTransform), typeof(Image));
             RectTransform rt = root.GetComponent<RectTransform>();
@@ -36,7 +37,7 @@ namespace CardgameProof.Core
 
             CreateText(panel.transform, "Guia de Apoio", 44, 80f, TextAnchor.MiddleCenter);
 
-            GameObject scrollGo = new GameObject("ScrollView", typeof(RectTransform), typeof(Image), typeof(ScrollRect));
+            GameObject scrollGo = new GameObject("ScrollView", typeof(RectTransform), typeof(Image), typeof(ScrollRect), typeof(LayoutElement));
             scrollGo.transform.SetParent(panel.transform, false);
             scrollGo.GetComponent<LayoutElement>().preferredHeight = 900f;
             scrollGo.GetComponent<Image>().color = new Color(0.03f, 0.05f, 0.08f, 0.8f);
@@ -77,7 +78,18 @@ namespace CardgameProof.Core
 
         public void Show(IReadOnlyList<CharacterData> characters)
         {
-            if (root == null) return;
+            Debug.Log("[Guidebook] Show requested");
+            if (root == null)
+            {
+                Debug.LogWarning("[Guidebook] Show ignored: view not initialized.");
+                return;
+            }
+            if (characters == null || characters.Count == 0)
+            {
+                Debug.LogWarning("[Guidebook] Show ignored: no character data available.");
+                root.SetActive(false);
+                return;
+            }
             root.SetActive(true);
             foreach (GameObject entry in entries) if (entry != null) Destroy(entry);
             entries.Clear();
@@ -103,6 +115,7 @@ namespace CardgameProof.Core
 
         public void Hide()
         {
+            Debug.Log("[Guidebook] Hide requested");
             if (root != null) root.SetActive(false);
         }
 

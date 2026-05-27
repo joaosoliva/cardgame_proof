@@ -59,6 +59,8 @@ namespace CardgameProof.Core
         {
             if (builtSceneRoot == null || builtSceneRoot.FullScreenRoot == null) return;
             sceneRoot = builtSceneRoot;
+            Debug.Log("[GameController] InitializeMainMenu called");
+            DisableLegacyManualSceneObjects();
 
             EnsureTutorialOverlay();
             EnsureReadyScreenView();
@@ -67,9 +69,15 @@ namespace CardgameProof.Core
             EnsureWinScreenView();
             EnsureMatchReportView();
             EnsureBoardController();
+            HideAllScreensAndGameplayUi();
 
             RectTransform fullRoot = sceneRoot.FullScreenRoot;
-            if (fullRoot.Find("MainMenuRoot") != null) return;
+            if (fullRoot.Find("MainMenuRoot") != null)
+            {
+                CurrentPhase = GamePhase.MainMenu;
+                Debug.Log("[GameController] Entered MainMenu phase");
+                return;
+            }
 
             GameObject menuRootObject = new GameObject("MainMenuRoot", typeof(RectTransform), typeof(Image));
             RectTransform menuRoot = menuRootObject.GetComponent<RectTransform>();
@@ -88,6 +96,7 @@ namespace CardgameProof.Core
             CreateModeButton(menuRoot, "Partida Completa — 10 min", "10min");
             CreateFooter(menuRoot, "Protótipo digital para teste de jogo físico");
             CurrentPhase = GamePhase.MainMenu;
+            Debug.Log("[GameController] Entered MainMenu phase");
         }
 
         private void CreateModeButton(RectTransform parent, string label, string modeId)
@@ -131,6 +140,7 @@ namespace CardgameProof.Core
             currentSetupPlayer = player;
             matchReportService.StartSetup(player);
             CurrentPhase = GamePhase.Setup;
+            if (sceneRoot?.CenterBoardArea != null) sceneRoot.CenterBoardArea.gameObject.SetActive(true);
             BuildBoardForActiveMode();
             BuildBottomTray();
             BuildPlacedCardActions();
@@ -237,6 +247,7 @@ namespace CardgameProof.Core
         {
             HideReadyScreen();
             CurrentPhase = GamePhase.Investigation;
+            if (sceneRoot?.CenterBoardArea != null) sceneRoot.CenterBoardArea.gameObject.SetActive(true);
             BuildInvestigationHud();
             scores[PlayerId.PlayerOne] = 0; scores[PlayerId.PlayerTwo] = 0;
             researchTokens[PlayerId.PlayerOne] = ActiveModeConfig.ResearchTokensPerPlayer;
@@ -477,15 +488,47 @@ namespace CardgameProof.Core
         private void RemoveStoredPlacedCardForCurrentPlayer(string cardId) => playerBoardStates[currentSetupPlayer].RemoveAll(c => c.CardId == cardId);
 
         private void EnsureBoardController() { if (boardController != null) return; GameObject boardObject = new GameObject("BoardController", typeof(RectTransform)); boardObject.transform.SetParent(sceneRoot.CenterBoardArea, false); boardController = boardObject.AddComponent<BoardController>(); }
-        private void EnsureTutorialOverlay() { if (tutorialOverlay != null) return; GameObject overlayObject = new GameObject("TutorialOverlayView"); overlayObject.transform.SetParent(sceneRoot.OverlayLayer, false); tutorialOverlay = overlayObject.AddComponent<TutorialOverlayView>(); tutorialOverlay.Initialize(sceneRoot.OverlayLayer); }
-        private void EnsureInvestigationOverlayView() { if (investigationOverlayView != null) return; GameObject go = new GameObject("InvestigationOverlayView"); go.transform.SetParent(sceneRoot.OverlayLayer, false); investigationOverlayView = go.AddComponent<InvestigationOverlayView>(); investigationOverlayView.Initialize(sceneRoot.OverlayLayer); }
-        private void EnsureGuidebookOverlayView() { if (guidebookOverlayView != null) return; GameObject go = new GameObject("GuidebookOverlayView"); go.transform.SetParent(sceneRoot.OverlayLayer, false); guidebookOverlayView = go.AddComponent<GuidebookOverlayView>(); guidebookOverlayView.Initialize(sceneRoot.OverlayLayer); }
-        private void EnsureWinScreenView() { if (winScreenView != null) return; GameObject go = new GameObject("WinScreenView"); go.transform.SetParent(sceneRoot.OverlayLayer, false); winScreenView = go.AddComponent<WinScreenView>(); winScreenView.Initialize(sceneRoot.OverlayLayer); }
-        private void EnsureMatchReportView() { if (matchReportView != null) return; GameObject go = new GameObject("MatchReportView"); go.transform.SetParent(sceneRoot.OverlayLayer, false); matchReportView = go.AddComponent<MatchReportView>(); matchReportView.Initialize(sceneRoot.OverlayLayer); }
+        private void EnsureTutorialOverlay() { if (tutorialOverlay != null) return; Debug.Log("[UI] Creating TutorialOverlayView"); GameObject overlayObject = new GameObject("TutorialOverlayView"); overlayObject.transform.SetParent(sceneRoot.OverlayLayer, false); tutorialOverlay = overlayObject.AddComponent<TutorialOverlayView>(); tutorialOverlay.Initialize(sceneRoot.OverlayLayer); }
+        private void EnsureInvestigationOverlayView() { if (investigationOverlayView != null) return; Debug.Log("[UI] Creating InvestigationOverlayView"); GameObject go = new GameObject("InvestigationOverlayView"); go.transform.SetParent(sceneRoot.OverlayLayer, false); investigationOverlayView = go.AddComponent<InvestigationOverlayView>(); investigationOverlayView.Initialize(sceneRoot.OverlayLayer); }
+        private void EnsureGuidebookOverlayView() { if (guidebookOverlayView != null) return; Debug.Log("[UI] Creating GuidebookOverlayView"); GameObject go = new GameObject("GuidebookOverlayView"); go.transform.SetParent(sceneRoot.OverlayLayer, false); guidebookOverlayView = go.AddComponent<GuidebookOverlayView>(); guidebookOverlayView.Initialize(sceneRoot.OverlayLayer); }
+        private void EnsureWinScreenView() { if (winScreenView != null) return; Debug.Log("[UI] Creating WinScreenView"); GameObject go = new GameObject("WinScreenView"); go.transform.SetParent(sceneRoot.OverlayLayer, false); winScreenView = go.AddComponent<WinScreenView>(); winScreenView.Initialize(sceneRoot.OverlayLayer); }
+        private void EnsureMatchReportView() { if (matchReportView != null) return; Debug.Log("[UI] Creating MatchReportView"); GameObject go = new GameObject("MatchReportView"); go.transform.SetParent(sceneRoot.OverlayLayer, false); matchReportView = go.AddComponent<MatchReportView>(); matchReportView.Initialize(sceneRoot.OverlayLayer); }
         private void OpenReportFromWinScreen() { EnsureMatchReportView(); winScreenView.Hide(); matchReportView.Show(lastReportText, () => { matchReportView.Hide(); winScreenView.Show("Resultado", "Veja o resumo final", OpenReportFromWinScreen, RestartCurrentModeMatch, ReturnToMainMenu); }); }
         private void EnsureReadyScreenView() { if (readyScreenView != null) return; GameObject go = new GameObject("ReadyScreenView"); go.transform.SetParent(sceneRoot.OverlayLayer, false); readyScreenView = go.AddComponent<ReadyScreenView>(); readyScreenView.Initialize(sceneRoot.OverlayLayer); }
         private void ShowReadyScreen(string message, string buttonText, Action onConfirm) { EnsureReadyScreenView(); readyScreenView.Show(message, buttonText, onConfirm); }
         private void HideReadyScreen() => readyScreenView?.Hide();
+        private void HideAllScreensAndGameplayUi()
+        {
+            tutorialOverlay?.Hide();
+            investigationOverlayView?.Hide();
+            guidebookOverlayView?.Hide();
+            readyScreenView?.Hide();
+            winScreenView?.Hide();
+            matchReportView?.Hide();
+            if (trayRoot != null) trayRoot.gameObject.SetActive(false);
+            if (placedActionsRoot != null) placedActionsRoot.gameObject.SetActive(false);
+            if (hudRoot != null) hudRoot.gameObject.SetActive(false);
+            if (sceneRoot?.CenterBoardArea != null) sceneRoot.CenterBoardArea.gameObject.SetActive(false);
+        }
+
+        private static void DisableLegacyManualSceneObjects()
+        {
+            string[] legacyNames = { "GuidebookView", "GuidebookOverlayView", "Guia de Apoio", "TutorialOverlayView", "GameController", "Canvas", "EventSystem" };
+            foreach (string name in legacyNames)
+            {
+                GameObject[] matches = GameObject.FindObjectsByType<GameObject>(FindObjectsSortMode.None);
+                int activeCount = 0;
+                foreach (GameObject go in matches)
+                {
+                    if (!string.Equals(go.name, name, StringComparison.Ordinal)) continue;
+                    activeCount++;
+                }
+                if (activeCount > 1)
+                {
+                    Debug.LogWarning($"[Bootstrap] Potential duplicate object detected: {name} ({activeCount})");
+                }
+            }
+        }
 
         private static Button CreateActionButton(RectTransform parent, string text, Action onClick)
         {
