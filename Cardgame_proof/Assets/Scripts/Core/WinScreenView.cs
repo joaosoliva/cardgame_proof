@@ -9,6 +9,7 @@ namespace CardgameProof.Core
         private GameObject root;
         private Text titleText;
         private Text detailsText;
+        private Button reportButton;
         private Button playAgainButton;
         private Button menuButton;
 
@@ -36,19 +37,22 @@ namespace CardgameProof.Core
 
             titleText = CreateText(panel.transform, "Vitória", 56, 120f);
             detailsText = CreateText(panel.transform, "Detalhes", 32, 220f);
+            reportButton = CreateButton(panel.transform, "Ver Relatório");
             playAgainButton = CreateButton(panel.transform, "Jogar novamente");
             menuButton = CreateButton(panel.transform, "Voltar ao menu");
 
             root.SetActive(false);
         }
 
-        public void Show(string title, string details, Action onPlayAgain, Action onBackMenu)
+        public void Show(string title, string details, Action onReport, Action onPlayAgain, Action onBackMenu)
         {
             if (root == null) return;
             root.SetActive(true);
             titleText.text = title;
             detailsText.text = details;
 
+            reportButton.onClick.RemoveAllListeners();
+            reportButton.onClick.AddListener(() => onReport?.Invoke());
             playAgainButton.onClick.RemoveAllListeners();
             playAgainButton.onClick.AddListener(() => onPlayAgain?.Invoke());
             menuButton.onClick.RemoveAllListeners();

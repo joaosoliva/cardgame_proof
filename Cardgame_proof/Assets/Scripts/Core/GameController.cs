@@ -21,6 +21,9 @@ namespace CardgameProof.Core
         private InvestigationOverlayView investigationOverlayView;
         private GuidebookOverlayView guidebookOverlayView;
         private WinScreenView winScreenView;
+        private MatchReportView matchReportView;
+        private readonly MatchReportService matchReportService = new MatchReportService();
+        private string lastReportText;
         private BoardController boardController;
 
         private RectTransform trayRoot;
@@ -62,6 +65,7 @@ namespace CardgameProof.Core
             EnsureInvestigationOverlayView();
             EnsureGuidebookOverlayView();
             EnsureWinScreenView();
+            EnsureMatchReportView();
             EnsureBoardController();
 
             RectTransform fullRoot = sceneRoot.FullScreenRoot;
@@ -119,11 +123,13 @@ namespace CardgameProof.Core
             playerBoardStates[PlayerId.PlayerOne] = new List<PlacedCardData>();
             playerBoardStates[PlayerId.PlayerTwo] = new List<PlacedCardData>();
             BeginSetupForPlayer(PlayerId.PlayerOne);
+            matchReportService.StartMatch(ActiveModeConfig.DisplayName);
         }
 
         private void BeginSetupForPlayer(PlayerId player)
         {
             currentSetupPlayer = player;
+            matchReportService.StartSetup(player);
             CurrentPhase = GamePhase.Setup;
             BuildBoardForActiveMode();
             BuildBottomTray();
@@ -166,7 +172,7 @@ namespace CardgameProof.Core
             placedActionsRoot.offsetMin = new Vector2(20f, 20f); placedActionsRoot.offsetMax = new Vector2(-20f, -20f);
             HorizontalLayoutGroup h = root.GetComponent<HorizontalLayoutGroup>(); h.spacing = 16f; h.childForceExpandWidth = true;
 
-            CreateActionButton(placedActionsRoot, "Girar", () => { if (selectedPlacedCoordinate.HasValue) boardController.RotateCard(selectedPlacedCoordinate.Value); });
+            CreateActionButton(placedActionsRoot, "Girar", () => { if (selectedPlacedCoordinate.HasValue) { boardController.RotateCard(selectedPlacedCoordinate.Value); matchReportService.OnRotate(); } });
             CreateActionButton(placedActionsRoot, "Remover", OnRemoveSelectedPlacedCard);
             CreateActionButton(placedActionsRoot, "Confirmar", () => selectedPlacedCoordinate = null);
             finalizeSetupButton = CreateActionButton(placedActionsRoot, "Finalizar montagem", OnFinalizeSetupPressed);
@@ -193,7 +199,7 @@ namespace CardgameProof.Core
         {
             if (!boardController.TryGetCoordinateFromScreenPosition(eventData.position, out Vector2Int coord)) { cardView.ResetToTray(); return; }
             PlacedCardData data = cardView.CardData; data.Coordinate = coord;
-            if (!boardController.PlaceCard(data)) { cardView.ResetToTray(); Debug.Log("Jogada inválida"); AudioManager.Instance?.PlayInvalid(); return; }
+            if (!boardController.PlaceCard(data)) { cardView.ResetToTray(); Debug.Log("Jogada inválida"); AudioManager.Instance?.PlayInvalid(); matchReportService.OnInvalidPlacement(); return; }
             AudioManager.Instance?.PlayCardPlace();
             cardView.gameObject.SetActive(false);
             StorePlacedCardForCurrentPlayer(data);
@@ -206,6 +212,7 @@ namespace CardgameProof.Core
             if (!selectedPlacedCoordinate.HasValue) return;
             PlacedCardData placed = boardController.GetPlacedCard(selectedPlacedCoordinate.Value);
             if (placed == null || !boardController.RemoveCard(selectedPlacedCoordinate.Value)) return;
+            matchReportService.OnRepositionOrRemove();
             RemoveStoredPlacedCardForCurrentPlayer(placed.CardId);
             SetupCardView trayCard = trayCards.Find(c => c != null && c.CardData.CardId == placed.CardId);
             if (trayCard != null) trayCard.gameObject.SetActive(true);
@@ -216,6 +223,7 @@ namespace CardgameProof.Core
 
         private void OnFinalizeSetupPressed()
         {
+            matchReportService.EndSetup(currentSetupPlayer);
             HideSetupSensitiveUi();
             if (currentSetupPlayer == PlayerId.PlayerOne)
             {
@@ -238,6 +246,7 @@ namespace CardgameProof.Core
             blockedCharacterGuesses[PlayerId.PlayerOne] = new HashSet<string>(); blockedCharacterGuesses[PlayerId.PlayerTwo] = new HashSet<string>();
             totalCluesRequested = 0; totalResearchUses = 0; totalGuesses = 0;
             currentTurnPlayer = PlayerId.PlayerOne;
+            matchReportService.TurnStart(currentTurnPlayer);
             ShowOpponentBoardForCurrentTurn();
             UpdateHud();
         }
@@ -260,6 +269,7 @@ namespace CardgameProof.Core
             if (card == null || card.IsFaceUp) return;
             AudioManager.Instance?.PlayReveal();
             if (card.CardType == CardType.Character && blockedCharacterGuesses[currentTurnPlayer].Contains(card.CardId)) return;
+            matchReportService.MarkFirstInvestigation();
             card.IsFaceUp = true; boardController.RemoveCard(coordinate); boardController.PlaceCard(card);
             if (card.CardType == CardType.Archive) { EnsureInvestigationOverlayView(); ResolveArchiveCard(card); return; }
             ResolveCharacterCard(card);
@@ -269,9 +279,9 @@ namespace CardgameProof.Core
         {
             LogTelemetry("archive_card_found", $"card={card.CardId}");
             int effectType = ParseCardIndex(card.CardId) % 3;
-            if (effectType == 0) ResolveArchiveLacunaDeArquivo(card.CardId);
-            else if (effectType == 1) ResolveArchiveReferenciaCruzada(card);
-            else ResolveArchiveFragmentoDocumento(card.CardId);
+            if (effectType == 0) { matchReportService.OnArchiveRevealed("lacuna"); ResolveArchiveLacunaDeArquivo(card.CardId); }
+            else if (effectType == 1) { matchReportService.OnArchiveRevealed("referencia"); ResolveArchiveReferenciaCruzada(card); }
+            else { matchReportService.OnArchiveRevealed("fragmento"); ResolveArchiveFragmentoDocumento(card.CardId); }
         }
         private void ResolveArchiveLacunaDeArquivo(string cardId) { researchTokens[currentTurnPlayer] += 1; UpdateHud(); investigationOverlayView.Show("Lacuna de Arquivo", "Você ganhou +1 Ficha de Pesquisa."); investigationOverlayView.AddButton("Continuar", EndTurnAfterOverlay); LogTelemetry("archive_effect_resolved", $"card={cardId};effect=lacuna_de_arquivo;result=token_plus_one"); }
         private void ResolveArchiveReferenciaCruzada(PlacedCardData archiveCard)
@@ -299,7 +309,7 @@ namespace CardgameProof.Core
             }
         }
 
-        private void ResolveCharacterCard(PlacedCardData card) => ShowClueSelectionOverlay(card.CardId);
+        private void ResolveCharacterCard(PlacedCardData card) { matchReportService.MarkFirstCharacterFound(); ShowClueSelectionOverlay(card.CardId); }
         private void ShowClueSelectionOverlay(string characterId)
         {
             EnsureInvestigationOverlayView();
@@ -317,6 +327,7 @@ namespace CardgameProof.Core
             GetKnownClues(currentTurnPlayer, characterId).Add(category);
             blockedCharacterGuesses[currentTurnPlayer].Remove(characterId);
             totalCluesRequested += 1;
+            matchReportService.OnClueRequested(characterId, category);
             LogTelemetry("clue_requested", $"character={characterId};category={category}");
             AudioManager.Instance?.PlayClue();
             investigationOverlayView.Show("Pista revelada", $"{GetCategoryLabel(category)}\n\n{GetClueText(characterId, category)}");
@@ -332,6 +343,7 @@ namespace CardgameProof.Core
         private void ResolveGuess(string characterId, string guessedName)
         {
             totalGuesses += 1;
+            matchReportService.OnGuess(correct, characterId);
             CharacterData target = FindCharacterByCardId(characterId);
             bool correct = target != null && string.Equals(target.DisplayName, guessedName, StringComparison.Ordinal);
             LogTelemetry("guess_made", $"character={characterId};guess={guessedName}");
@@ -350,7 +362,7 @@ namespace CardgameProof.Core
         }
 
         private void EndTurnAfterOverlay() { investigationOverlayView.Hide(); EndTurnWithPassScreen(); }
-        private void EndTurnWithPassScreen() { PlayerId next = currentTurnPlayer == PlayerId.PlayerOne ? PlayerId.PlayerTwo : PlayerId.PlayerOne; ShowReadyScreen("Passe o aparelho para o próximo jogador", "Estou pronto", () => { currentTurnPlayer = next; HideReadyScreen(); ShowOpponentBoardForCurrentTurn(); UpdateHud(); }); }
+        private void EndTurnWithPassScreen() { PlayerId next = currentTurnPlayer == PlayerId.PlayerOne ? PlayerId.PlayerTwo : PlayerId.PlayerOne; ShowReadyScreen("Passe o aparelho para o próximo jogador", "Estou pronto", () => { currentTurnPlayer = next; matchReportService.TurnStart(currentTurnPlayer); HideReadyScreen(); ShowOpponentBoardForCurrentTurn(); UpdateHud(); }); }
 
         private void BuildInvestigationHud()
         {
@@ -381,8 +393,10 @@ namespace CardgameProof.Core
             string modeLabel = ActiveModeConfig != null ? ActiveModeConfig.DisplayName : "Modo desconhecido";
             string winnerLabel = winner == PlayerId.PlayerOne ? "Jogador 1" : "Jogador 2";
             EnsureWinScreenView();
-            winScreenView.Show($"Vitória do {winnerLabel}!", $"Personagens identificados: {scores[winner]}\nModo: {modeLabel}", RestartCurrentModeMatch, ReturnToMainMenu);
+            EnsureMatchReportView();
+            winScreenView.Show($"Vitória do {winnerLabel}!", $"Personagens identificados: {scores[winner]}\nModo: {modeLabel}", OpenReportFromWinScreen, RestartCurrentModeMatch, ReturnToMainMenu);
             AudioManager.Instance?.PlayWin();
+            lastReportText = matchReportService.Finish(winnerLabel, scores[PlayerId.PlayerOne], scores[PlayerId.PlayerTwo]).ModeName != null ? matchReportService.BuildReadableReport() : string.Empty;
             LogTelemetry("match_finished", $"winner={winner};mode={ActiveModeConfig?.Id};duration={ActiveModeConfig?.DurationMinutes};final_scores={scores[PlayerId.PlayerOne]}-{scores[PlayerId.PlayerTwo]};total_clues_requested={totalCluesRequested};total_research_uses={totalResearchUses};total_guesses={totalGuesses}");
         }
 
@@ -435,14 +449,14 @@ namespace CardgameProof.Core
             foreach (ClueCategory c in order) { if (known.Contains(c)) continue; known.Add(c); blockedCharacterGuesses[currentTurnPlayer].Remove(characterId); category = c; clueText = GetClueText(characterId, c); return true; }
             category = ClueCategory.Area; clueText = string.Empty; return false;
         }
-        private void ShowNoValidTargetArchiveEffect(string effectName, string cardId) { investigationOverlayView.Show("Efeito de Arquivo", "Sem alvo válido. A investigação continua."); investigationOverlayView.AddButton("Continuar", EndTurnAfterOverlay); LogTelemetry("archive_effect_resolved", $"card={cardId};effect={effectName};result=sem_alvo_valido"); }
+        private void ShowNoValidTargetArchiveEffect(string effectName, string cardId) { investigationOverlayView.Show("Efeito de Arquivo", "Sem alvo válido. A investigação continua."); investigationOverlayView.AddButton("Continuar", EndTurnAfterOverlay); matchReportService.OnArchiveResolution(false); LogTelemetry("archive_effect_resolved", $"card={cardId};effect={effectName};result=sem_alvo_valido"); }
 
         private void OnGuidebookButtonPressed()
         {
             EnsureInvestigationOverlayView();
             if (researchTokens[currentTurnPlayer] <= 0) { investigationOverlayView.Show("Guia de Apoio", "Você não tem Fichas de Pesquisa restantes."); investigationOverlayView.AddButton("Fechar", investigationOverlayView.Hide); return; }
             investigationOverlayView.Show("Guia de Apoio", "Gastar 1 Ficha de Pesquisa para abrir o guia?");
-            investigationOverlayView.AddButton("Confirmar", () => { researchTokens[currentTurnPlayer] = Mathf.Max(0, researchTokens[currentTurnPlayer] - 1); totalResearchUses += 1; AudioManager.Instance?.PlayResearch(); UpdateHud(); investigationOverlayView.Hide(); ShowGuidebookOverlay(); });
+            investigationOverlayView.AddButton("Confirmar", () => { researchTokens[currentTurnPlayer] = Mathf.Max(0, researchTokens[currentTurnPlayer] - 1); totalResearchUses += 1; matchReportService.OnGuidebookUse(currentTurnPlayer); AudioManager.Instance?.PlayResearch(); UpdateHud(); investigationOverlayView.Hide(); ShowGuidebookOverlay(); });
             investigationOverlayView.AddButton("Cancelar", investigationOverlayView.Hide);
         }
         private void ShowGuidebookOverlay() { EnsureGuidebookOverlayView(); guidebookOverlayView.Show(PrototypeDatabase.Characters); }
@@ -463,6 +477,8 @@ namespace CardgameProof.Core
         private void EnsureInvestigationOverlayView() { if (investigationOverlayView != null) return; GameObject go = new GameObject("InvestigationOverlayView"); go.transform.SetParent(sceneRoot.OverlayLayer, false); investigationOverlayView = go.AddComponent<InvestigationOverlayView>(); investigationOverlayView.Initialize(sceneRoot.OverlayLayer); }
         private void EnsureGuidebookOverlayView() { if (guidebookOverlayView != null) return; GameObject go = new GameObject("GuidebookOverlayView"); go.transform.SetParent(sceneRoot.OverlayLayer, false); guidebookOverlayView = go.AddComponent<GuidebookOverlayView>(); guidebookOverlayView.Initialize(sceneRoot.OverlayLayer); }
         private void EnsureWinScreenView() { if (winScreenView != null) return; GameObject go = new GameObject("WinScreenView"); go.transform.SetParent(sceneRoot.OverlayLayer, false); winScreenView = go.AddComponent<WinScreenView>(); winScreenView.Initialize(sceneRoot.OverlayLayer); }
+        private void EnsureMatchReportView() { if (matchReportView != null) return; GameObject go = new GameObject("MatchReportView"); go.transform.SetParent(sceneRoot.OverlayLayer, false); matchReportView = go.AddComponent<MatchReportView>(); matchReportView.Initialize(sceneRoot.OverlayLayer); }
+        private void OpenReportFromWinScreen() { EnsureMatchReportView(); winScreenView.Hide(); matchReportView.Show(lastReportText, () => { matchReportView.Hide(); winScreenView.Show("Resultado", "Veja o resumo final", OpenReportFromWinScreen, RestartCurrentModeMatch, ReturnToMainMenu); }); }
         private void EnsureReadyScreenView() { if (readyScreenView != null) return; GameObject go = new GameObject("ReadyScreenView"); go.transform.SetParent(sceneRoot.OverlayLayer, false); readyScreenView = go.AddComponent<ReadyScreenView>(); readyScreenView.Initialize(sceneRoot.OverlayLayer); }
         private void ShowReadyScreen(string message, string buttonText, Action onConfirm) { EnsureReadyScreenView(); readyScreenView.Show(message, buttonText, onConfirm); }
         private void HideReadyScreen() => readyScreenView?.Hide();
