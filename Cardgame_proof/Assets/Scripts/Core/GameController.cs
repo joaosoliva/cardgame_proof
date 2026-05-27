@@ -50,6 +50,7 @@ namespace CardgameProof.Core
 
         private RectTransform hudRoot;
         private RectTransform hudButtonCardsRoot;
+        private TextMeshProUGUI guideCardTokensText;
         private TextMeshProUGUI hudCurrentPlayer;
         private TextMeshProUGUI hudObjective;
         private TextMeshProUGUI hudScore;
@@ -488,8 +489,8 @@ namespace CardgameProof.Core
             hudButtonCardsRoot.SetParent(sceneRoot.ActionArea, false);
             hudButtonCardsRoot.anchorMin = Vector2.zero; hudButtonCardsRoot.anchorMax = Vector2.one;
             hudButtonCardsRoot.offsetMin = new Vector2(18f, 8f); hudButtonCardsRoot.offsetMax = new Vector2(-18f, -8f);
-            CreateInfoCardButton(hudButtonCardsRoot, "Guia", "Pesquisar personagens", -170f, OnGuidebookButtonPressed);
-            CreateInfoCardButton(hudButtonCardsRoot, "Regras", "Resumo da partida", 170f, ShowRulesOverlay);
+            CreateInfoCardButton(hudButtonCardsRoot, "Guia", "Pesquisar personagens", "Fichas: 0", -230f, OnGuidebookButtonPressed, out guideCardTokensText);
+            CreateInfoCardButton(hudButtonCardsRoot, "Regras", "Resumo da partida", string.Empty, 230f, ShowRulesOverlay, out _);
         }
 
         private void UpdateHud()
@@ -499,6 +500,10 @@ namespace CardgameProof.Core
             hudObjective.text = $"Objetivo: identificar {ActiveModeConfig.ObjectiveIdentifications}";
             hudScore.text = $"Placar J1 {scores[PlayerId.PlayerOne]} x {scores[PlayerId.PlayerTwo]} J2";
             hudResearch.text = $"Fichas de Pesquisa: {researchTokens[currentTurnPlayer]}";
+            if (guideCardTokensText != null)
+            {
+                guideCardTokensText.text = $"Fichas: {researchTokens[currentTurnPlayer]}";
+            }
         }
 
         private void CompleteMatch(PlayerId winner)
@@ -702,24 +707,33 @@ namespace CardgameProof.Core
             rect.sizeDelta = new Vector2(width, 84f);
             rect.anchoredPosition = new Vector2(x, 0f);
         }
-        private Button CreateInfoCardButton(RectTransform parent, string title, string subtitle, float xOffset, Action onClick)
+        private Button CreateInfoCardButton(RectTransform parent, string title, string subtitle, string detailText, float xOffset, Action onClick, out TextMeshProUGUI detailLabel)
         {
             GameObject go = new GameObject($"{title}Card", typeof(RectTransform), typeof(Image), typeof(Button));
             RectTransform rect = go.GetComponent<RectTransform>();
             rect.SetParent(parent, false);
             rect.anchorMin = new Vector2(0.5f, 0.5f); rect.anchorMax = new Vector2(0.5f, 0.5f);
-            rect.sizeDelta = new Vector2(300f, 128f);
+            rect.sizeDelta = new Vector2(430f, 150f);
             rect.anchoredPosition = new Vector2(xOffset, 0f);
             Image bg = go.GetComponent<Image>();
-            bg.color = new Color(0.16f, 0.2f, 0.28f, 0.98f);
+            bg.color = new Color(0.9f, 0.92f, 0.96f, 0.98f);
             Button b = go.GetComponent<Button>();
             b.onClick.AddListener(() => { AudioManager.Instance?.PlayButton(); onClick?.Invoke(); });
+            Outline outline = go.AddComponent<Outline>();
+            outline.effectColor = new Color(0f, 0f, 0f, 0.2f);
+            outline.effectDistance = new Vector2(2f, -2f);
             TextMeshProUGUI t1 = new GameObject("Title", typeof(RectTransform), typeof(TextMeshProUGUI)).GetComponent<TextMeshProUGUI>();
-            t1.rectTransform.SetParent(rect, false); t1.rectTransform.anchorMin = new Vector2(0.08f, 0.5f); t1.rectTransform.anchorMax = new Vector2(0.92f, 0.92f); t1.rectTransform.offsetMin = Vector2.zero; t1.rectTransform.offsetMax = Vector2.zero;
-            t1.text = title; t1.fontSize = 34; t1.color = Color.white; t1.alignment = TextAlignmentOptions.MidlineLeft;
+            t1.rectTransform.SetParent(rect, false); t1.rectTransform.anchorMin = new Vector2(0.06f, 0.56f); t1.rectTransform.anchorMax = new Vector2(0.94f, 0.94f); t1.rectTransform.offsetMin = Vector2.zero; t1.rectTransform.offsetMax = Vector2.zero;
+            t1.text = title; t1.fontSize = 40; t1.color = new Color(0.12f, 0.12f, 0.14f, 1f); t1.alignment = TextAlignmentOptions.MidlineLeft;
             TextMeshProUGUI t2 = new GameObject("Subtitle", typeof(RectTransform), typeof(TextMeshProUGUI)).GetComponent<TextMeshProUGUI>();
-            t2.rectTransform.SetParent(rect, false); t2.rectTransform.anchorMin = new Vector2(0.08f, 0.08f); t2.rectTransform.anchorMax = new Vector2(0.92f, 0.46f); t2.rectTransform.offsetMin = Vector2.zero; t2.rectTransform.offsetMax = Vector2.zero;
-            t2.text = subtitle; t2.fontSize = 22; t2.color = new Color(0.78f, 0.86f, 0.95f, 1f); t2.alignment = TextAlignmentOptions.MidlineLeft;
+            t2.rectTransform.SetParent(rect, false); t2.rectTransform.anchorMin = new Vector2(0.06f, 0.24f); t2.rectTransform.anchorMax = new Vector2(0.94f, 0.54f); t2.rectTransform.offsetMin = Vector2.zero; t2.rectTransform.offsetMax = Vector2.zero;
+            t2.text = subtitle; t2.fontSize = 24; t2.color = new Color(0.2f, 0.24f, 0.29f, 1f); t2.alignment = TextAlignmentOptions.MidlineLeft;
+            detailLabel = new GameObject("Detail", typeof(RectTransform), typeof(TextMeshProUGUI)).GetComponent<TextMeshProUGUI>();
+            detailLabel.rectTransform.SetParent(rect, false); detailLabel.rectTransform.anchorMin = new Vector2(0.06f, 0.04f); detailLabel.rectTransform.anchorMax = new Vector2(0.94f, 0.22f); detailLabel.rectTransform.offsetMin = Vector2.zero; detailLabel.rectTransform.offsetMax = Vector2.zero;
+            detailLabel.text = detailText;
+            detailLabel.fontSize = 20;
+            detailLabel.color = new Color(0.35f, 0.38f, 0.45f, 1f);
+            detailLabel.alignment = TextAlignmentOptions.MidlineLeft;
             return b;
         }
 
