@@ -25,9 +25,9 @@ namespace CardgameProof.Bootstrap
             SafeAreaRoot = CreateOrGetChild(FullScreenRoot, "SafeAreaRoot", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             ApplySafeArea(SafeAreaRoot);
 
-            float topHeight = 220f;
-            float actionHeight = 220f;
-            float bottomHeight = 360f;
+            float topHeight = 150f;
+            float actionHeight = 170f;
+            float bottomHeight = 330f;
 
             TopArea = CreateOrGetChild(SafeAreaRoot, "TopArea", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(0f, topHeight));
 
@@ -40,6 +40,11 @@ namespace CardgameProof.Bootstrap
             OverlayLayer = CreateOrGetChild(SafeAreaRoot, "OverlayLayer", new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0f, 0f), new Vector2(0f, 0f));
             OverlayLayer.SetAsLastSibling();
         }
+
+        public static void SetAnchors(RectTransform rect, Vector2 min, Vector2 max) { if (rect == null) return; rect.anchorMin = min; rect.anchorMax = max; }
+        public static void SetPivot(RectTransform rect, Vector2 pivot) { if (rect == null) return; rect.pivot = pivot; }
+        public static void SetSize(RectTransform rect, float width, float height) { if (rect == null) return; rect.sizeDelta = new Vector2(width, height); }
+        public static void SetAnchoredPosition(RectTransform rect, float x, float y) { if (rect == null) return; rect.anchoredPosition = new Vector2(x, y); }
 
         private static void ApplySafeArea(RectTransform root)
         {

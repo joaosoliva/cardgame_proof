@@ -49,6 +49,7 @@ namespace CardgameProof.Core
         private PlayerId currentTurnPlayer = PlayerId.PlayerOne;
 
         private RectTransform hudRoot;
+        private RectTransform hudButtonCardsRoot;
         private TextMeshProUGUI hudCurrentPlayer;
         private TextMeshProUGUI hudObjective;
         private TextMeshProUGUI hudScore;
@@ -205,17 +206,26 @@ namespace CardgameProof.Core
         private void BuildPlacedCardActions()
         {
             if (placedActionsRoot != null) Destroy(placedActionsRoot.gameObject);
-            GameObject root = new GameObject("PlacedCardActions", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+            GameObject root = new GameObject("PlacedCardActions", typeof(RectTransform));
             placedActionsRoot = root.GetComponent<RectTransform>();
             placedActionsRoot.SetParent(sceneRoot.ActionArea, false);
             placedActionsRoot.anchorMin = Vector2.zero; placedActionsRoot.anchorMax = Vector2.one;
-            placedActionsRoot.offsetMin = new Vector2(20f, 20f); placedActionsRoot.offsetMax = new Vector2(-20f, -20f);
-            HorizontalLayoutGroup h = root.GetComponent<HorizontalLayoutGroup>(); h.spacing = 16f; h.childForceExpandWidth = true;
+            placedActionsRoot.offsetMin = new Vector2(16f, 12f); placedActionsRoot.offsetMax = new Vector2(-16f, -12f);
 
-            CreateActionButton(placedActionsRoot, "Girar", () => { if (selectedPlacedCoordinate.HasValue) { boardController.RotateCard(selectedPlacedCoordinate.Value); matchReportService.OnRotate(); } });
-            CreateActionButton(placedActionsRoot, "Remover", OnRemoveSelectedPlacedCard);
-            CreateActionButton(placedActionsRoot, "Confirmar", () => selectedPlacedCoordinate = null);
+            float spacing = 14f;
+            float width = (sceneRoot.ActionArea.rect.width - 32f - (spacing * 3f)) / 4f;
+            if (width < 200f) width = 200f;
+            float x = width * -1.5f - spacing * 1.5f;
+
+            RectTransform r1 = CreateActionButton(placedActionsRoot, "Girar", () => { if (selectedPlacedCoordinate.HasValue) { boardController.RotateCard(selectedPlacedCoordinate.Value); matchReportService.OnRotate(); } }).GetComponent<RectTransform>();
+            RectTransform r2 = CreateActionButton(placedActionsRoot, "Remover", OnRemoveSelectedPlacedCard).GetComponent<RectTransform>();
+            RectTransform r3 = CreateActionButton(placedActionsRoot, "Confirmar", () => selectedPlacedCoordinate = null).GetComponent<RectTransform>();
             finalizeSetupButton = CreateActionButton(placedActionsRoot, "Finalizar montagem", OnFinalizeSetupPressed);
+            RectTransform r4 = finalizeSetupButton.GetComponent<RectTransform>();
+            PositionActionButton(r1, x + (width + spacing) * 0f, width);
+            PositionActionButton(r2, x + (width + spacing) * 1f, width);
+            PositionActionButton(r3, x + (width + spacing) * 2f, width);
+            PositionActionButton(r4, x + (width + spacing) * 3f, width);
         }
 
         private void GenerateCurrentPlayerSetupCards(PlayerId player)
@@ -414,14 +424,30 @@ namespace CardgameProof.Core
         private void BuildInvestigationHud()
         {
             if (hudRoot != null) Destroy(hudRoot.gameObject);
-            GameObject hud = new GameObject("InvestigationHUD", typeof(RectTransform), typeof(Image), typeof(VerticalLayoutGroup));
-            hudRoot = hud.GetComponent<RectTransform>(); hudRoot.SetParent(sceneRoot.TopArea, false); hudRoot.anchorMin = Vector2.zero; hudRoot.anchorMax = Vector2.one; hudRoot.offsetMin = new Vector2(8, 8); hudRoot.offsetMax = new Vector2(-8, -8);
-            hud.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.2f);
-            VerticalLayoutGroup v = hud.GetComponent<VerticalLayoutGroup>(); v.spacing = 6f;
-            hudCurrentPlayer = CreateHudText(hudRoot, "Jogador atual"); hudObjective = CreateHudText(hudRoot, "Objetivo"); hudScore = CreateHudText(hudRoot, "Placar"); hudResearch = CreateHudText(hudRoot, "Fichas de pesquisa");
-            RectTransform buttonsRow = new GameObject("HUDButtons", typeof(RectTransform), typeof(HorizontalLayoutGroup)).GetComponent<RectTransform>();
-            buttonsRow.SetParent(hudRoot, false); buttonsRow.GetComponent<HorizontalLayoutGroup>().spacing = 12f;
-            CreateActionButton(buttonsRow, "Guia de Apoio", OnGuidebookButtonPressed); CreateActionButton(buttonsRow, "Regras", ShowRulesOverlay);
+            GameObject hud = new GameObject("InvestigationHUD", typeof(RectTransform), typeof(Image));
+            hudRoot = hud.GetComponent<RectTransform>();
+            hudRoot.SetParent(sceneRoot.TopArea, false);
+            hudRoot.anchorMin = Vector2.zero; hudRoot.anchorMax = Vector2.one;
+            hudRoot.offsetMin = new Vector2(8, 6); hudRoot.offsetMax = new Vector2(-8, -6);
+            hud.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.26f);
+
+            hudCurrentPlayer = CreateHudText(hudRoot, "Jogador atual");
+            hudObjective = CreateHudText(hudRoot, "Objetivo");
+            hudScore = CreateHudText(hudRoot, "Placar");
+            hudResearch = CreateHudText(hudRoot, "Fichas de pesquisa");
+            PositionHudText(hudCurrentPlayer, new Vector2(0.02f, 0.53f), new Vector2(0.49f, 0.98f));
+            PositionHudText(hudObjective, new Vector2(0.51f, 0.53f), new Vector2(0.98f, 0.98f));
+            PositionHudText(hudScore, new Vector2(0.02f, 0.02f), new Vector2(0.49f, 0.47f));
+            PositionHudText(hudResearch, new Vector2(0.51f, 0.02f), new Vector2(0.98f, 0.47f));
+
+            if (hudButtonCardsRoot != null) Destroy(hudButtonCardsRoot.gameObject);
+            GameObject cardRow = new GameObject("GuideRulesCards", typeof(RectTransform));
+            hudButtonCardsRoot = cardRow.GetComponent<RectTransform>();
+            hudButtonCardsRoot.SetParent(sceneRoot.ActionArea, false);
+            hudButtonCardsRoot.anchorMin = Vector2.zero; hudButtonCardsRoot.anchorMax = Vector2.one;
+            hudButtonCardsRoot.offsetMin = new Vector2(18f, 8f); hudButtonCardsRoot.offsetMax = new Vector2(-18f, -8f);
+            CreateInfoCardButton(hudButtonCardsRoot, "Guia", "Pesquisar personagens", -170f, OnGuidebookButtonPressed);
+            CreateInfoCardButton(hudButtonCardsRoot, "Regras", "Resumo da partida", 170f, ShowRulesOverlay);
         }
 
         private void UpdateHud()
@@ -619,6 +645,40 @@ namespace CardgameProof.Core
             t.enableWordWrapping = true;
             t.text = value;
             return t;
+        }
+        private static void PositionHudText(TextMeshProUGUI text, Vector2 min, Vector2 max)
+        {
+            RectTransform rect = text.rectTransform;
+            rect.anchorMin = min; rect.anchorMax = max;
+            rect.offsetMin = Vector2.zero; rect.offsetMax = Vector2.zero;
+        }
+        private static void PositionActionButton(RectTransform rect, float x, float width)
+        {
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = new Vector2(width, 84f);
+            rect.anchoredPosition = new Vector2(x, 0f);
+        }
+        private Button CreateInfoCardButton(RectTransform parent, string title, string subtitle, float xOffset, Action onClick)
+        {
+            GameObject go = new GameObject($"{title}Card", typeof(RectTransform), typeof(Image), typeof(Button));
+            RectTransform rect = go.GetComponent<RectTransform>();
+            rect.SetParent(parent, false);
+            rect.anchorMin = new Vector2(0.5f, 0.5f); rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = new Vector2(300f, 128f);
+            rect.anchoredPosition = new Vector2(xOffset, 0f);
+            Image bg = go.GetComponent<Image>();
+            bg.color = new Color(0.16f, 0.2f, 0.28f, 0.98f);
+            Button b = go.GetComponent<Button>();
+            b.onClick.AddListener(() => { AudioManager.Instance?.PlayButton(); onClick?.Invoke(); });
+            TextMeshProUGUI t1 = new GameObject("Title", typeof(RectTransform), typeof(TextMeshProUGUI)).GetComponent<TextMeshProUGUI>();
+            t1.rectTransform.SetParent(rect, false); t1.rectTransform.anchorMin = new Vector2(0.08f, 0.5f); t1.rectTransform.anchorMax = new Vector2(0.92f, 0.92f); t1.rectTransform.offsetMin = Vector2.zero; t1.rectTransform.offsetMax = Vector2.zero;
+            t1.text = title; t1.fontSize = 34; t1.color = Color.white; t1.alignment = TextAlignmentOptions.MidlineLeft;
+            TextMeshProUGUI t2 = new GameObject("Subtitle", typeof(RectTransform), typeof(TextMeshProUGUI)).GetComponent<TextMeshProUGUI>();
+            t2.rectTransform.SetParent(rect, false); t2.rectTransform.anchorMin = new Vector2(0.08f, 0.08f); t2.rectTransform.anchorMax = new Vector2(0.92f, 0.46f); t2.rectTransform.offsetMin = Vector2.zero; t2.rectTransform.offsetMax = Vector2.zero;
+            t2.text = subtitle; t2.fontSize = 22; t2.color = new Color(0.78f, 0.86f, 0.95f, 1f); t2.alignment = TextAlignmentOptions.MidlineLeft;
+            return b;
         }
 
         private void SetPhase(GamePhase newPhase)
