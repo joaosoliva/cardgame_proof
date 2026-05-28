@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using UnityEngine.EventSystems;
 
 namespace CardgameProof.Core
 {
@@ -48,12 +49,14 @@ namespace CardgameProof.Core
                 {
                     Debug.Log("[TUTORIAL_CLICK_TEST] Entendi clicked");
                     Debug.Log($"[TUTORIAL] Continue clicked: {currentStepId}");
+                    Debug.Log($"[TUTORIAL] Selected GO: {(EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null ? EventSystem.current.currentSelectedGameObject.name : "null")}");
                     onContinue();
                 });
             }
 
             SetCompact(step.CompactMode || !showContinueButton);
             SetPlacement(step.PreferredPlacement, target, step.AvoidTargetOverlap);
+            cardRoot.SetAsLastSibling();
 
             blocker.alpha = 1f;
             blocker.interactable = blockOutsideTarget;
@@ -280,10 +283,11 @@ namespace CardgameProof.Core
 
         private void ForceWelcomeInputSafety()
         {
-            blocker.interactable = false;
-            blocker.blocksRaycasts = false;
+            // Welcome/continue step must block gameplay behind the tutorial.
+            blocker.interactable = true;
+            blocker.blocksRaycasts = true;
             Image blockerImage = panelObject.GetComponent<Image>();
-            if (blockerImage != null) blockerImage.raycastTarget = false;
+            if (blockerImage != null) blockerImage.raycastTarget = true;
             highlightFrame.raycastTarget = false;
             CanvasGroup hg = highlightFrame.GetComponent<CanvasGroup>();
             if (hg != null) { hg.interactable = false; hg.blocksRaycasts = false; }
