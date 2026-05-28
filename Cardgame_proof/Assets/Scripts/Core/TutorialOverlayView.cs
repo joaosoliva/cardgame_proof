@@ -1,8 +1,10 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using UnityEngine.EventSystems;
 
 namespace CardgameProof.Core
 {
@@ -19,6 +21,7 @@ namespace CardgameProof.Core
         private RectTransform cardRoot;
         private CanvasGroup cardCanvasGroup;
         private Coroutine fadeCoroutine;
+        private bool debugWelcomeStepActive;
 
         public bool IsVisible => panelObject != null && panelObject.activeSelf;
 
@@ -44,6 +47,7 @@ namespace CardgameProof.Core
             {
                 confirmButton.onClick.AddListener(() =>
                 {
+                    Debug.Log("[TUTORIAL_CLICK_TEST] Entendi clicked");
                     Debug.Log($"[TUTORIAL] Continue clicked: {currentStepId}");
                     onContinue();
                 });
@@ -62,6 +66,13 @@ namespace CardgameProof.Core
             cardCanvasGroup.blocksRaycasts = true;
             UpdateHighlight(target);
             LogTutorialUiState();
+            debugWelcomeStepActive = string.Equals(step.Id, "setup_intro", StringComparison.OrdinalIgnoreCase) ||
+                                     step.Title.Contains("Bem-vindo", StringComparison.OrdinalIgnoreCase);
+            if (debugWelcomeStepActive)
+            {
+                ForceWelcomeInputSafety();
+                DumpWelcomeDiagnostics();
+            }
         }
 
         public void Hide()
@@ -73,6 +84,20 @@ namespace CardgameProof.Core
             cardCanvasGroup.alpha = 0f; cardCanvasGroup.interactable = false; cardCanvasGroup.blocksRaycasts = false;
             highlightFrame.gameObject.SetActive(false);
             panelObject.SetActive(false);
+            debugWelcomeStepActive = false;
+        }
+
+        private void Update()
+        {
+            if (!debugWelcomeStepActive || !IsVisible || EventSystem.current == null) return;
+            if (!Input.GetMouseButtonDown(0)) return;
+            var eventData = new PointerEventData(EventSystem.current) { position = Input.mousePosition };
+            List<RaycastResult> results = new List<RaycastResult>();
+            EventSystem.current.RaycastAll(eventData, results);
+            for (int i = 0; i < results.Count; i++)
+            {
+                Debug.Log($"[UI_RAYCAST] Hit {i}: {results[i].gameObject.name}");
+            }
         }
 
         public void SetPlacement(TutorialPanelPlacement placement, RectTransform target = null, bool avoidTargetOverlap = true)
@@ -187,6 +212,9 @@ namespace CardgameProof.Core
             highlightFrame = frameObj.GetComponent<Image>();
             highlightFrame.color = new Color(1f, 0.85f, 0.2f, 0.18f);
             highlightFrame.raycastTarget = false;
+            CanvasGroup highlightGroup = frameObj.AddComponent<CanvasGroup>();
+            highlightGroup.interactable = false;
+            highlightGroup.blocksRaycasts = false;
             var outline = frameObj.AddComponent<Outline>();
             outline.effectColor = new Color(1f, 0.85f, 0.2f, 0.95f);
             outline.effectDistance = new Vector2(4f, -4f);
@@ -262,6 +290,65 @@ namespace CardgameProof.Core
             Debug.Log($"[TUTORIAL_UI] card sibling={cardRoot.GetSiblingIndex()} raycast={cardRoot.GetComponent<Image>().raycastTarget}");
             Debug.Log($"[TUTORIAL_UI] continue sibling={confirmButton.transform.GetSiblingIndex()} interactable={confirmButton.interactable} raycast={(buttonImage != null && buttonImage.raycastTarget)}");
             Debug.Log($"[TUTORIAL_UI] blocker alpha={blocker.alpha} interactable={blocker.interactable} blocks={blocker.blocksRaycasts}");
+        }
+
+        private void ForceWelcomeInputSafety()
+        {
+            blocker.interactable = false;
+            blocker.blocksRaycasts = false;
+            Image blockerImage = panelObject.GetComponent<Image>();
+            if (blockerImage != null) blockerImage.raycastTarget = false;
+            highlightFrame.raycastTarget = false;
+            CanvasGroup hg = highlightFrame.GetComponent<CanvasGroup>();
+            if (hg != null) { hg.interactable = false; hg.blocksRaycasts = false; }
+            confirmButton.interactable = true;
+            Image bi = confirmButton.GetComponent<Image>();
+            if (bi != null) bi.raycastTarget = true;
+            TextMeshProUGUI lbl = confirmButton.GetComponentInChildren<TextMeshProUGUI>(true);
+            if (lbl != null) lbl.raycastTarget = false;
+            cardCanvasGroup.alpha = 1f;
+            cardCanvasGroup.interactable = true;
+            cardCanvasGroup.blocksRaycasts = true;
+        }
+
+        private void DumpWelcomeDiagnostics()
+        {
+            Debug.Log($"[TUTORIAL_DIAG] Button={confirmButton.name} interactable={confirmButton.interactable} activeSelf={confirmButton.gameObject.activeSelf} activeInHierarchy={confirmButton.gameObject.activeInHierarchy}");
+            Image bi = confirmButton.GetComponent<Image>();
+            TextMeshProUGUI lbl = confirmButton.GetComponentInChildren<TextMeshProUGUI>(true);
+            Debug.Log($"[TUTORIAL_DIAG] ButtonImage.raycastTarget={(bi != null && bi.raycastTarget)} Label.raycastTarget={(lbl != null && lbl.raycastTarget)}");
+            Debug.Log($"[TUTORIAL_DIAG] Button parent={(confirmButton.transform.parent != null ? confirmButton.transform.parent.name : "null")} sibling={confirmButton.transform.GetSiblingIndex()}");
+            DumpUiRaycastTree(confirmButton.gameObject);
+            DumpOverlayChildren();
+        }
+
+        private void DumpUiRaycastTree(GameObject target)
+        {
+            Transform t = target != null ? target.transform : null;
+            while (t != null)
+            {
+                CanvasGroup cg = t.GetComponent<CanvasGroup>();
+                Image img = t.GetComponent<Image>();
+                Canvas canvas = t.GetComponent<Canvas>();
+                Debug.Log($"[UI_TREE] name={t.name} activeSelf={t.gameObject.activeSelf} activeInHierarchy={t.gameObject.activeInHierarchy} cg={(cg!=null)} alpha={(cg!=null?cg.alpha:-1)} interactable={(cg!=null&&cg.interactable)} blocks={(cg!=null&&cg.blocksRaycasts)} ignoreParent={(cg!=null&&cg.ignoreParentGroups)} img={(img!=null)} raycast={(img!=null&&img.raycastTarget)} canvas={(canvas!=null)} order={(canvas!=null?canvas.sortingOrder:-1)} sibling={t.GetSiblingIndex()}");
+                t = t.parent;
+            }
+        }
+
+        private void DumpOverlayChildren()
+        {
+            if (panelRoot == null || panelRoot.parent == null) return;
+            Transform parent = panelRoot.parent;
+            for (int i = 0; i < parent.childCount; i++)
+            {
+                Transform c = parent.GetChild(i);
+                CanvasGroup cg = c.GetComponent<CanvasGroup>();
+                Image img = c.GetComponent<Image>();
+                RectTransform rt = c as RectTransform;
+                Vector2 size = rt != null ? rt.rect.size : Vector2.zero;
+                bool large = size.x >= Screen.width * 0.75f && size.y >= Screen.height * 0.75f;
+                Debug.Log($"[UI_LAYER] name={c.name} active={c.gameObject.activeInHierarchy} sibling={c.GetSiblingIndex()} alpha={(cg!=null?cg.alpha:-1)} blocks={(cg!=null&&cg.blocksRaycasts)} raycast={(img!=null&&img.raycastTarget)} size={size} large={large}");
+            }
         }
     }
 }
