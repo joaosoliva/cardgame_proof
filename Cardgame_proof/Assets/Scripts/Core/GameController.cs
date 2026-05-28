@@ -96,6 +96,7 @@ namespace CardgameProof.Core
             {
                 mainMenuRoot = fullRoot.Find("MainMenuRoot") as RectTransform;
                 if (mainMenuRoot != null) mainMenuRoot.gameObject.SetActive(true);
+                EnsureHowToPlayView();
                 SetPhase(GamePhase.MainMenu);
                 Debug.Log("[GameController] Entered MainMenu phase");
                 return;
@@ -109,7 +110,11 @@ namespace CardgameProof.Core
             mainMenuRoot.GetComponent<Image>().color = new Color(0.08f, 0.11f, 0.16f, 1f);
 
             CreateTitle(mainMenuRoot, "Arquivo da Investigação");
-            CreateMenuActionButton(mainMenuRoot, "Como Funciona", new Vector2(0.5f, 0.58f), OpenHowToPlay);
+            CreateMenuActionButton(mainMenuRoot, "Como Funciona", new Vector2(0.5f, 0.58f), () =>
+            {
+                Debug.Log("[MAIN_MENU] Como Funciona clicked");
+                OpenHowToPlay();
+            });
             CreateMenuActionButton(mainMenuRoot, "Jogar Protótipo", new Vector2(0.5f, 0.42f), () => StartGameMode("quick_5"));
             CreateFooter(mainMenuRoot, "Modo digital: seleção de modo → montagem → investigação");
             EnsureHowToPlayView();
@@ -165,12 +170,35 @@ namespace CardgameProof.Core
         private void OpenHowToPlay()
         {
             EnsureHowToPlayView();
-            howToPlayView.Show(howToPlayPages, () => howToPlayView.Hide(), () => StartGameMode("quick_5"));
+            if (howToPlayView == null)
+            {
+                Debug.LogWarning("[HOW_TO_PLAY] Could not open: HowToPlayView is unavailable.");
+                return;
+            }
+
+            Debug.Log("[HOW_TO_PLAY] Open");
+            howToPlayView.Show(
+                howToPlayPages,
+                () =>
+                {
+                    Debug.Log("[HOW_TO_PLAY] Close");
+                    if (howToPlayView != null) howToPlayView.Hide();
+                },
+                () =>
+                {
+                    Debug.Log("[HOW_TO_PLAY] Play Prototype clicked");
+                    StartGameMode("quick_5");
+                });
         }
 
         private void EnsureHowToPlayView()
         {
             if (howToPlayView != null) return;
+            if (sceneRoot == null || sceneRoot.OverlayLayer == null)
+            {
+                Debug.LogWarning("[HOW_TO_PLAY] Initialization failed: sceneRoot/OverlayLayer is null.");
+                return;
+            }
             GameObject go = new GameObject("HowToPlayView");
             go.transform.SetParent(sceneRoot.OverlayLayer, false);
             howToPlayView = go.AddComponent<HowToPlayView>();
