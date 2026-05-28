@@ -29,7 +29,8 @@ namespace CardgameProof.Bootstrap
             float actionHeight = 170f;
             float bottomHeight = 330f;
 
-            TopArea = CreateOrGetChild(SafeAreaRoot, "TopArea", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, 1f), new Vector2(0f, topHeight));
+            TopArea = CreateOrGetChild(SafeAreaRoot, "TopArea", new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
+            ConfigureTopBarArea(TopArea, topHeight, SafeAreaRoot);
 
             BottomCardTray = CreateOrGetChild(SafeAreaRoot, "BottomCardTray", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 0f), new Vector2(0f, bottomHeight));
 
@@ -45,6 +46,41 @@ namespace CardgameProof.Bootstrap
         public static void SetPivot(RectTransform rect, Vector2 pivot) { if (rect == null) return; rect.pivot = pivot; }
         public static void SetSize(RectTransform rect, float width, float height) { if (rect == null) return; rect.sizeDelta = new Vector2(width, height); }
         public static void SetAnchoredPosition(RectTransform rect, float x, float y) { if (rect == null) return; rect.anchoredPosition = new Vector2(x, y); }
+
+
+        private static void ConfigureTopBarArea(RectTransform topArea, float height, RectTransform safeAreaRoot)
+        {
+            if (topArea == null) return;
+
+            Vector2 oldAnchorMin = topArea.anchorMin;
+            Vector2 oldAnchorMax = topArea.anchorMax;
+            Vector2 oldPivot = topArea.pivot;
+            Vector2 oldSizeDelta = topArea.sizeDelta;
+            Vector2 oldAnchoredPosition = topArea.anchoredPosition;
+            string parentName = topArea.parent != null ? topArea.parent.name : "<none>";
+            Vector2 parentSize = topArea.parent is RectTransform parentRect ? parentRect.rect.size : Vector2.zero;
+
+            topArea.anchorMin = new Vector2(0f, 1f);
+            topArea.anchorMax = new Vector2(1f, 1f);
+            topArea.pivot = new Vector2(0.5f, 1f);
+            topArea.sizeDelta = new Vector2(0f, height);
+            topArea.anchoredPosition = Vector2.zero;
+            topArea.offsetMin = new Vector2(0f, -height);
+            topArea.offsetMax = Vector2.zero;
+
+            float screenHeight = Mathf.Max(1f, Screen.height);
+            Rect safe = Screen.safeArea;
+            float topInset = screenHeight - (safe.y + safe.height);
+            float convertedInset = 0f;
+            if (safeAreaRoot == null)
+            {
+                convertedInset = topInset;
+                topArea.anchoredPosition = new Vector2(0f, -convertedInset);
+            }
+
+            Debug.Log($"[LAYOUT] TopBar old anchorMin={oldAnchorMin} anchorMax={oldAnchorMax} pivot={oldPivot} sizeDelta={oldSizeDelta} anchoredPosition={oldAnchoredPosition} parent={parentName} parentRect={parentSize}");
+            Debug.Log($"[LAYOUT] TopBar anchored to safe top. topInset={topInset:F1} convertedInset={convertedInset:F1} finalY={topArea.anchoredPosition.y:F1} anchorMin={topArea.anchorMin} anchorMax={topArea.anchorMax} pivot={topArea.pivot} sizeDelta={topArea.sizeDelta} parent={parentName} parentRect={parentSize}");
+        }
 
         private static void ApplySafeArea(RectTransform root)
         {
