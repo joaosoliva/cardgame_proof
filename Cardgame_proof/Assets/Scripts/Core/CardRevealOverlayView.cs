@@ -33,6 +33,8 @@ namespace CardgameProof.Core
         private Action onComplete;
         private bool canContinue;
 
+        public bool IsVisible => root != null && root.activeSelf;
+
         public void Initialize(RectTransform parent)
         {
             if (root != null || parent == null) return;

@@ -19,6 +19,8 @@ namespace CardgameProof.Core
         private Button backButton;
         private Coroutine animationCoroutine;
 
+        public bool IsVisible => gameObject != null && gameObject.activeSelf;
+
         public void Initialize(RectTransform overlayParent)
         {
             root = gameObject.GetComponent<RectTransform>();

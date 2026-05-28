@@ -29,6 +29,14 @@ namespace CardgameProof.Core
         private bool debugWelcomeStepActive;
         private RectTransform activeHighlightTarget;
         private Coroutine pulseCoroutine;
+        private TutorialStep currentStep;
+        private RectTransform currentTarget;
+        private bool currentAvoidTargetOverlap = true;
+        private bool focusCardActive;
+        private bool placementModeActive;
+        private bool guidebookActive;
+        private bool cardRevealActive;
+        private TutorialLayoutMode? lastLoggedLayoutMode;
 
         private readonly Color outlineColor = new Color(1f, 0.82f, 0.22f, 1f);
         private const float outlineThickness = 8f;
@@ -51,9 +59,12 @@ namespace CardgameProof.Core
             if (panelObject == null || step == null) return;
             panelObject.SetActive(true);
             panelRoot.SetAsLastSibling();
+            currentStep = step;
+            currentTarget = target;
+            currentAvoidTargetOverlap = step.AvoidTargetOverlap;
             currentStepId = step.Id;
             titleText.text = step.Title;
-            bodyText.text = step.Body;
+            bodyText.text = ResolveBodyText(step);
             confirmButton.gameObject.SetActive(showContinueButton);
             confirmButton.onClick.RemoveAllListeners();
             if (showContinueButton && onContinue != null)
@@ -74,8 +85,7 @@ namespace CardgameProof.Core
                 });
             }
 
-            SetCompact(step.CompactMode || !showContinueButton);
-            SetPlacement(step.PreferredPlacement, target, step.AvoidTargetOverlap);
+            UpdateTutorialLayout(forceLog: true);
             cardRoot.SetAsLastSibling();
 
             blocker.alpha = 1f;
@@ -110,7 +120,27 @@ namespace CardgameProof.Core
             cardCanvasGroup.alpha = 0f; cardCanvasGroup.interactable = false; cardCanvasGroup.blocksRaycasts = false;
             SetHighlightActive(false);
             panelObject.SetActive(false);
+            currentStep = null;
+            currentTarget = null;
+            lastLoggedLayoutMode = null;
             debugWelcomeStepActive = false;
+        }
+
+        public void SetLayoutContext(bool isFocusCardActive, bool isPlacementModeActive, bool isGuidebookActive, bool isCardRevealActive)
+        {
+            focusCardActive = isFocusCardActive;
+            placementModeActive = isPlacementModeActive;
+            guidebookActive = isGuidebookActive;
+            cardRevealActive = isCardRevealActive;
+            if (IsVisible)
+            {
+                UpdateTutorialLayout(forceLog: true);
+            }
+        }
+
+        public void RefreshAdaptiveLayout()
+        {
+            if (IsVisible) UpdateTutorialLayout(forceLog: true);
         }
 
         private void LateUpdate()
@@ -119,6 +149,65 @@ namespace CardgameProof.Core
             {
                 PositionOutlineAroundTarget(activeHighlightTarget);
             }
+        }
+
+        private void UpdateTutorialLayout(bool forceLog = false)
+        {
+            if (cardRoot == null || currentStep == null) return;
+            panelRoot.SetAsLastSibling();
+            TutorialLayoutMode mode = ResolveLayoutMode();
+            bool compact = currentStep.CompactMode || mode != TutorialLayoutMode.CenterModal || !confirmButton.gameObject.activeSelf;
+            bodyText.text = ResolveBodyText(currentStep);
+            ApplyLayoutMode(mode, compact);
+
+            if (!cardRevealActive)
+            {
+                cardCanvasGroup.alpha = 1f;
+                cardCanvasGroup.interactable = true;
+                cardCanvasGroup.blocksRaycasts = true;
+            }
+            else
+            {
+                FadeTo(0.08f, 0.12f);
+                cardCanvasGroup.interactable = false;
+                cardCanvasGroup.blocksRaycasts = false;
+            }
+
+            if (currentAvoidTargetOverlap && currentTarget != null && !focusCardActive && !placementModeActive && !guidebookActive && !cardRevealActive && DoesOverlapTarget(currentTarget))
+            {
+                ApplyLayoutMode(TutorialLayoutMode.TopDock, true);
+                mode = TutorialLayoutMode.TopDock;
+            }
+
+            if (forceLog || lastLoggedLayoutMode != mode)
+            {
+                Debug.Log($"[TUTORIAL_LAYOUT] Mode = {mode}");
+                if (focusCardActive) Debug.Log("[TUTORIAL_LAYOUT] FocusCard active");
+                if (placementModeActive) Debug.Log("[TUTORIAL_LAYOUT] PlacementMode active");
+                if (guidebookActive) Debug.Log("[TUTORIAL_LAYOUT] Guidebook active");
+                if (cardRevealActive) Debug.Log("[TUTORIAL_LAYOUT] CardReveal active");
+                lastLoggedLayoutMode = mode;
+            }
+        }
+
+        private TutorialLayoutMode ResolveLayoutMode()
+        {
+            if (cardRevealActive) return TutorialLayoutMode.FloatingCorner;
+            if (focusCardActive) return TutorialLayoutMode.TopDock;
+            if (placementModeActive) return TutorialLayoutMode.BottomDock;
+            if (guidebookActive) return TutorialLayoutMode.FloatingCorner;
+            return TutorialLayoutMode.CenterModal;
+        }
+
+        private string ResolveBodyText(TutorialStep step)
+        {
+            if (step == null) return string.Empty;
+            if (focusCardActive && !string.IsNullOrWhiteSpace(step.CompactBody)) return step.CompactBody;
+            if (focusCardActive && !string.IsNullOrWhiteSpace(step.Body) && step.Body.Length > 82)
+            {
+                return "Analise a carta antes de posicionar.";
+            }
+            return step.Body;
         }
 
         public void SetPlacement(TutorialPanelPlacement placement, RectTransform target = null, bool avoidTargetOverlap = true)
@@ -154,7 +243,7 @@ namespace CardgameProof.Core
 
         public void TemporarilyFadeDuringAction()
         {
-            FadeTo(0.32f, 0.15f);
+            FadeTo(0.08f, 0.15f);
             cardCanvasGroup.interactable = false;
             cardCanvasGroup.blocksRaycasts = false;
         }
@@ -210,6 +299,80 @@ namespace CardgameProof.Core
             }
         }
 
+        private void ApplyLayoutMode(TutorialLayoutMode mode, bool compact)
+        {
+            float rootWidth = panelRoot != null && panelRoot.rect.width > 0f ? panelRoot.rect.width : Screen.width;
+            float rootHeight = panelRoot != null && panelRoot.rect.height > 0f ? panelRoot.rect.height : Screen.height;
+            float safeMarginX = Mathf.Max(32f, rootWidth * 0.055f);
+            float topSafeY = Mathf.Max(28f, rootHeight * 0.035f);
+            float bottomSafeY = Mathf.Max(30f, rootHeight * 0.04f);
+
+            cardRoot.anchorMin = cardRoot.anchorMax = Vector2.zero;
+            cardRoot.pivot = mode == TutorialLayoutMode.FloatingCorner ? new Vector2(1f, 1f) : new Vector2(0.5f, 0.5f);
+
+            switch (mode)
+            {
+                case TutorialLayoutMode.TopDock:
+                    cardRoot.sizeDelta = new Vector2(Mathf.Min(rootWidth - (safeMarginX * 2f), rootWidth * 0.88f), 220f);
+                    cardRoot.anchoredPosition = new Vector2(rootWidth * 0.5f, rootHeight - topSafeY - 110f);
+                    SetPanelTypography(30, 22, TextAlignmentOptions.Left, true);
+                    break;
+                case TutorialLayoutMode.BottomDock:
+                    cardRoot.sizeDelta = new Vector2(Mathf.Min(rootWidth - (safeMarginX * 2f), rootWidth * 0.86f), 230f);
+                    cardRoot.anchoredPosition = new Vector2(rootWidth * 0.5f, bottomSafeY + 115f);
+                    SetPanelTypography(32, 23, TextAlignmentOptions.Left, true);
+                    break;
+                case TutorialLayoutMode.FloatingCorner:
+                    cardRoot.sizeDelta = new Vector2(Mathf.Min(520f, rootWidth * 0.44f), 250f);
+                    cardRoot.anchoredPosition = new Vector2(rootWidth - safeMarginX, rootHeight - topSafeY);
+                    SetPanelTypography(26, 20, TextAlignmentOptions.Left, true);
+                    break;
+                case TutorialLayoutMode.CenterModal:
+                default:
+                    cardRoot.sizeDelta = compact ? new Vector2(Mathf.Min(760f, rootWidth * 0.82f), 260f) : new Vector2(Mathf.Min(860f, rootWidth * 0.86f), 360f);
+                    cardRoot.anchoredPosition = new Vector2(rootWidth * 0.5f, rootHeight * 0.5f);
+                    SetPanelTypography(compact ? 34 : 40, compact ? 24 : 28, TextAlignmentOptions.Center, false);
+                    break;
+            }
+        }
+
+        private void SetPanelTypography(int titleSize, int bodySize, TextAlignmentOptions titleAlignment, bool docked)
+        {
+            titleText.fontSize = titleSize;
+            titleText.alignment = titleAlignment;
+            bodyText.fontSize = bodySize;
+            bodyText.alignment = TextAlignmentOptions.TopLeft;
+            PositionPanelContent(docked);
+        }
+
+        private void PositionPanelContent(bool docked)
+        {
+            if (titleText == null || bodyText == null || confirmButton == null) return;
+            RectTransform titleRect = titleText.rectTransform;
+            RectTransform bodyRect = bodyText.rectTransform;
+            RectTransform buttonRect = confirmButton.GetComponent<RectTransform>();
+
+            if (docked)
+            {
+                SetAnchors(titleRect, new Vector2(0.05f, 0.66f), new Vector2(0.70f, 0.92f));
+                SetAnchors(bodyRect, new Vector2(0.05f, 0.16f), new Vector2(0.70f, 0.64f));
+                SetAnchors(buttonRect, new Vector2(0.73f, 0.20f), new Vector2(0.96f, 0.78f));
+                return;
+            }
+
+            SetAnchors(titleRect, new Vector2(0.06f, 0.76f), new Vector2(0.94f, 0.93f));
+            SetAnchors(bodyRect, new Vector2(0.07f, 0.30f), new Vector2(0.93f, 0.72f));
+            SetAnchors(buttonRect, new Vector2(0.60f, 0.08f), new Vector2(0.93f, 0.25f));
+        }
+
+        private static void SetAnchors(RectTransform rect, Vector2 min, Vector2 max)
+        {
+            rect.anchorMin = min;
+            rect.anchorMax = max;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+        }
+
         private bool DoesOverlapTarget(RectTransform target)
         {
             Vector3[] tc = new Vector3[4]; target.GetWorldCorners(tc);
@@ -225,7 +388,7 @@ namespace CardgameProof.Core
             panelRoot = panelObject.GetComponent<RectTransform>();
             panelRoot.SetParent(parent, false);
             panelRoot.anchorMin = Vector2.zero; panelRoot.anchorMax = Vector2.one; panelRoot.offsetMin = Vector2.zero; panelRoot.offsetMax = Vector2.zero;
-            panelObject.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.42f);
+            panelObject.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.30f);
             blocker = panelObject.GetComponent<CanvasGroup>();
 
             var highlightObj = new GameObject("TutorialHighlightRoot", typeof(RectTransform), typeof(CanvasGroup));
@@ -240,22 +403,22 @@ namespace CardgameProof.Core
             highlightLeft = CreateHighlightBorder("LeftBorder", highlightRoot);
             highlightRight = CreateHighlightBorder("RightBorder", highlightRoot);
 
-            GameObject card = new GameObject("TutorialCard", typeof(RectTransform), typeof(Image), typeof(CanvasGroup));
+            GameObject card = new GameObject("TutorialCard", typeof(RectTransform), typeof(Image), typeof(CanvasGroup), typeof(Outline));
             cardRoot = card.GetComponent<RectTransform>();
             cardRoot.SetParent(panelRoot, false);
             cardRoot.sizeDelta = new Vector2(920f, 420f);
             Image cardImage = card.GetComponent<Image>();
-            cardImage.color = new Color(0.94f, 0.96f, 1f, 1f);
+            cardImage.color = new Color(0.94f, 0.96f, 1f, 0.94f);
             cardImage.raycastTarget = true;
+            Outline cardShadow = card.GetComponent<Outline>();
+            cardShadow.effectColor = new Color(0f, 0f, 0f, 0.22f);
+            cardShadow.effectDistance = new Vector2(4f, -4f);
             cardCanvasGroup = card.GetComponent<CanvasGroup>();
             cardCanvasGroup.interactable = true;
             cardCanvasGroup.blocksRaycasts = true;
-            VerticalLayoutGroup layout = card.AddComponent<VerticalLayoutGroup>();
-            layout.padding = new RectOffset(24, 24, 18, 18); layout.spacing = 12f; layout.childControlHeight = false; layout.childControlWidth = true;
-
-            titleText = CreateText(cardRoot, "Title", 42, TextAlignmentOptions.Center, Color.black, 72f);
-            bodyText = CreateText(cardRoot, "Body", 30, TextAlignmentOptions.TopLeft, new Color(0.12f, 0.12f, 0.12f), 150f);
-            confirmButton = CreateButton(cardRoot, "Entendi", 86f);
+            titleText = CreateText(cardRoot, "Title", 40, TextAlignmentOptions.Center, Color.black, 56f);
+            bodyText = CreateText(cardRoot, "Body", 28, TextAlignmentOptions.TopLeft, new Color(0.12f, 0.12f, 0.12f), 118f);
+            confirmButton = CreateButton(cardRoot, "Entendi", 68f);
         }
 
         private void UpdateHighlight(RectTransform target)
@@ -288,18 +451,19 @@ namespace CardgameProof.Core
 
         private static TextMeshProUGUI CreateText(RectTransform parent, string name, int fontSize, TextAlignmentOptions alignment, Color color, float preferredHeight)
         {
-            GameObject textObj = new GameObject(name, typeof(RectTransform), typeof(LayoutElement), typeof(TextMeshProUGUI));
-            textObj.transform.SetParent(parent, false);
-            textObj.GetComponent<LayoutElement>().preferredHeight = preferredHeight;
+            GameObject textObj = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
+            RectTransform rect = textObj.GetComponent<RectTransform>();
+            rect.SetParent(parent, false);
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
             TextMeshProUGUI text = textObj.GetComponent<TextMeshProUGUI>();
             text.alignment = alignment; text.fontSize = fontSize; text.color = color; text.enableWordWrapping = true; text.overflowMode = TextOverflowModes.Overflow; text.raycastTarget = false; return text;
         }
 
         private static Button CreateButton(RectTransform parent, string label, float preferredHeight)
         {
-            GameObject buttonObj = new GameObject("ConfirmButton", typeof(RectTransform), typeof(LayoutElement), typeof(Image), typeof(Button));
+            GameObject buttonObj = new GameObject("ConfirmButton", typeof(RectTransform), typeof(Image), typeof(Button));
             buttonObj.transform.SetParent(parent, false);
-            buttonObj.GetComponent<LayoutElement>().preferredHeight = preferredHeight;
             Image buttonImage = buttonObj.GetComponent<Image>();
             buttonImage.color = new Color(0.19f, 0.46f, 0.88f, 1f);
             buttonImage.raycastTarget = true;

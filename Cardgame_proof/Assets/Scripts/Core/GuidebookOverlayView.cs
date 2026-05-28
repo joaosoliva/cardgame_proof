@@ -26,6 +26,9 @@ namespace CardgameProof.Core
         private readonly List<Button> rowButtons = new List<Button>();
         private int selectedIndex = -1;
 
+        public bool IsVisible => root != null && root.activeSelf;
+        public Action OnVisibilityChanged;
+
         public void Initialize(RectTransform parent)
         {
             if (root != null || parent == null) return;
@@ -77,6 +80,7 @@ namespace CardgameProof.Core
         {
             if (root == null || characters == null || characters.Count == 0) return;
             root.SetActive(true);
+            OnVisibilityChanged?.Invoke();
             tokenText.text = $"Fichas de Pesquisa restantes: {remainingResearchTokens}";
             currentCharacters.Clear();
             currentCharacters.AddRange(characters);
@@ -87,6 +91,7 @@ namespace CardgameProof.Core
         public void Hide()
         {
             if (root != null) root.SetActive(false);
+            OnVisibilityChanged?.Invoke();
         }
 
         private void BuildCharacterList(RectTransform parent)

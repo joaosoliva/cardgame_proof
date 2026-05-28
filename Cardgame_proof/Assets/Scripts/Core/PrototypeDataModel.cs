@@ -112,6 +112,14 @@ namespace CardgameProof.Core
         NearTarget
     }
 
+    public enum TutorialLayoutMode
+    {
+        CenterModal,
+        TopDock,
+        BottomDock,
+        FloatingCorner
+    }
+
     [Serializable]
     public sealed class TutorialStep
     {
@@ -119,6 +127,8 @@ namespace CardgameProof.Core
         public string Title;
         [TextArea]
         public string Body;
+        [TextArea]
+        public string CompactBody;
         public GamePhase? Phase;
         public string TargetKey;
         public bool OnlyShowOnce;
