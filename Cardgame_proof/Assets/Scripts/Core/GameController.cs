@@ -202,15 +202,16 @@ namespace CardgameProof.Core
         private void EnsureHowToPlayView()
         {
             if (howToPlayView != null) return;
-            if (sceneRoot == null || sceneRoot.OverlayLayer == null)
+            if (sceneRoot == null || sceneRoot.FullScreenRoot == null)
             {
-                Debug.LogWarning("[HOW_TO_PLAY] Initialization failed: sceneRoot/OverlayLayer is null.");
+                Debug.LogWarning("[HOW_TO_PLAY] Initialization failed: sceneRoot/FullScreenRoot is null.");
                 return;
             }
             GameObject go = new GameObject("HowToPlayView");
-            go.transform.SetParent(sceneRoot.OverlayLayer, false);
+            go.transform.SetParent(sceneRoot.FullScreenRoot, false);
+            go.transform.SetAsLastSibling();
             howToPlayView = go.AddComponent<HowToPlayView>();
-            howToPlayView.Initialize(sceneRoot.OverlayLayer);
+            howToPlayView.Initialize(sceneRoot.FullScreenRoot);
         }
 
         public void LoadPrototypeMode(string modeId) => ActiveModeConfig = PrototypeDatabase.GetMode(modeId);

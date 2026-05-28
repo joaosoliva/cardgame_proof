@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Rendering;
 
 namespace CardgameProof.Core
 {
@@ -97,12 +98,15 @@ namespace CardgameProof.Core
                 canvasGroup.blocksRaycasts = true;
             }
             root.SetAsLastSibling();
+            Debug.Log("[HOW_TO_PLAY] Show - SetAsLastSibling called");
             GoToPage(0);
             Debug.Log($"[HOW_TO_PLAY] Active: {root.gameObject.activeSelf}");
             Debug.Log($"[HOW_TO_PLAY] Alpha: {(canvasGroup != null ? canvasGroup.alpha : -1f)}");
             Debug.Log($"[HOW_TO_PLAY] Parent: {(root.parent != null ? root.parent.name : "null")}");
             Debug.Log($"[HOW_TO_PLAY] Sibling index: {root.GetSiblingIndex()}");
             Debug.Log($"[HOW_TO_PLAY] Page count: {pages.Count}");
+            Canvas canvas = root.GetComponentInParent<Canvas>();
+            Debug.Log($"[HOW_TO_PLAY] Canvas sorting order: {(canvas != null ? canvas.sortingOrder : -1)}");
         }
 
         public void Hide()
