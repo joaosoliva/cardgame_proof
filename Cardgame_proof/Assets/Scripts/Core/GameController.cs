@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Events;
 using TMPro;
 using CardgameProof.Bootstrap;
 
@@ -13,12 +14,11 @@ namespace CardgameProof.Core
         private enum GuessSource { FreshDiscovery, PersistentAction }
         private static readonly IReadOnlyList<TutorialStep> DefaultTutorialSteps = new List<TutorialStep>
         {
-            new TutorialStep { Id = "welcome", Title = "Bem-vindo ao Arquivo", Body = "Você vai montar um arquivo secreto e depois investigar o arquivo do outro jogador.", Phase = GamePhase.Setup, TargetKey = null, OnlyShowOnce = true, CompleteTrigger = TutorialTrigger.ContinueButton, ShowContinueButton = true, BlockOutsideTarget = true, PreferredPlacement = TutorialPanelPlacement.Center },
-            new TutorialStep { Id = "character_card_intro", Title = "Dossiês de Personagem", Body = "Arraste um Dossiê para a grade.", Phase = GamePhase.Setup, TargetKey = "character_card_hand", CompleteTrigger = TutorialTrigger.CharacterCardPlaced, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.Top, FadeDuringAction = true, CompactMode = true },
-            new TutorialStep { Id = "archive_card_intro", Title = "Cartas de Arquivo", Body = "Arraste uma Carta de Arquivo para a grade.", Phase = GamePhase.Setup, TargetKey = "archive_card_hand", CompleteTrigger = TutorialTrigger.ArchiveCardPlaced, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.Top, FadeDuringAction = true, CompactMode = true },
-            new TutorialStep { Id = "setup_goal", Title = "Monte seu arquivo", Body = "Posicione o restante das cartas.", Phase = GamePhase.Setup, TargetKey = "board_grid", CompleteTrigger = TutorialTrigger.AllRequiredCardsPlaced, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.UpperBoard, CompactMode = true },
-            new TutorialStep { Id = "confirm_setup", Title = "Finalizar montagem", Body = "Toque em Finalizar montagem.", Phase = GamePhase.Setup, TargetKey = "confirm_setup_button", CompleteTrigger = TutorialTrigger.SetupConfirmed, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.Top, FadeDuringAction = true, CompactMode = true },
-            new TutorialStep { Id = "auto_no_record", Title = "Sem Registro", Body = "As lacunas são preenchidas automaticamente com cartas Sem Registro.", Phase = GamePhase.Setup, TargetKey = "board_grid", CompleteTrigger = TutorialTrigger.AutoNoRecordFillCompleted, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.Top, CompactMode = true }
+            new TutorialStep { Id = "setup_drag", Title = "Arraste cartas", Body = "Arraste um Dossiê ou Carta de Arquivo da bandeja para a grade.", Phase = GamePhase.Setup, TargetKey = "character_card_hand", CompleteTrigger = TutorialTrigger.AnyCardPlaced, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.Top, FadeDuringAction = true, CompactMode = true },
+            new TutorialStep { Id = "setup_finish", Title = "Finalize a montagem", Body = "Depois de posicionar tudo, toque em Finalizar montagem.", Phase = GamePhase.Setup, TargetKey = "confirm_setup_button", CompleteTrigger = TutorialTrigger.SetupConfirmed, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.Top, FadeDuringAction = true, CompactMode = true },
+            new TutorialStep { Id = "investigate_click", Title = "Clique no tabuleiro", Body = "Durante a investigação, toque em uma carta oculta do arquivo adversário.", Phase = GamePhase.Investigation, TargetKey = "board_grid", CompleteTrigger = TutorialTrigger.CellInvestigated, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.UpperBoard, CompactMode = true },
+            new TutorialStep { Id = "reveal_and_guide", Title = "Revelar e usar Guia", Body = "Cartas reveladas ativam ações. Use o botão Guia para pesquisa quando precisar.", Phase = GamePhase.Investigation, TargetKey = "board_grid", CompleteTrigger = TutorialTrigger.GuideOpened, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.Top, CompactMode = true },
+            new TutorialStep { Id = "identify_and_end", Title = "Identificar e encerrar turno", Body = "Use Tentar identificar quando tiver pistas e depois encerre o turno.", Phase = GamePhase.Investigation, TargetKey = null, CompleteTrigger = TutorialTrigger.TurnPassed, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.Center, CompactMode = true }
         };
 
 
@@ -36,6 +36,8 @@ namespace CardgameProof.Core
         private string lastReportText;
         private BoardController boardController;
         private RectTransform mainMenuRoot;
+        private HowToPlayView howToPlayView;
+        private readonly List<HowToPlayPageData> howToPlayPages = BuildHowToPlayPages();
 
         private RectTransform trayRoot;
         private RectTransform placedActionsRoot;
@@ -106,27 +108,25 @@ namespace CardgameProof.Core
             mainMenuRoot.offsetMin = Vector2.zero; mainMenuRoot.offsetMax = Vector2.zero;
             mainMenuRoot.GetComponent<Image>().color = new Color(0.08f, 0.11f, 0.16f, 1f);
 
-            VerticalLayoutGroup layout = menuRootObject.AddComponent<VerticalLayoutGroup>();
-            layout.childAlignment = TextAnchor.MiddleCenter;
-            layout.padding = new RectOffset(56, 56, 120, 80);
-            layout.spacing = 28f; layout.childControlWidth = true;
-
-            CreateTitle(mainMenuRoot, "Nosso jogo, diversão ilimitada");
-            CreateModeButton(mainMenuRoot, "Partida Rápida — 5 min", "quick_5");
-            CreateModeButton(mainMenuRoot, "Partida Completa — 10 min", "full_10");
-            CreateFooter(mainMenuRoot, "Protótipo digital para teste de jogo físico");
+            CreateTitle(mainMenuRoot, "Arquivo da Investigação");
+            CreateMenuActionButton(mainMenuRoot, "Como Funciona", new Vector2(0.5f, 0.58f), OpenHowToPlay);
+            CreateMenuActionButton(mainMenuRoot, "Jogar Protótipo", new Vector2(0.5f, 0.42f), () => StartGameMode("quick_5"));
+            CreateFooter(mainMenuRoot, "Modo digital: seleção de modo → montagem → investigação");
+            EnsureHowToPlayView();
             SetPhase(GamePhase.MainMenu);
             Debug.Log("[GameController] Entered MainMenu phase");
         }
 
-        private void CreateModeButton(RectTransform parent, string label, string modeId)
+        private void CreateMenuActionButton(RectTransform parent, string label, Vector2 anchor, UnityAction onClick)
         {
-            GameObject buttonObj = new GameObject($"{modeId}_Button", typeof(RectTransform), typeof(Image), typeof(Button), typeof(LayoutElement));
+            GameObject buttonObj = new GameObject($"{label}_Button", typeof(RectTransform), typeof(Image), typeof(Button));
             buttonObj.transform.SetParent(parent, false);
-            buttonObj.GetComponent<LayoutElement>().preferredHeight = 180f;
+            RectTransform buttonRect = buttonObj.GetComponent<RectTransform>();
+            buttonRect.anchorMin = anchor; buttonRect.anchorMax = anchor; buttonRect.pivot = new Vector2(0.5f, 0.5f);
+            buttonRect.sizeDelta = new Vector2(760f, 190f);
             buttonObj.GetComponent<Image>().color = new Color(0.19f, 0.46f, 0.88f, 1f);
             Button button = buttonObj.GetComponent<Button>();
-            button.onClick.AddListener(() => OnModeSelected(modeId));
+            button.onClick.AddListener(onClick);
 
             GameObject labelObj = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
             RectTransform lr = labelObj.GetComponent<RectTransform>(); lr.SetParent(buttonObj.transform, false); lr.anchorMin = Vector2.zero; lr.anchorMax = Vector2.one;
@@ -135,14 +135,6 @@ namespace CardgameProof.Core
             t.fontSize = 52;
             t.alignment = TextAlignmentOptions.Center;
             t.color = Color.white;
-        }
-
-        private void OnModeSelected(string modeId)
-        {
-            if (modeId == "quick_5") Debug.Log("[MENU] 5 min button clicked");
-            if (modeId == "full_10") Debug.Log("[MENU] 10 min button clicked");
-            AudioManager.Instance?.PlayButton();
-            StartGameMode(modeId);
         }
 
         public void StartGameMode(string modeId)
@@ -159,6 +151,8 @@ namespace CardgameProof.Core
                 Debug.Log("[GAME] Mode selected: full_10");
             }
 
+            AudioManager.Instance?.PlayButton();
+            howToPlayView?.Hide();
             LoadPrototypeMode(resolvedModeId);
             if (ActiveModeConfig == null) return;
             if (mainMenuRoot != null) mainMenuRoot.gameObject.SetActive(false);
@@ -166,6 +160,21 @@ namespace CardgameProof.Core
             TransitionToTutorialIntro();
             StartPassAndPlaySetup();
             ShowTutorialSequence(DefaultTutorialSteps);
+        }
+
+        private void OpenHowToPlay()
+        {
+            EnsureHowToPlayView();
+            howToPlayView.Show(howToPlayPages, () => howToPlayView.Hide(), () => StartGameMode("quick_5"));
+        }
+
+        private void EnsureHowToPlayView()
+        {
+            if (howToPlayView != null) return;
+            GameObject go = new GameObject("HowToPlayView");
+            go.transform.SetParent(sceneRoot.OverlayLayer, false);
+            howToPlayView = go.AddComponent<HowToPlayView>();
+            howToPlayView.Initialize(sceneRoot.OverlayLayer);
         }
 
         public void LoadPrototypeMode(string modeId) => ActiveModeConfig = PrototypeDatabase.GetMode(modeId);
@@ -630,7 +639,7 @@ namespace CardgameProof.Core
             hudButtonCardsRoot.offsetMin = new Vector2(18f, 8f); hudButtonCardsRoot.offsetMax = new Vector2(-18f, -8f);
             CreateInfoCardButton(hudButtonCardsRoot, "Guia", "Pesquisar personagens", "Fichas: 0", -460f, OnGuidebookButtonPressed, out guideCardTokensText);
             identifyCardButton = CreateInfoCardButton(hudButtonCardsRoot, "Tentar identificar Dossiê", "Use pistas já reveladas", "Sem dossiês elegíveis", 0f, ShowPersistentGuessTargetsOverlay, out identifyCardDetailText);
-            CreateInfoCardButton(hudButtonCardsRoot, "Regras", "Resumo da partida", string.Empty, 460f, ShowRulesOverlay, out _);
+            CreateInfoCardButton(hudButtonCardsRoot, "Fluxo", "Ações do protótipo", string.Empty, 460f, ShowRulesOverlay, out _);
         }
 
         private void UpdateHud()
@@ -728,7 +737,7 @@ namespace CardgameProof.Core
             investigationOverlayView.AddButton("Cancelar", investigationOverlayView.Hide);
         }
         private void ShowGuidebookOverlay() { tutorialManager?.Notify(TutorialTrigger.GuideOpened); EnsureGuidebookOverlayView(); guidebookOverlayView.Show(PrototypeDatabase.Characters, researchTokens[currentTurnPlayer]); }
-        private void ShowRulesOverlay() { EnsureInvestigationOverlayView(); investigationOverlayView.Show("Resumo das Regras", "Durante a montagem, posicione seus Personagens e Cartas de Arquivo. Ao finalizar, as lacunas do arquivo são preenchidas automaticamente com Sem Registro.\n\nSem Registro não tem efeito. Ele apenas indica que aquela parte do arquivo não tinha um dossiê útil.\n\nEm seu turno, você pode investigar uma carta oculta ou tentar identificar um Dossiê já encontrado.\nDepois de revelar pelo menos uma pista, você pode tentar identificar aquele personagem em turnos futuros.\n\n1. Investigue cartas no arquivo adversário.\n2. Se encontrar um Dossiê, a primeira pista é gratuita e você já pode tentar identificar.\n3. Se encontrar uma Carta de Arquivo, revele e resolva seu efeito.\n4. Se encontrar Sem Registro, apenas marque aquela carta como investigada.\n5. Personagens só revelam sua identidade após uma identificação correta.\n6. Vence quem completar o objetivo do modo escolhido."); investigationOverlayView.AddButton("Fechar", investigationOverlayView.Hide); }
+        private void ShowRulesOverlay() { EnsureInvestigationOverlayView(); investigationOverlayView.Show("Fluxo do Protótipo", "Use este lembrete apenas para interações digitais:\n\n1. Arraste cartas para montar o arquivo.\n2. Toque em Finalizar montagem.\n3. Toque em cartas ocultas no tabuleiro para revelar.\n4. Use o botão Guia para consultar personagens.\n5. Use Tentar identificar quando tiver pistas.\n6. Encerre o turno para passar o aparelho."); investigationOverlayView.AddButton("Fechar", investigationOverlayView.Hide); }
 
         private void HideSetupSensitiveUi()
         {
@@ -1025,9 +1034,12 @@ private void EnsureBoardController() { if (boardController != null) return; Game
 
         private static void CreateTitle(RectTransform parent, string textValue)
         {
-            GameObject titleObj = new GameObject("MainMenuTitle", typeof(RectTransform), typeof(LayoutElement), typeof(TextMeshProUGUI));
+            GameObject titleObj = new GameObject("MainMenuTitle", typeof(RectTransform), typeof(TextMeshProUGUI));
             titleObj.transform.SetParent(parent, false);
-            titleObj.GetComponent<LayoutElement>().preferredHeight = 280f;
+            RectTransform rect = titleObj.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.08f, 0.74f);
+            rect.anchorMax = new Vector2(0.92f, 0.92f);
+            rect.offsetMin = Vector2.zero; rect.offsetMax = Vector2.zero;
             TextMeshProUGUI text = titleObj.GetComponent<TextMeshProUGUI>();
             text.text = textValue;
             text.alignment = TextAlignmentOptions.Center;
@@ -1038,13 +1050,12 @@ private void EnsureBoardController() { if (boardController != null) return; Game
 
         private static void CreateFooter(RectTransform parent, string textValue)
         {
-            GameObject spacer = new GameObject("FooterSpacer", typeof(RectTransform), typeof(LayoutElement));
-            spacer.transform.SetParent(parent, false);
-            spacer.GetComponent<LayoutElement>().flexibleHeight = 1f;
-
-            GameObject footerObj = new GameObject("MainMenuFooter", typeof(RectTransform), typeof(LayoutElement), typeof(TextMeshProUGUI));
+            GameObject footerObj = new GameObject("MainMenuFooter", typeof(RectTransform), typeof(TextMeshProUGUI));
             footerObj.transform.SetParent(parent, false);
-            footerObj.GetComponent<LayoutElement>().preferredHeight = 120f;
+            RectTransform rect = footerObj.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.08f, 0.06f);
+            rect.anchorMax = new Vector2(0.92f, 0.18f);
+            rect.offsetMin = Vector2.zero; rect.offsetMax = Vector2.zero;
             TextMeshProUGUI text = footerObj.GetComponent<TextMeshProUGUI>();
             text.text = textValue;
             text.alignment = TextAlignmentOptions.Center;
@@ -1107,6 +1118,27 @@ private void EnsureBoardController() { if (boardController != null) return; Game
             detailLabel.color = new Color(0.35f, 0.38f, 0.45f, 1f);
             detailLabel.alignment = TextAlignmentOptions.MidlineLeft;
             return b;
+        }
+
+        private static List<HowToPlayPageData> BuildHowToPlayPages()
+        {
+            return new List<HowToPlayPageData>
+            {
+                new HowToPlayPageData { PageId = "p1", Title = "O que é o jogo?", Body = "Este é um jogo de investigação e dedução sobre personagens acadêmicos e científicos.\n\nSeu objetivo é descobrir quais personagens estão escondidos no arquivo do outro jogador usando pistas, pesquisa e lógica." },
+                new HowToPlayPageData { PageId = "p2", Title = "As cartas do jogo", Body = "O jogo possui 3 tipos de carta:\n\n• Dossiês de Personagem\n• Cartas de Arquivo\n• Cartas Sem Registro\n\nCada tipo tem uma função diferente durante a investigação." },
+                new HowToPlayPageData { PageId = "p3", Title = "Preparando o tabuleiro", Body = "Cada jogador monta um arquivo secreto usando 9 cartas viradas para baixo em uma grade 3x3." },
+                new HowToPlayPageData { PageId = "p4", Title = "O que existe no arquivo?", Body = "Na versão rápida 3x3, cada arquivo possui:\n\n• 3 Dossiês de Personagem\n• 3 Cartas de Arquivo\n• 3 cartas Sem Registro" },
+                new HowToPlayPageData { PageId = "p5", Title = "Cartas escondidas", Body = "Enquanto estão viradas para baixo, todas as cartas parecem iguais.\n\nOs jogadores não sabem onde estão os personagens, arquivos ou Sem Registro." },
+                new HowToPlayPageData { PageId = "p6", Title = "Começando a partida", Body = "Depois que os dois jogadores terminam seus arquivos, a investigação começa.\n\nEm cada turno, um jogador escolhe uma carta do arquivo adversário." },
+                new HowToPlayPageData { PageId = "p7", Title = "Sem Registro", Body = "Se a carta escolhida for Sem Registro, nada acontece.\n\nA carta permanece revelada e o turno passa para o próximo jogador." },
+                new HowToPlayPageData { PageId = "p8", Title = "Cartas de Arquivo", Body = "Cartas de Arquivo ativam efeitos especiais que ajudam na investigação.\n\nAlgumas revelam pistas extras.\nOutras permitem novas ações ou ajudam na pesquisa." },
+                new HowToPlayPageData { PageId = "p9", Title = "Encontrando um personagem", Body = "Se um Dossiê for encontrado, o jogador dono da carta deve revelar uma pista sobre aquele personagem.\n\nO nome nunca pode ser revelado diretamente." },
+                new HowToPlayPageData { PageId = "p10", Title = "Tipos de pista", Body = "As pistas podem revelar informações como:\n\n• Área de atuação\n• Época\n• Região\n• Contribuições\n• Contexto histórico" },
+                new HowToPlayPageData { PageId = "p11", Title = "Fichas de Pesquisa", Body = "Os jogadores possuem Fichas de Pesquisa que permitem consultar o Guia de Apoio." },
+                new HowToPlayPageData { PageId = "p12", Title = "Guia de Apoio", Body = "O Guia de Apoio funciona como um pequeno códice com mini biografias dos personagens do jogo.\n\nEle ajuda os jogadores a relacionar pistas com personagens reais." },
+                new HowToPlayPageData { PageId = "p13", Title = "Consulta limitada", Body = "O Guia de Apoio não pode ser consultado livremente por muito tempo.\n\nA ideia é fazer pesquisas rápidas para manter o ritmo da partida." },
+                new HowToPlayPageData { PageId = "p14", Title = "Como vencer", Body = "Vence o jogador que identificar a quantidade necessária de personagens antes do adversário." }
+            };
         }
 
         private void SetPhase(GamePhase newPhase)
