@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using CardgameProof.App;
 using CardgameProof.Prototypes.ScienceCardGame.Runtime.Data;
+using CardgameProof.Prototypes.ScienceCardGame.Runtime.UI;
 
 namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 {
@@ -208,21 +209,8 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
         private RectTransform CreateCardView(RectTransform parent, ScienceCardData card, string name)
         {
-            Color cardColor = card != null && card.CardType == ScienceCardType.Action
-                ? new Color(0.32f, 0.22f, 0.45f, 1f)
-                : new Color(0.20f, 0.31f, 0.42f, 1f);
-            RectTransform cardRect = CreatePanel(parent, name, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), cardColor);
-
-            string title = card?.DisplayName ?? "Carta";
-            string type = card == null ? string.Empty : card.CardType.ToString();
-            string details = card?.ShortDescription ?? string.Empty;
-            if (card is ScienceActionCardData actionCard) details = $"{actionCard.EffectType}\n{actionCard.RulesText}";
-            if (card is ScienceCharacterCardData characterCard) details = $"{characterCard.Field}\n{characterCard.FactCategoryA} + {characterCard.FactCategoryB}";
-
-            CreateText(cardRect, title, 17, new Vector2(0.06f, 0.70f), new Vector2(0.94f, 0.96f), FontStyles.Bold);
-            CreateText(cardRect, type, 14, new Vector2(0.08f, 0.56f), new Vector2(0.92f, 0.70f), FontStyles.Italic);
-            CreateText(cardRect, details, 12, new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.54f), FontStyles.Normal, TextAlignmentOptions.Top);
-            return cardRect;
+            ScienceCardView view = ScienceCardView.Create(parent, name, card, ScienceCardViewDisplayMode.Hand);
+            return view.GetComponent<RectTransform>();
         }
 
         private void DrawCardForCurrentPlayer()
