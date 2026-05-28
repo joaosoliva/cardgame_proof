@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using UnityEngine.EventSystems;
 
 namespace CardgameProof.Core
 {
@@ -85,19 +84,6 @@ namespace CardgameProof.Core
             highlightFrame.gameObject.SetActive(false);
             panelObject.SetActive(false);
             debugWelcomeStepActive = false;
-        }
-
-        private void Update()
-        {
-            if (!debugWelcomeStepActive || !IsVisible || EventSystem.current == null) return;
-            if (!Input.GetMouseButtonDown(0)) return;
-            var eventData = new PointerEventData(EventSystem.current) { position = Input.mousePosition };
-            List<RaycastResult> results = new List<RaycastResult>();
-            EventSystem.current.RaycastAll(eventData, results);
-            for (int i = 0; i < results.Count; i++)
-            {
-                Debug.Log($"[UI_RAYCAST] Hit {i}: {results[i].gameObject.name}");
-            }
         }
 
         public void SetPlacement(TutorialPanelPlacement placement, RectTransform target = null, bool avoidTargetOverlap = true)
