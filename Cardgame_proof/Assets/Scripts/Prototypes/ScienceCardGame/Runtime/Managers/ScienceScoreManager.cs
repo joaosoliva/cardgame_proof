@@ -11,13 +11,19 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         {
             state = gameState;
             telemetry = telemetryManager;
+            ResetScores();
+
+            Debug.Log("[ScienceCardGame] 04 ScoreManager initialized");
+            telemetry?.LogEvent("science_scores_initialized", $"players={state.Players.Count}");
+        }
+
+        public void ResetScores()
+        {
+            if (state == null) return;
             foreach (var player in state.Players)
             {
                 player.SetScore(0);
             }
-
-            Debug.Log("[ScienceCardGame] 04 ScoreManager initialized");
-            telemetry?.LogEvent("science_scores_initialized", $"players={state.Players.Count}");
         }
 
         public void AddScore(int playerIndex, int amount)

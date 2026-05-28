@@ -37,6 +37,33 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             return card;
         }
 
+        public void DealInitialHands(IReadOnlyList<SciencePlayerState> players, int cardsPerPlayer)
+        {
+            if (players == null || cardsPerPlayer <= 0) return;
+
+            for (int i = 0; i < players.Count; i++)
+            {
+                players[i]?.ResetCards();
+            }
+
+            for (int cardIndex = 0; cardIndex < cardsPerPlayer; cardIndex++)
+            {
+                for (int playerIndex = 0; playerIndex < players.Count; playerIndex++)
+                {
+                    ScienceCardData card = DrawCard();
+                    if (card == null)
+                    {
+                        telemetry?.LogEvent("science_initial_deal_deck_empty", $"playerIndex={playerIndex};cardIndex={cardIndex}");
+                        return;
+                    }
+
+                    players[playerIndex]?.AddToHand(card);
+                }
+            }
+
+            telemetry?.LogEvent("science_initial_hands_dealt", $"players={players.Count};cardsPerPlayer={cardsPerPlayer};remaining={drawPile.Count}");
+        }
+
         public void Discard(ScienceCardData card)
         {
             if (card == null) return;

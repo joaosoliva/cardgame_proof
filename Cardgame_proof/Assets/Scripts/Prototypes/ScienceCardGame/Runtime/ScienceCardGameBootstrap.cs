@@ -29,7 +29,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime
             }
 
             state.InitializeDefaults();
-            Debug.Log("[ScienceCardGame] 00 State initialized");
+            Debug.Log("[ScienceCardGame] 00 State initialized for setup");
 
             telemetryManager = new ScienceTelemetryManager();
             telemetryManager.Initialize(state);
@@ -47,9 +47,9 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime
             turnManager.Initialize(state, telemetryManager);
 
             uiManager = new ScienceCardGameUIManager();
-            uiManager.Initialize(context, state, deckManager, turnManager, telemetryManager);
+            uiManager.Initialize(context, state, deckManager, turnManager, telemetryManager, ConfirmSetupAndDistributeCards);
 
-            telemetryManager.LogEvent("science_bootstrap_complete", "placeholder_only=true");
+            telemetryManager.LogEvent("science_bootstrap_complete", "screen=setup");
             Debug.Log("[ScienceCardGame] Bootstrap initialize complete");
         }
 
@@ -72,6 +72,20 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime
             context = null;
             state = null;
             Debug.Log("[ScienceCardGame] Bootstrap cleanup complete");
+        }
+
+        private void ConfirmSetupAndDistributeCards(int playerCount)
+        {
+            if (state == null || deckManager == null || uiManager == null) return;
+
+            Debug.Log($"[ScienceCardGame] Setup confirmed players={playerCount}");
+            state.InitializePlayers(playerCount);
+            scoreManager?.ResetScores();
+            turnManager?.ResetForPlayers();
+            deckManager.DealInitialHands(state.Players, state.InitialHandSize);
+            state.SetPhase(ScienceCardGamePhase.CardDistribution);
+            telemetryManager?.LogEvent("science_setup_confirmed", $"players={state.SelectedPlayerCount};phase={state.CurrentPhase}");
+            uiManager.ShowCardDistributionScreen();
         }
     }
 }

@@ -14,10 +14,15 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         {
             state = gameState;
             telemetry = telemetryManager;
-            CurrentPlayerIndex = 0;
-            TurnNumber = 1;
+            ResetForPlayers();
             Debug.Log("[ScienceCardGame] 05 TurnManager initialized");
             telemetry?.LogEvent("science_turn_initialized", $"turn={TurnNumber};player={CurrentPlayerIndex}");
+        }
+
+        public void ResetForPlayers()
+        {
+            CurrentPlayerIndex = 0;
+            TurnNumber = state != null && state.Players.Count > 0 ? 1 : 0;
         }
 
         public void AdvanceTurn()
