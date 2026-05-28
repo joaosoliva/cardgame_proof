@@ -77,6 +77,9 @@ namespace CardgameProof.Core
         private readonly Dictionary<PlayerId, Dictionary<string, HashSet<ClueCategory>>> discoveredClues = new Dictionary<PlayerId, Dictionary<string, HashSet<ClueCategory>>>();
         private readonly Dictionary<PlayerId, HashSet<string>> firstCluePendingByPlayer = new Dictionary<PlayerId, HashSet<string>>();
         private readonly Dictionary<PlayerId, HashSet<string>> firstClueChosenByPlayer = new Dictionary<PlayerId, HashSet<string>>();
+        private readonly Dictionary<PlayerId, List<CharacterData>> matchCharactersByPlayer = new Dictionary<PlayerId, List<CharacterData>>();
+        private System.Random matchRandom;
+        private int matchRandomSeed;
 
         private int totalCluesRequested;
         private int totalResearchUses;
@@ -248,6 +251,7 @@ namespace CardgameProof.Core
             playerBoardStates[PlayerId.PlayerTwo] = new List<PlacedCardData>();
             playerTwoShortTutorialShown = false;
             investigationTutorialSeen = false;
+            PrepareMatchCharacterDistribution();
             BeginSetupForPlayer(PlayerId.PlayerOne);
             matchReportService.StartMatch(ActiveModeConfig.DisplayName);
         }
@@ -283,6 +287,123 @@ namespace CardgameProof.Core
             }
             HideReadyScreen();
             winScreenView?.Hide();
+        }
+
+        private void PrepareMatchCharacterDistribution()
+        {
+            matchCharactersByPlayer.Clear();
+            matchRandomSeed = Environment.TickCount ^ Guid.NewGuid().GetHashCode();
+            matchRandom = new System.Random(matchRandomSeed);
+
+            List<CharacterData> availableCharacters = BuildAvailableCharacterPool();
+            int perPlayer = ActiveModeConfig != null ? ActiveModeConfig.CharactersPerPlayer : 0;
+            int requiredTotal = perPlayer * 2;
+
+            Debug.Log($"[DECK] Shuffling character pool seed={matchRandomSeed}");
+            Debug.Log($"[DECK] Total characters available: {availableCharacters.Count}");
+            ShuffleInPlace(availableCharacters);
+
+            if (availableCharacters.Count < requiredTotal)
+            {
+                Debug.LogWarning($"[DECK] Not enough unique characters for all players. available={availableCharacters.Count}, required={requiredTotal}.");
+            }
+
+            matchCharactersByPlayer[PlayerId.PlayerOne] = DealCharactersForPlayer(PlayerId.PlayerOne, availableCharacters, 0, perPlayer);
+            matchCharactersByPlayer[PlayerId.PlayerTwo] = DealCharactersForPlayer(PlayerId.PlayerTwo, availableCharacters, perPlayer, perPlayer);
+
+            Debug.Log($"[DECK] Player1 characters: {FormatCharacterList(matchCharactersByPlayer[PlayerId.PlayerOne])}");
+            Debug.Log($"[DECK] Player2 characters: {FormatCharacterList(matchCharactersByPlayer[PlayerId.PlayerTwo])}");
+        }
+
+        private static List<CharacterData> BuildAvailableCharacterPool()
+        {
+            List<CharacterData> availableCharacters = new List<CharacterData>();
+            HashSet<string> seenIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (PrototypeDatabase.Characters == null) return availableCharacters;
+
+            foreach (CharacterData character in PrototypeDatabase.Characters)
+            {
+                if (character == null || string.IsNullOrWhiteSpace(character.Id))
+                {
+                    Debug.LogWarning("[DECK] Ignoring character entry without a valid id.");
+                    continue;
+                }
+
+                if (!seenIds.Add(character.Id))
+                {
+                    Debug.LogWarning($"[DECK] Duplicate character id in pool ignored: {character.Id}");
+                    continue;
+                }
+
+                availableCharacters.Add(character);
+            }
+
+            return availableCharacters;
+        }
+
+        private List<CharacterData> DealCharactersForPlayer(PlayerId player, List<CharacterData> shuffledPool, int startIndex, int count)
+        {
+            List<CharacterData> result = new List<CharacterData>();
+            if (count <= 0) return result;
+
+            for (int i = 0; i < count; i++)
+            {
+                int poolIndex = startIndex + i;
+                if (poolIndex >= 0 && poolIndex < shuffledPool.Count)
+                {
+                    result.Add(shuffledPool[poolIndex]);
+                    continue;
+                }
+
+                CharacterData fallback = DrawDuplicateFallback(shuffledPool, player, i);
+                if (fallback != null) result.Add(fallback);
+            }
+
+            return result;
+        }
+
+        private CharacterData DrawDuplicateFallback(List<CharacterData> shuffledPool, PlayerId player, int playerIndex)
+        {
+            if (shuffledPool == null || shuffledPool.Count == 0)
+            {
+                Debug.LogWarning($"[DECK_WARNING] Duplicate character fallback could not run because the character pool is empty for {player} index={playerIndex}.");
+                return null;
+            }
+
+            int fallbackIndex = matchRandom != null ? matchRandom.Next(shuffledPool.Count) : UnityEngine.Random.Range(0, shuffledPool.Count);
+            CharacterData fallback = shuffledPool[fallbackIndex];
+            Debug.LogWarning($"[DECK_WARNING] Duplicate character fallback used due to insufficient pool. player={player}, index={playerIndex}, character={fallback.DisplayName}");
+            return fallback;
+        }
+
+        private void ShuffleInPlace<T>(IList<T> list)
+        {
+            if (list == null || list.Count <= 1) return;
+            if (matchRandom == null)
+            {
+                matchRandomSeed = Environment.TickCount ^ Guid.NewGuid().GetHashCode();
+                matchRandom = new System.Random(matchRandomSeed);
+            }
+
+            for (int i = list.Count - 1; i > 0; i--)
+            {
+                int j = matchRandom.Next(i + 1);
+                T tmp = list[i];
+                list[i] = list[j];
+                list[j] = tmp;
+            }
+        }
+
+        private static string FormatCharacterList(IReadOnlyList<CharacterData> characters)
+        {
+            if (characters == null || characters.Count == 0) return "(none)";
+            List<string> labels = new List<string>();
+            for (int i = 0; i < characters.Count; i++)
+            {
+                CharacterData c = characters[i];
+                labels.Add(c != null ? c.DisplayName : "<missing>");
+            }
+            return string.Join(", ", labels);
         }
 
         private void BuildBoardForActiveMode()
@@ -360,59 +481,77 @@ namespace CardgameProof.Core
         {
             foreach (var card in trayCards) if (card != null) Destroy(card.gameObject);
             trayCards.Clear();
-            int total = ActiveModeConfig.CharactersPerPlayer + ActiveModeConfig.ArchiveCardsPerPlayer;
-            for (int i = 0; i < total; i++)
+
+            List<PlacedCardData> setupCards = BuildSetupHandCards(player);
+            ShuffleInPlace(setupCards);
+            for (int i = 0; i < setupCards.Count; i++)
             {
-                CardType type;
-                if (i < ActiveModeConfig.CharactersPerPlayer) type = CardType.Character;
-                else type = CardType.Archive;
-                string cardId = BuildPrototypeCardIdForSetup(player, type, i);
-                var placed = new PlacedCardData { CardId = cardId, CardType = type, Owner = player, Coordinate = Vector2Int.zero, IsFaceUp = false };
+                PlacedCardData placed = setupCards[i];
                 GameObject go = new GameObject($"SetupCard_{i}", typeof(RectTransform), typeof(Image), typeof(LayoutElement), typeof(CanvasGroup));
                 go.transform.SetParent(trayCardsRow != null ? trayCardsRow : trayRoot, false);
                 SetupCardView view = go.AddComponent<SetupCardView>();
                 view.Initialize(FindFirstObjectByType<Canvas>(), placed, OnSetupCardDrop, OnSetupCardTapped, false);
                 trayCards.Add(view);
-                if (type == CardType.Character) tutorialManager?.RegisterTarget("character_card_hand", view.GetComponent<RectTransform>());
-                if (type == CardType.Archive) tutorialManager?.RegisterTarget("archive_card_hand", view.GetComponent<RectTransform>());
+                if (placed.CardType == CardType.Character) tutorialManager?.RegisterTarget("character_card_hand", view.GetComponent<RectTransform>());
+                if (placed.CardType == CardType.Archive) tutorialManager?.RegisterTarget("archive_card_hand", view.GetComponent<RectTransform>());
             }
         }
 
-        private string BuildPrototypeCardIdForSetup(PlayerId player, CardType type, int setupIndex)
+        private List<PlacedCardData> BuildSetupHandCards(PlayerId player)
+        {
+            List<PlacedCardData> setupCards = new List<PlacedCardData>();
+            for (int characterIndex = 0; characterIndex < ActiveModeConfig.CharactersPerPlayer; characterIndex++)
+            {
+                string cardId = BuildPrototypeCardIdForSetup(player, CardType.Character, characterIndex);
+                setupCards.Add(new PlacedCardData { CardId = cardId, CardType = CardType.Character, Owner = player, Coordinate = Vector2Int.zero, IsFaceUp = false });
+            }
+
+            for (int archiveIndex = 0; archiveIndex < ActiveModeConfig.ArchiveCardsPerPlayer; archiveIndex++)
+            {
+                string cardId = BuildPrototypeCardIdForSetup(player, CardType.Archive, archiveIndex);
+                setupCards.Add(new PlacedCardData { CardId = cardId, CardType = CardType.Archive, Owner = player, Coordinate = Vector2Int.zero, IsFaceUp = false });
+            }
+
+            return setupCards;
+        }
+
+        private string BuildPrototypeCardIdForSetup(PlayerId player, CardType type, int typeIndex)
         {
             if (type == CardType.Character)
             {
-                int characterIndex = setupIndex;
-                CharacterData character = GetCharacterForSetup(player, characterIndex);
+                CharacterData character = GetCharacterForSetup(player, typeIndex);
                 if (character == null)
                 {
-                    Debug.LogWarning($"[Cards] Character data missing for setupIndex={setupIndex}. Using fallback id.");
-                    return $"{player}_character_missing_{setupIndex}";
+                    Debug.LogWarning($"[Cards] Character data missing for typeIndex={typeIndex}. Using fallback id.");
+                    return $"{player}_character_missing_{typeIndex}";
                 }
-                return $"{player}_{character.Id}_{setupIndex}";
+                return $"{player}_{character.Id}_{typeIndex}";
             }
 
             if (type == CardType.SemRegistro)
             {
-                int semIndex = setupIndex - ActiveModeConfig.CharactersPerPlayer - ActiveModeConfig.ArchiveCardsPerPlayer;
-                return $"{player}_sem_registro_{semIndex}";
+                return $"{player}_sem_registro_{typeIndex}";
             }
 
-            int archiveIndex = setupIndex - ActiveModeConfig.CharactersPerPlayer;
-            ArchiveCardData archive = GetArchiveForSetup(player, archiveIndex);
+            ArchiveCardData archive = GetArchiveForSetup(player, typeIndex);
             if (archive == null)
             {
-                Debug.LogWarning($"[Cards] Archive data missing for setupIndex={setupIndex}. Using fallback id.");
-                return $"{player}_archive_missing_{archiveIndex}";
+                Debug.LogWarning($"[Cards] Archive data missing for typeIndex={typeIndex}. Using fallback id.");
+                return $"{player}_archive_missing_{typeIndex}";
             }
-            return $"{player}_{archive.Id}_{archiveIndex}";
+            return $"{player}_{archive.Id}_{typeIndex}";
         }
 
-        private static CharacterData GetCharacterForSetup(PlayerId player, int index)
+        private CharacterData GetCharacterForSetup(PlayerId player, int index)
         {
+            if (matchCharactersByPlayer.TryGetValue(player, out List<CharacterData> playerCharacters) && index >= 0 && index < playerCharacters.Count)
+            {
+                return playerCharacters[index];
+            }
+
+            Debug.LogWarning($"[DECK] Missing generated character for {player} index={index}. Falling back to database order.");
             if (PrototypeDatabase.Characters == null || PrototypeDatabase.Characters.Count == 0) return null;
-            int offset = player == PlayerId.PlayerOne ? 0 : 1;
-            int mapped = (index + offset) % PrototypeDatabase.Characters.Count;
+            int mapped = Mathf.Abs(index) % PrototypeDatabase.Characters.Count;
             return PrototypeDatabase.Characters[mapped];
         }
 
@@ -1471,6 +1610,9 @@ namespace CardgameProof.Core
             discoveredClues.Clear();
             firstCluePendingByPlayer.Clear();
             firstClueChosenByPlayer.Clear();
+            matchCharactersByPlayer.Clear();
+            matchRandom = null;
+            matchRandomSeed = 0;
             totalCluesRequested = 0;
             totalResearchUses = 0;
             totalGuesses = 0;
