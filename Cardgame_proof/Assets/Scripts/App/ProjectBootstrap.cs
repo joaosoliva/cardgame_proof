@@ -13,6 +13,7 @@ namespace CardgameProof.App
         private Canvas rootCanvas;
         private SceneRootBuilder rootBuilder;
         private PrototypeSelectorView selectorView;
+        private Button returnToSelectorButton;
         private IPrototypeModule activePrototype;
         private PrototypeRuntimeContext runtimeContext;
 
@@ -40,6 +41,7 @@ namespace CardgameProof.App
 
         private void ShowPrototypeSelector()
         {
+            HideReturnToSelectorButton();
             StopActivePrototype();
             ClearSceneRootChildren();
             rootBuilder.Build();
@@ -51,7 +53,7 @@ namespace CardgameProof.App
                 selectorView = selectorObject.AddComponent<PrototypeSelectorView>();
             }
 
-            selectorView.Show(rootCanvas.GetComponent<RectTransform>(), PrototypeRegistry.All, StartPrototype);
+            selectorView.Show(rootCanvas.GetComponent<RectTransform>(), PrototypeRegistry.All, StartPrototype, QuitApplication);
         }
 
         private void StartPrototype(PrototypeDefinition definition)
@@ -65,6 +67,7 @@ namespace CardgameProof.App
             activePrototype = definition.CreateModule.Invoke();
             Debug.Log($"[ProjectBootstrap] Starting prototype: {definition.Id}");
             activePrototype.StartPrototype(runtimeContext);
+            ShowReturnToSelectorButton();
         }
 
         private void StopActivePrototype()
@@ -76,6 +79,60 @@ namespace CardgameProof.App
             activePrototype = null;
         }
 
+        private void ShowReturnToSelectorButton()
+        {
+            if (rootCanvas == null) return;
+
+            if (returnToSelectorButton == null)
+            {
+                GameObject buttonObject = new GameObject("DebugReturnToPrototypeSelectorButton", typeof(RectTransform), typeof(Image), typeof(Button));
+                RectTransform rect = buttonObject.GetComponent<RectTransform>();
+                rect.SetParent(rootCanvas.transform, false);
+                rect.anchorMin = new Vector2(0f, 1f);
+                rect.anchorMax = new Vector2(0f, 1f);
+                rect.pivot = new Vector2(0f, 1f);
+                rect.anchoredPosition = new Vector2(24f, -24f);
+                rect.sizeDelta = new Vector2(300f, 76f);
+                buttonObject.GetComponent<Image>().color = new Color(0.02f, 0.04f, 0.07f, 0.82f);
+
+                returnToSelectorButton = buttonObject.GetComponent<Button>();
+                returnToSelectorButton.onClick.AddListener(ShowPrototypeSelector);
+
+                GameObject labelObject = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
+                RectTransform labelRect = labelObject.GetComponent<RectTransform>();
+                labelRect.SetParent(buttonObject.transform, false);
+                labelRect.anchorMin = Vector2.zero;
+                labelRect.anchorMax = Vector2.one;
+                labelRect.offsetMin = Vector2.zero;
+                labelRect.offsetMax = Vector2.zero;
+
+                TextMeshProUGUI label = labelObject.GetComponent<TextMeshProUGUI>();
+                label.text = "← Protótipos";
+                label.fontSize = 24;
+                label.fontStyle = FontStyles.Bold;
+                label.alignment = TextAlignmentOptions.Center;
+                label.color = Color.white;
+                label.raycastTarget = false;
+            }
+
+            returnToSelectorButton.gameObject.SetActive(true);
+            returnToSelectorButton.transform.SetAsLastSibling();
+        }
+
+        private void HideReturnToSelectorButton()
+        {
+            if (returnToSelectorButton != null)
+            {
+                returnToSelectorButton.gameObject.SetActive(false);
+            }
+        }
+
+        private static void QuitApplication()
+        {
+            Debug.Log("[ProjectBootstrap] Quit requested from prototype selector.");
+            Application.Quit();
+        }
+
         private void ClearSceneRootChildren()
         {
             if (rootBuilder?.FullScreenRoot == null) return;
@@ -85,6 +142,7 @@ namespace CardgameProof.App
             {
                 Transform child = fullRoot.GetChild(i);
                 if (child == rootBuilder.SafeAreaRoot) continue;
+                child.gameObject.SetActive(false);
                 Destroy(child.gameObject);
             }
 
@@ -100,7 +158,9 @@ namespace CardgameProof.App
             if (parent == null) return;
             for (int i = parent.childCount - 1; i >= 0; i--)
             {
-                Destroy(parent.GetChild(i).gameObject);
+                GameObject child = parent.GetChild(i).gameObject;
+                child.SetActive(false);
+                Destroy(child);
             }
         }
 

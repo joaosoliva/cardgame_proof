@@ -10,7 +10,7 @@ namespace CardgameProof.App
     {
         private RectTransform root;
 
-        public void Show(RectTransform parent, IReadOnlyList<PrototypeDefinition> prototypes, Action<PrototypeDefinition> onSelected)
+        public void Show(RectTransform parent, IReadOnlyList<PrototypeDefinition> prototypes, Action<PrototypeDefinition> onSelected, Action onQuit)
         {
             if (parent == null) return;
             if (root == null)
@@ -18,8 +18,9 @@ namespace CardgameProof.App
                 Build(parent);
             }
 
-            ClearPrototypeRows();
+            ClearDynamicRows();
             Populate(prototypes, onSelected);
+            CreateUtilityButton(root, "Sair", new Vector2(0.5f, 0.10f), onQuit);
             root.gameObject.SetActive(true);
             root.SetAsLastSibling();
         }
@@ -40,8 +41,8 @@ namespace CardgameProof.App
             root.offsetMax = Vector2.zero;
             rootObj.GetComponent<Image>().color = new Color(0.06f, 0.08f, 0.12f, 1f);
 
-            CreateText(root, "Selecionar Protótipo", 58, new Vector2(0.08f, 0.80f), new Vector2(0.92f, 0.92f), FontStyles.Bold, TextAlignmentOptions.Center);
-            CreateText(root, "Escolha qual protótipo deseja abrir. O protótipo existente permanece disponível como um módulo separado.", 28, new Vector2(0.10f, 0.70f), new Vector2(0.90f, 0.80f), FontStyles.Normal, TextAlignmentOptions.Center);
+            CreateText(root, "Selecionar Protótipo", 58, new Vector2(0.08f, 0.82f), new Vector2(0.92f, 0.93f), FontStyles.Bold, TextAlignmentOptions.Center);
+            CreateText(root, "Escolha qual protótipo deseja abrir. Cada opção é um módulo separado e preserva sua própria interface após iniciar.", 28, new Vector2(0.10f, 0.72f), new Vector2(0.90f, 0.82f), FontStyles.Normal, TextAlignmentOptions.Center);
         }
 
         private void Populate(IReadOnlyList<PrototypeDefinition> prototypes, Action<PrototypeDefinition> onSelected)
@@ -49,43 +50,81 @@ namespace CardgameProof.App
             if (prototypes == null) return;
 
             float startY = 0.58f;
-            float step = 0.18f;
+            float step = 0.22f;
             for (int i = 0; i < prototypes.Count; i++)
             {
                 PrototypeDefinition definition = prototypes[i];
-                CreatePrototypeButton(root, definition, new Vector2(0.5f, startY - (i * step)), onSelected);
+                CreatePrototypeCard(root, definition, new Vector2(0.5f, startY - (i * step)), onSelected);
             }
         }
 
-        private void ClearPrototypeRows()
+        private void ClearDynamicRows()
         {
             if (root == null) return;
             for (int i = root.childCount - 1; i >= 0; i--)
             {
                 Transform child = root.GetChild(i);
-                if (child.name.StartsWith("PrototypeButton_", StringComparison.Ordinal))
+                if (child.name.StartsWith("PrototypeCard_", StringComparison.Ordinal) || child.name.StartsWith("SelectorUtilityButton_", StringComparison.Ordinal))
                 {
                     Destroy(child.gameObject);
                 }
             }
         }
 
-        private static void CreatePrototypeButton(RectTransform parent, PrototypeDefinition definition, Vector2 anchor, Action<PrototypeDefinition> onSelected)
+        private static void CreatePrototypeCard(RectTransform parent, PrototypeDefinition definition, Vector2 anchor, Action<PrototypeDefinition> onSelected)
         {
-            GameObject buttonObj = new GameObject($"PrototypeButton_{definition.Id}", typeof(RectTransform), typeof(Image), typeof(Button));
+            GameObject cardObj = new GameObject($"PrototypeCard_{definition.Id}", typeof(RectTransform), typeof(Image), typeof(Outline));
+            RectTransform rect = cardObj.GetComponent<RectTransform>();
+            rect.SetParent(parent, false);
+            rect.anchorMin = anchor;
+            rect.anchorMax = anchor;
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = new Vector2(860f, 190f);
+
+            Image background = cardObj.GetComponent<Image>();
+            background.color = new Color(0.11f, 0.16f, 0.24f, 1f);
+
+            Outline outline = cardObj.GetComponent<Outline>();
+            outline.effectColor = new Color(1f, 1f, 1f, 0.12f);
+            outline.effectDistance = new Vector2(2f, -2f);
+
+            CreateText(rect, definition.DisplayName, 34, new Vector2(0.05f, 0.58f), new Vector2(0.68f, 0.88f), FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
+            CreateText(rect, definition.ShortDescription, 23, new Vector2(0.05f, 0.14f), new Vector2(0.68f, 0.58f), FontStyles.Normal, TextAlignmentOptions.TopLeft);
+            CreateStartButton(rect, "Iniciar", new Vector2(0.82f, 0.50f), () => onSelected?.Invoke(definition));
+        }
+
+        private static void CreateStartButton(RectTransform parent, string label, Vector2 anchor, UnityEngine.Events.UnityAction onClick)
+        {
+            GameObject buttonObj = new GameObject("StartButton", typeof(RectTransform), typeof(Image), typeof(Button));
             RectTransform rect = buttonObj.GetComponent<RectTransform>();
             rect.SetParent(parent, false);
             rect.anchorMin = anchor;
             rect.anchorMax = anchor;
             rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.sizeDelta = new Vector2(820f, 150f);
-            buttonObj.GetComponent<Image>().color = new Color(0.17f, 0.36f, 0.65f, 1f);
+            rect.sizeDelta = new Vector2(230f, 96f);
+            buttonObj.GetComponent<Image>().color = new Color(0.18f, 0.48f, 0.86f, 1f);
 
             Button button = buttonObj.GetComponent<Button>();
-            button.onClick.AddListener(() => onSelected?.Invoke(definition));
+            button.onClick.AddListener(onClick);
 
-            CreateText(rect, definition.DisplayName, 34, new Vector2(0.05f, 0.50f), new Vector2(0.95f, 0.88f), FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
-            CreateText(rect, definition.ShortDescription, 23, new Vector2(0.05f, 0.12f), new Vector2(0.95f, 0.50f), FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+            CreateText(rect, label, 30, Vector2.zero, Vector2.one, FontStyles.Bold, TextAlignmentOptions.Center);
+        }
+
+        private static void CreateUtilityButton(RectTransform parent, string label, Vector2 anchor, Action onClick)
+        {
+            GameObject buttonObj = new GameObject($"SelectorUtilityButton_{label}", typeof(RectTransform), typeof(Image), typeof(Button));
+            RectTransform rect = buttonObj.GetComponent<RectTransform>();
+            rect.SetParent(parent, false);
+            rect.anchorMin = anchor;
+            rect.anchorMax = anchor;
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = new Vector2(420f, 84f);
+            buttonObj.GetComponent<Image>().color = new Color(0.24f, 0.27f, 0.33f, 1f);
+
+            Button button = buttonObj.GetComponent<Button>();
+            button.onClick.AddListener(() => onClick?.Invoke());
+
+            CreateText(rect, label, 28, Vector2.zero, Vector2.one, FontStyles.Bold, TextAlignmentOptions.Center);
         }
 
         private static TextMeshProUGUI CreateText(RectTransform parent, string value, int size, Vector2 anchorMin, Vector2 anchorMax, FontStyles style, TextAlignmentOptions alignment)
@@ -105,6 +144,7 @@ namespace CardgameProof.App
             text.alignment = alignment;
             text.color = Color.white;
             text.enableWordWrapping = true;
+            text.raycastTarget = false;
             return text;
         }
     }
