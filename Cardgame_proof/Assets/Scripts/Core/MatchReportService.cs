@@ -55,6 +55,10 @@ namespace CardgameProof.Core
             public int GuessAttemptsFromFreshDiscovery;
             public int GuessAttemptsFromPersistentAction;
             public int RepeatedGuessesAfterWrong;
+            public int FirstCluePromptsOpened;
+            public int FirstCluesChosen;
+            public string LastFirstClueCategory;
+            public float LastFirstClueChoiceSeconds;
             public int TurnsWithoutHiddenCards;
             public int EndgameSafeguardTriggered;
         }
@@ -63,11 +67,13 @@ namespace CardgameProof.Core
         private readonly Dictionary<string, int> cluesBeforeCorrectByCharacter = new Dictionary<string, int>();
         private DateTime setupStartP1;
         private DateTime setupStartP2;
+        private readonly Dictionary<string, DateTime> firstCluePromptOpenedAt = new Dictionary<string, DateTime>();
 
         public void StartMatch(string modeName)
         {
             report = new Report();
             cluesBeforeCorrectByCharacter.Clear();
+            firstCluePromptOpenedAt.Clear();
             report.ModeName = modeName;
             report.StartTimeUtc = DateTime.UtcNow;
             report.CluesByCategory = Enum.GetValues(typeof(ClueCategory)).Cast<ClueCategory>().ToDictionary(x => x, _ => 0);
@@ -76,7 +82,10 @@ namespace CardgameProof.Core
         public void EndSetup(PlayerId player) { if (player == PlayerId.PlayerOne) report.SetupP1 = DateTime.UtcNow - setupStartP1; else report.SetupP2 = DateTime.UtcNow - setupStartP2; }
         public void TurnStart(PlayerId player) { report.TotalTurns++; if (player == PlayerId.PlayerOne) report.TurnsP1++; else report.TurnsP2++; }
         public void MarkFirstInvestigation() { if (!report.FirstInvestigation.HasValue) report.FirstInvestigation = DateTime.UtcNow - report.StartTimeUtc; }
-        public void MarkFirstCharacterFound() { if (!report.FirstCharacterFound.HasValue) report.FirstCharacterFound = DateTime.UtcNow - report.StartTimeUtc; report.CharactersFound++; }
+        public void MarkFirstCharacterFound() { MarkFirstCharacterFound(null); }
+        public void MarkFirstCharacterFound(string characterId) { if (!report.FirstCharacterFound.HasValue) report.FirstCharacterFound = DateTime.UtcNow - report.StartTimeUtc; report.CharactersFound++; if (!string.IsNullOrEmpty(characterId)) firstCluePromptOpenedAt[characterId] = DateTime.UtcNow; }
+        public void OnFirstCluePromptOpened(string characterId) { if (string.IsNullOrEmpty(characterId)) return; if (!firstCluePromptOpenedAt.ContainsKey(characterId)) firstCluePromptOpenedAt[characterId] = DateTime.UtcNow; report.FirstCluePromptsOpened++; }
+        public void OnFirstClueChosen(string characterId, ClueCategory category) { report.FirstCluesChosen++; report.LastFirstClueCategory = category.ToString(); if (!string.IsNullOrEmpty(characterId) && firstCluePromptOpenedAt.TryGetValue(characterId, out DateTime openedAt)) report.LastFirstClueChoiceSeconds = Mathf.Max(0f, (float)(DateTime.UtcNow - openedAt).TotalSeconds); }
         public void OnClueRequested(string characterId, ClueCategory category) { if (!report.FirstClue.HasValue) report.FirstClue = DateTime.UtcNow - report.StartTimeUtc; report.CluesByCategory[category]++; if (!cluesBeforeCorrectByCharacter.ContainsKey(characterId)) cluesBeforeCorrectByCharacter[characterId] = 0; cluesBeforeCorrectByCharacter[characterId]++; }
         public void OnGuidebookUse(PlayerId player) { if (!report.FirstGuidebookUse.HasValue) report.FirstGuidebookUse = DateTime.UtcNow - report.StartTimeUtc; report.GuidebookOpens++; report.ResearchUsed++; if (player == PlayerId.PlayerOne) report.ResearchUsedP1++; else report.ResearchUsedP2++; if (!report.FirstCorrect.HasValue) report.GuidebookBeforeCorrect = true; }
         public void OnGuess(bool correct, string characterId) { if (!report.FirstGuess.HasValue) report.FirstGuess = DateTime.UtcNow - report.StartTimeUtc; if (correct) { if (!report.FirstCorrect.HasValue) report.FirstCorrect = DateTime.UtcNow - report.StartTimeUtc; report.CharactersCorrect++; } else report.WrongGuesses++; }
@@ -128,7 +137,7 @@ namespace CardgameProof.Core
 
             return $"[Resultado]\nModo jogado: {report.ModeName}\nVencedor: {report.Winner}\nPlacar final: J1 {report.ScoreP1} x {report.ScoreP2} J2\nDuração total da partida: {report.TotalDuration:mm\\:ss}\nTotal de turnos: {report.TotalTurns}\n\n" +
                    $"[Ritmo da partida]\nPrimeira investigação: {Fmt(report.FirstInvestigation)}\nPrimeiro personagem encontrado: {Fmt(report.FirstCharacterFound)}\nPrimeira pista solicitada: {Fmt(report.FirstClue)}\nPrimeira tentativa de identificação: {Fmt(report.FirstGuess)}\nPrimeira identificação correta: {Fmt(report.FirstCorrect)}\n\n" +
-                   $"[Dedução]\nPersonagens encontrados: {report.CharactersFound}\nPersonagens identificados corretamente: {report.CharactersCorrect}\nTentativas erradas: {report.WrongGuesses}\nTentativas de identificação (descoberta fresca): {report.GuessAttemptsFromFreshDiscovery}\nTentativas de identificação (ação persistente): {report.GuessAttemptsFromPersistentAction}\nRepetições após erro: {report.RepeatedGuessesAfterWrong}\nMédia de pistas antes do acerto: {report.AvgCluesBeforeCorrect:0.00}\nCategoria de pista mais usada: {topClue}\n\n" +
+                   $"[Dedução]\nPersonagens encontrados: {report.CharactersFound}\nPersonagens identificados corretamente: {report.CharactersCorrect}\nTentativas erradas: {report.WrongGuesses}\nTentativas de identificação (descoberta fresca): {report.GuessAttemptsFromFreshDiscovery}\nTentativas de identificação (ação persistente): {report.GuessAttemptsFromPersistentAction}\nRepetições após erro: {report.RepeatedGuessesAfterWrong}\nPrompts de primeira pista abertos: {report.FirstCluePromptsOpened}\nPrimeiras pistas escolhidas: {report.FirstCluesChosen}\nÚltima categoria de primeira pista: {report.LastFirstClueCategory ?? "-"}\nTempo até escolher primeira pista: {report.LastFirstClueChoiceSeconds:0.00}s\nMédia de pistas antes do acerto: {report.AvgCluesBeforeCorrect:0.00}\nCategoria de pista mais usada: {topClue}\n\n" +
                    $"[Pesquisa]\nUsos do Guia de Apoio: {report.GuidebookOpens}\nFichas de Pesquisa usadas: {report.ResearchUsed}\nO guia foi usado antes de algum acerto? {(report.GuidebookBeforeCorrect ? "Sim" : "Não")}\n\n" +
                    $"[Cartas de Arquivo]\nCartas de Arquivo reveladas: {report.ArchiveRevealed}\nTipo mais revelado: {MostArchiveType()}\nEfeitos sem alvo válido: {report.ArchiveEffectsNoTarget}\n\n" +
                    $"[Sem Registro]\nSem Registro revelados: {report.NoRecordRevealed}\n% de investigações em Sem Registro: {PctNoRecord():0.0}%\nTurnos sem cartas ocultas restantes: {report.TurnsWithoutHiddenCards}\nSafeguard anti-soft-lock acionado: {report.EndgameSafeguardTriggered}\n\n" +
