@@ -81,12 +81,16 @@ namespace CardgameProof.Core
             cardCanvasGroup.blocksRaycasts = true;
             UpdateHighlight(target);
             LogTutorialUiState();
-            debugWelcomeStepActive = string.Equals(step.Id, "setup_intro", StringComparison.OrdinalIgnoreCase) ||
-                                     step.Title.Contains("Bem-vindo", StringComparison.OrdinalIgnoreCase);
-            if (debugWelcomeStepActive)
+            bool isContinueStep = showContinueButton && step.CompleteTrigger == TutorialTrigger.ContinueButton;
+            debugWelcomeStepActive = isContinueStep;
+            if (isContinueStep)
             {
-                ForceWelcomeInputSafety();
-                DumpWelcomeDiagnostics();
+                ForceContinueStepInputSafety();
+                if (string.Equals(step.Id, "setup_intro", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(step.Id, "player2_setup_intro", StringComparison.OrdinalIgnoreCase))
+                {
+                    DumpWelcomeDiagnostics();
+                }
             }
         }
 
@@ -314,9 +318,9 @@ namespace CardgameProof.Core
             Debug.Log($"[TUTORIAL_UI] blocker alpha={blocker.alpha} interactable={blocker.interactable} blocks={blocker.blocksRaycasts}");
         }
 
-        private void ForceWelcomeInputSafety()
+        private void ForceContinueStepInputSafety()
         {
-            // Welcome/continue step must block gameplay behind the tutorial.
+            // Continue-button steps must block gameplay behind tutorial and keep button clickable.
             blocker.interactable = true;
             blocker.blocksRaycasts = true;
             Image blockerImage = panelObject.GetComponent<Image>();

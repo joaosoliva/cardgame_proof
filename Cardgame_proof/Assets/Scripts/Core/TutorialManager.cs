@@ -45,6 +45,11 @@ namespace CardgameProof.Core
         public void StartSequence(IReadOnlyList<TutorialStep> sequence)
         {
             steps = sequence == null ? new List<TutorialStep>() : new List<TutorialStep>(sequence);
+            for (int i = 0; i < steps.Count; i++)
+            {
+                TutorialStep s = steps[i];
+                Debug.Log($"[TUTORIAL_SEQUENCE] index={i} id={s.Id} title={s.Title} phase={s.Phase} trigger={s.CompleteTrigger} showButton={s.ShowContinueButton} targetKey={s.TargetKey}");
+            }
             index = 0;
             ShowCurrent();
         }
