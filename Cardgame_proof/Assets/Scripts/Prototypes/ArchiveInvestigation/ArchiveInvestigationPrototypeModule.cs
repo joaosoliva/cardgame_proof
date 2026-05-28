@@ -8,6 +8,7 @@ namespace CardgameProof.Prototypes.ArchiveInvestigation
     {
         private GameController controller;
         private GameObject controllerObject;
+        private bool ownsControllerObject;
 
         public void StartPrototype(PrototypeRuntimeContext context)
         {
@@ -22,23 +23,37 @@ namespace CardgameProof.Prototypes.ArchiveInvestigation
             {
                 controllerObject = new GameObject("ArchiveInvestigationController");
                 controller = controllerObject.AddComponent<GameController>();
+                ownsControllerObject = true;
             }
             else
             {
                 controllerObject = controller.gameObject;
+                ownsControllerObject = false;
             }
 
+            controllerObject.SetActive(true);
             controller.InitializeMainMenu(context.SceneRoot);
         }
 
         public void StopPrototype()
         {
-            if (controllerObject != null)
+            if (controller != null)
+            {
+                controller.CleanupForPrototypeSwitch();
+            }
+
+            if (controllerObject != null && ownsControllerObject)
             {
                 Object.Destroy(controllerObject);
-                controllerObject = null;
-                controller = null;
             }
+            else if (controllerObject != null)
+            {
+                controllerObject.SetActive(false);
+            }
+
+            controllerObject = null;
+            controller = null;
+            ownsControllerObject = false;
         }
     }
 }

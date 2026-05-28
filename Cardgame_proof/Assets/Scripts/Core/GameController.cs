@@ -1713,6 +1713,25 @@ namespace CardgameProof.Core
             return panel;
         }
 
+        public void CleanupForPrototypeSwitch()
+        {
+            Debug.Log("[GameController] CleanupForPrototypeSwitch");
+            StopAllCoroutines();
+            ResetRuntimeUIState("PrototypeSwitch");
+            howToPlayView?.Hide();
+            boardController?.ClearBoard();
+
+            if (mainMenuRoot != null)
+            {
+                mainMenuRoot.gameObject.SetActive(false);
+                mainMenuRoot = null;
+            }
+
+            if (sceneRoot?.CenterBoardArea != null) sceneRoot.CenterBoardArea.gameObject.SetActive(false);
+            CurrentPhase = GamePhase.MainMenu;
+            ActiveModeConfig = null;
+        }
+
         private void SetSetupInteractionEnabled(bool enabled)
         {
             if (trayRoot != null)
