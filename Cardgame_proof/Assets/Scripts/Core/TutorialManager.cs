@@ -12,6 +12,7 @@ namespace CardgameProof.Core
         AnyCardPlaced,
         AllRequiredCardsPlaced,
         SetupConfirmed,
+        AutoNoRecordFillStarted,
         AutoNoRecordFillCompleted,
         GuideOpened,
         RulesOpened,

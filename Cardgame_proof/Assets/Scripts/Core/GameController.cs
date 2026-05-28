@@ -14,11 +14,19 @@ namespace CardgameProof.Core
         private enum GuessSource { FreshDiscovery, PersistentAction }
         private static readonly IReadOnlyList<TutorialStep> DefaultTutorialSteps = new List<TutorialStep>
         {
-            new TutorialStep { Id = "setup_drag", Title = "Arraste cartas", Body = "Arraste um Dossiê ou Carta de Arquivo da bandeja para a grade.", Phase = GamePhase.Setup, TargetKey = "character_card_hand", CompleteTrigger = TutorialTrigger.AnyCardPlaced, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.Top, FadeDuringAction = true, CompactMode = true },
-            new TutorialStep { Id = "setup_finish", Title = "Finalize a montagem", Body = "Depois de posicionar tudo, toque em Finalizar montagem.", Phase = GamePhase.Setup, TargetKey = "confirm_setup_button", CompleteTrigger = TutorialTrigger.SetupConfirmed, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.Top, FadeDuringAction = true, CompactMode = true },
+            new TutorialStep { Id = "setup_intro", Title = "Bem-vindo ao Arquivo", Body = "Monte um arquivo secreto e investigue o arquivo do outro jogador para descobrir personagens acadêmicos usando pistas e pesquisa.", Phase = GamePhase.Setup, TargetKey = null, CompleteTrigger = TutorialTrigger.ContinueButton, ShowContinueButton = true, BlockOutsideTarget = false, PreferredPlacement = TutorialPanelPlacement.Center },
+            new TutorialStep { Id = "setup_archive_card", Title = "Cartas de Arquivo", Body = "Cartas de Arquivo ajudam a investigação. Arraste uma delas para a grade.", Phase = GamePhase.Setup, TargetKey = "archive_card_hand", CompleteTrigger = TutorialTrigger.ArchiveCardPlaced, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.Top, FadeDuringAction = true, CompactMode = true },
+            new TutorialStep { Id = "setup_character_card", Title = "Dossiês de Personagem", Body = "Dossiês escondem personagens. Arraste um Dossiê para a grade sem revelar sua identidade ao outro jogador.", Phase = GamePhase.Setup, TargetKey = "character_card_hand", CompleteTrigger = TutorialTrigger.CharacterCardPlaced, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.Top, FadeDuringAction = true, CompactMode = true },
+            new TutorialStep { Id = "setup_remaining_cards", Title = "Complete sua montagem", Body = "Agora posicione o restante das cartas importantes no arquivo.", Phase = GamePhase.Setup, TargetKey = "board_grid", CompleteTrigger = TutorialTrigger.AllRequiredCardsPlaced, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.UpperBoard, CompactMode = true },
+            new TutorialStep { Id = "setup_finalize", Title = "Finalizar montagem", Body = "Toque em Finalizar montagem para completar o arquivo.", Phase = GamePhase.Setup, TargetKey = "confirm_setup_button", CompleteTrigger = TutorialTrigger.SetupConfirmed, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.Top, FadeDuringAction = true, CompactMode = true },
+            new TutorialStep { Id = "setup_no_record", Title = "Cartas Sem Registro", Body = "As lacunas serão preenchidas automaticamente com cartas Sem Registro. Elas representam partes do arquivo onde nada útil foi encontrado.", Phase = GamePhase.Setup, TargetKey = "board_grid", CompleteTrigger = TutorialTrigger.AutoNoRecordFillCompleted, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.Top, CompactMode = true },
             new TutorialStep { Id = "investigate_click", Title = "Clique no tabuleiro", Body = "Durante a investigação, toque em uma carta oculta do arquivo adversário.", Phase = GamePhase.Investigation, TargetKey = "board_grid", CompleteTrigger = TutorialTrigger.CellInvestigated, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.UpperBoard, CompactMode = true },
             new TutorialStep { Id = "reveal_and_guide", Title = "Revelar e usar Guia", Body = "Cartas reveladas ativam ações. Use o botão Guia para pesquisa quando precisar.", Phase = GamePhase.Investigation, TargetKey = "board_grid", CompleteTrigger = TutorialTrigger.GuideOpened, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.Top, CompactMode = true },
             new TutorialStep { Id = "identify_and_end", Title = "Identificar e encerrar turno", Body = "Use Tentar identificar quando tiver pistas e depois encerre o turno.", Phase = GamePhase.Investigation, TargetKey = null, CompleteTrigger = TutorialTrigger.TurnPassed, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.Center, CompactMode = true }
+        };
+        private static readonly IReadOnlyList<TutorialStep> PlayerTwoSetupTutorialSteps = new List<TutorialStep>
+        {
+            new TutorialStep { Id = "setup_p2_short", Title = "Vez do Jogador 2", Body = "Monte seu arquivo da mesma forma: posicione Dossiês e Cartas de Arquivo. As lacunas serão preenchidas com Sem Registro.", Phase = GamePhase.Setup, TargetKey = null, CompleteTrigger = TutorialTrigger.ContinueButton, ShowContinueButton = true, PreferredPlacement = TutorialPanelPlacement.Center }
         };
 
 
@@ -70,6 +78,7 @@ namespace CardgameProof.Core
         private TextMeshProUGUI hudScore;
         private TextMeshProUGUI hudResearch;
         private bool identificationHintShown;
+        private bool playerTwoShortTutorialShown;
 
         public GameModeConfig ActiveModeConfig { get; private set; }
         public GamePhase CurrentPhase { get; private set; } = GamePhase.MainMenu;
@@ -164,7 +173,6 @@ namespace CardgameProof.Core
             Debug.Log("[GAME] Entering Tutorial/Setup");
             TransitionToTutorialIntro();
             StartPassAndPlaySetup();
-            ShowTutorialSequence(DefaultTutorialSteps);
         }
 
         private void OpenHowToPlay()
@@ -213,6 +221,7 @@ namespace CardgameProof.Core
         {
             playerBoardStates[PlayerId.PlayerOne] = new List<PlacedCardData>();
             playerBoardStates[PlayerId.PlayerTwo] = new List<PlacedCardData>();
+            playerTwoShortTutorialShown = false;
             BeginSetupForPlayer(PlayerId.PlayerOne);
             matchReportService.StartMatch(ActiveModeConfig.DisplayName);
         }
@@ -230,6 +239,15 @@ namespace CardgameProof.Core
             BuildPlacedCardActions();
             GenerateCurrentPlayerSetupCards(player);
             UpdateFinalizeButtonState();
+            if (player == PlayerId.PlayerOne)
+            {
+                ShowTutorialSequence(DefaultTutorialSteps);
+            }
+            else if (!playerTwoShortTutorialShown)
+            {
+                playerTwoShortTutorialShown = true;
+                ShowTutorialSequence(PlayerTwoSetupTutorialSteps);
+            }
             HideReadyScreen();
             winScreenView?.Hide();
         }
@@ -802,6 +820,7 @@ namespace CardgameProof.Core
         private IEnumerator FillEmptyCellsWithNoRecordCoroutine(PlayerId owner, Action onCompleted)
         {
             isAutoFillingNoRecord = true;
+            tutorialManager?.Notify(TutorialTrigger.AutoNoRecordFillStarted);
             if (finalizeSetupButton != null) finalizeSetupButton.interactable = false;
             SetSetupInteractionEnabled(false);
 
