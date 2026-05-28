@@ -8,20 +8,32 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Data
         Action
     }
 
+    public enum ScienceFactCategory
+    {
+        Observation,
+        Experimentation,
+        Theory,
+        Technology,
+        Society,
+        Environment,
+        Health,
+        Mathematics
+    }
+
     [Serializable]
     public abstract class ScienceCardData
     {
-        protected ScienceCardData(string id, string displayName, string description, ScienceCardType cardType)
+        protected ScienceCardData(string id, string displayName, string shortDescription, ScienceCardType cardType)
         {
             Id = id;
             DisplayName = displayName;
-            Description = description;
+            ShortDescription = shortDescription;
             CardType = cardType;
         }
 
         public string Id { get; }
         public string DisplayName { get; }
-        public string Description { get; }
+        public string ShortDescription { get; }
         public ScienceCardType CardType { get; }
     }
 }

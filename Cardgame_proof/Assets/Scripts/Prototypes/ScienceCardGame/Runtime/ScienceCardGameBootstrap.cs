@@ -1,5 +1,6 @@
 using UnityEngine;
 using CardgameProof.App;
+using CardgameProof.Prototypes.ScienceCardGame.Runtime.Data;
 using CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers;
 
 namespace CardgameProof.Prototypes.ScienceCardGame.Runtime
@@ -34,7 +35,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime
             telemetryManager.Initialize(state);
 
             deckManager = new ScienceDeckManager();
-            deckManager.Initialize(state, telemetryManager);
+            deckManager.Initialize(ScienceCardLibrary.CreateDemoDeck(), telemetryManager);
 
             boardManager = new ScienceBoardManager();
             boardManager.Initialize(state, telemetryManager);

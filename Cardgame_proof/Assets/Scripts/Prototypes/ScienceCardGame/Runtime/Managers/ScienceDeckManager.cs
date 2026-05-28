@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using CardgameProof.Prototypes.ScienceCardGame.Runtime.Data;
 using UnityEngine;
@@ -8,17 +9,23 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
     {
         private readonly List<ScienceCardData> drawPile = new List<ScienceCardData>();
         private readonly List<ScienceCardData> discardPile = new List<ScienceCardData>();
+        private readonly List<ScienceCharacterCardData> characterCards = new List<ScienceCharacterCardData>();
+        private readonly List<ScienceActionCardData> actionCards = new List<ScienceActionCardData>();
         private ScienceTelemetryManager telemetry;
+        private System.Random random;
 
         public IReadOnlyList<ScienceCardData> DrawPile => drawPile;
         public IReadOnlyList<ScienceCardData> DiscardPile => discardPile;
+        public IReadOnlyList<ScienceCharacterCardData> CharacterCards => characterCards;
+        public IReadOnlyList<ScienceActionCardData> ActionCards => actionCards;
 
-        public void Initialize(ScienceCardGameState state, ScienceTelemetryManager telemetryManager)
+        public void Initialize(IReadOnlyList<ScienceCardData> sourceCards, ScienceTelemetryManager telemetryManager, int? seed = null)
         {
             telemetry = telemetryManager;
-            BuildPrototypeDeck();
-            Debug.Log($"[ScienceCardGame] 02 DeckManager initialized cards={drawPile.Count}");
-            telemetry?.LogEvent("science_deck_initialized", $"cards={drawPile.Count}");
+            random = seed.HasValue ? new System.Random(seed.Value) : new System.Random(Environment.TickCount);
+            LoadDeck(sourceCards);
+            Debug.Log($"[ScienceCardGame] 02 DeckManager initialized cards={drawPile.Count} characters={characterCards.Count} actions={actionCards.Count}");
+            telemetry?.LogEvent("science_deck_initialized", $"cards={drawPile.Count};characters={characterCards.Count};actions={actionCards.Count}");
         }
 
         public ScienceCardData DrawCard()
@@ -41,17 +48,45 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         {
             drawPile.Clear();
             discardPile.Clear();
+            characterCards.Clear();
+            actionCards.Clear();
             telemetry = null;
+            random = null;
         }
 
-        private void BuildPrototypeDeck()
+        private void LoadDeck(IReadOnlyList<ScienceCardData> sourceCards)
         {
             drawPile.Clear();
             discardPile.Clear();
-            drawPile.Add(new ScienceCharacterCardData("character_curie", "Marie Curie", "Química e Física", "Século XX", "Conecte descobertas sobre radioatividade a impactos científicos e sociais."));
-            drawPile.Add(new ScienceCharacterCardData("character_darwin", "Charles Darwin", "Biologia", "Século XIX", "Relacione evidências, observação e teoria científica."));
-            drawPile.Add(new ScienceActionCardData("action_research", "Pesquisa Rápida", "Compre uma carta e explique uma possível conexão.", ScienceActionKind.Research));
-            drawPile.Add(new ScienceActionCardData("action_connect", "Conexão Cruzada", "Crie uma ligação entre dois personagens ou áreas.", ScienceActionKind.Connect));
+            characterCards.Clear();
+            actionCards.Clear();
+
+            if (sourceCards != null)
+            {
+                foreach (ScienceCardData card in sourceCards)
+                {
+                    if (card == null) continue;
+                    drawPile.Add(card);
+                    if (card is ScienceCharacterCardData characterCard) characterCards.Add(characterCard);
+                    if (card is ScienceActionCardData actionCard) actionCards.Add(actionCard);
+                }
+            }
+
+            Shuffle(drawPile);
+            Shuffle(characterCards);
+            Shuffle(actionCards);
+        }
+
+        private void Shuffle<T>(IList<T> cards)
+        {
+            if (cards == null || cards.Count <= 1) return;
+            for (int i = cards.Count - 1; i > 0; i--)
+            {
+                int j = random.Next(i + 1);
+                T temp = cards[i];
+                cards[i] = cards[j];
+                cards[j] = temp;
+            }
         }
     }
 }

@@ -2,23 +2,26 @@ using System;
 
 namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Data
 {
-    public enum ScienceActionKind
+    public enum ScienceActionEffectType
     {
-        Draw,
-        Connect,
-        Research,
-        Reframe
+        DrawCards,
+        CreateConnection,
+        ResearchHint,
+        SwapCard,
+        BonusScore
     }
 
     [Serializable]
     public sealed class ScienceActionCardData : ScienceCardData
     {
-        public ScienceActionCardData(string id, string displayName, string description, ScienceActionKind actionKind)
-            : base(id, displayName, description, ScienceCardType.Action)
+        public ScienceActionCardData(string id, string displayName, string shortDescription, ScienceActionEffectType effectType, string rulesText)
+            : base(id, displayName, shortDescription, ScienceCardType.Action)
         {
-            ActionKind = actionKind;
+            EffectType = effectType;
+            RulesText = rulesText;
         }
 
-        public ScienceActionKind ActionKind { get; }
+        public ScienceActionEffectType EffectType { get; }
+        public string RulesText { get; }
     }
 }

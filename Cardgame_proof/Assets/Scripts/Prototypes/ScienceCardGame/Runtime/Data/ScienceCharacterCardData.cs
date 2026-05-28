@@ -5,16 +5,25 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Data
     [Serializable]
     public sealed class ScienceCharacterCardData : ScienceCardData
     {
-        public ScienceCharacterCardData(string id, string displayName, string scientificField, string era, string connectionPrompt)
-            : base(id, displayName, connectionPrompt, ScienceCardType.Character)
+        public ScienceCharacterCardData(
+            string id,
+            string displayName,
+            string field,
+            string shortDescription,
+            ScienceFactCategory factCategoryA,
+            ScienceFactCategory factCategoryB,
+            string miniBio)
+            : base(id, displayName, shortDescription, ScienceCardType.Character)
         {
-            ScientificField = scientificField;
-            Era = era;
-            ConnectionPrompt = connectionPrompt;
+            Field = field;
+            FactCategoryA = factCategoryA;
+            FactCategoryB = factCategoryB;
+            MiniBio = miniBio;
         }
 
-        public string ScientificField { get; }
-        public string Era { get; }
-        public string ConnectionPrompt { get; }
+        public string Field { get; }
+        public ScienceFactCategory FactCategoryA { get; }
+        public ScienceFactCategory FactCategoryB { get; }
+        public string MiniBio { get; }
     }
 }
