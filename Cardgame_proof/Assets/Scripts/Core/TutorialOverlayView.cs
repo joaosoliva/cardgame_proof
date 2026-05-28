@@ -34,6 +34,7 @@ namespace CardgameProof.Core
         {
             if (panelObject == null || step == null) return;
             panelObject.SetActive(true);
+            panelRoot.SetAsLastSibling();
             currentStepId = step.Id;
             titleText.text = step.Title;
             bodyText.text = step.Body;
@@ -54,6 +55,8 @@ namespace CardgameProof.Core
             blocker.alpha = 1f;
             blocker.interactable = blockOutsideTarget;
             blocker.blocksRaycasts = blockOutsideTarget;
+            Image blockerImage = panelObject.GetComponent<Image>();
+            if (blockerImage != null) blockerImage.raycastTarget = blockOutsideTarget;
             cardCanvasGroup.alpha = 1f;
             cardCanvasGroup.interactable = true;
             cardCanvasGroup.blocksRaycasts = true;
@@ -65,6 +68,8 @@ namespace CardgameProof.Core
         {
             if (panelObject == null) return;
             blocker.alpha = 0f; blocker.interactable = false; blocker.blocksRaycasts = false;
+            Image blockerImage = panelObject.GetComponent<Image>();
+            if (blockerImage != null) blockerImage.raycastTarget = false;
             cardCanvasGroup.alpha = 0f; cardCanvasGroup.interactable = false; cardCanvasGroup.blocksRaycasts = false;
             highlightFrame.gameObject.SetActive(false);
             panelObject.SetActive(false);

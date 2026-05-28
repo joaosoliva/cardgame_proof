@@ -18,6 +18,7 @@ namespace CardgameProof.Core
     public sealed class HowToPlayView : MonoBehaviour
     {
         private RectTransform root;
+        private CanvasGroup canvasGroup;
         private Image illustrationImage;
         private GameObject placeholderRoot;
         private TextMeshProUGUI titleText;
@@ -36,6 +37,8 @@ namespace CardgameProof.Core
         public void Initialize(RectTransform parent)
         {
             root = CreateRect("HowToPlayRoot", parent, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            canvasGroup = root.gameObject.GetComponent<CanvasGroup>();
+            if (canvasGroup == null) canvasGroup = root.gameObject.AddComponent<CanvasGroup>();
             root.SetAsLastSibling();
 
             var dim = CreateImage("DimBackground", root, new Color(0f, 0f, 0f, 0.62f), Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
@@ -74,21 +77,45 @@ namespace CardgameProof.Core
             nextButton.onClick.AddListener(() => GoToPage(currentIndex + 1));
             playPrototypeButton.onClick.AddListener(() => onPlayPrototype?.Invoke());
 
-            root.gameObject.SetActive(false);
+            Debug.Log("[HOW_TO_PLAY] Created");
+            Hide();
         }
 
         public void Show(IReadOnlyList<HowToPlayPageData> allPages, Action closeAction, Action playPrototypeAction)
         {
+            Debug.Log("[HOW_TO_PLAY] Show called");
             pages.Clear();
             if (allPages != null) pages.AddRange(allPages);
             onClose = closeAction;
             onPlayPrototype = playPrototypeAction;
             currentIndex = 0;
             root.gameObject.SetActive(true);
+            if (canvasGroup != null)
+            {
+                canvasGroup.alpha = 1f;
+                canvasGroup.interactable = true;
+                canvasGroup.blocksRaycasts = true;
+            }
+            root.SetAsLastSibling();
             GoToPage(0);
+            Debug.Log($"[HOW_TO_PLAY] Active: {root.gameObject.activeSelf}");
+            Debug.Log($"[HOW_TO_PLAY] Alpha: {(canvasGroup != null ? canvasGroup.alpha : -1f)}");
+            Debug.Log($"[HOW_TO_PLAY] Parent: {(root.parent != null ? root.parent.name : "null")}");
+            Debug.Log($"[HOW_TO_PLAY] Sibling index: {root.GetSiblingIndex()}");
+            Debug.Log($"[HOW_TO_PLAY] Page count: {pages.Count}");
         }
 
-        public void Hide() => root.gameObject.SetActive(false);
+        public void Hide()
+        {
+            if (root == null) return;
+            if (canvasGroup != null)
+            {
+                canvasGroup.alpha = 0f;
+                canvasGroup.interactable = false;
+                canvasGroup.blocksRaycasts = false;
+            }
+            root.gameObject.SetActive(false);
+        }
 
         private void GoToPage(int index)
         {
@@ -123,7 +150,17 @@ namespace CardgameProof.Core
             GameObject go = new GameObject(name, typeof(RectTransform), typeof(Image));
             RectTransform rect = go.GetComponent<RectTransform>();
             rect.SetParent(parent, false);
-            rect.anchorMin = anchorMin; rect.anchorMax = anchorMax; rect.pivot = pivot; rect.sizeDelta = size; rect.offsetMin = Vector2.zero; rect.offsetMax = Vector2.zero;
+            rect.anchorMin = anchorMin; rect.anchorMax = anchorMax; rect.pivot = pivot;
+            if (anchorMin == Vector2.zero && anchorMax == Vector2.one)
+            {
+                rect.offsetMin = Vector2.zero;
+                rect.offsetMax = Vector2.zero;
+            }
+            else
+            {
+                rect.sizeDelta = size;
+                rect.anchoredPosition = Vector2.zero;
+            }
             return rect;
         }
 
