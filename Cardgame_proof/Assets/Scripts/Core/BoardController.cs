@@ -223,6 +223,15 @@ namespace CardgameProof.Core
             }
         }
 
+        public void SetTargetHighlights(ISet<Vector2Int> validTargets)
+        {
+            foreach (KeyValuePair<Vector2Int, BoardCellView> pair in boardViews)
+            {
+                bool highlighted = validTargets != null && validTargets.Contains(pair.Key);
+                pair.Value.SetPlacementHighlight(highlighted, false);
+            }
+        }
+
         public bool IsCellEmpty(Vector2Int coordinate)
         {
             return boardData.TryGetValue(coordinate, out BoardCellData cell) && !cell.IsOccupied;
