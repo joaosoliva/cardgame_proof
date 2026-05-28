@@ -36,6 +36,10 @@ namespace CardgameProof.Core
         private readonly HashSet<string> shown = new HashSet<string>();
         private List<TutorialStep> steps = new List<TutorialStep>();
         private int index;
+        private Action sequenceCompleted;
+
+        public bool IsTutorialActive => activeStep != null;
+        public bool IsBlockingGameplayInput => activeStep != null && activeStep.BlockGameplayInput;
 
         public TutorialManager(TutorialOverlayView overlayView) { overlay = overlayView; }
 
@@ -45,8 +49,9 @@ namespace CardgameProof.Core
             targets[key] = target;
         }
 
-        public void StartSequence(IReadOnlyList<TutorialStep> sequence)
+        public void StartSequence(IReadOnlyList<TutorialStep> sequence, Action onCompleted = null)
         {
+            sequenceCompleted = onCompleted;
             steps = sequence == null ? new List<TutorialStep>() : new List<TutorialStep>(sequence);
             for (int i = 0; i < steps.Count; i++)
             {
@@ -59,8 +64,14 @@ namespace CardgameProof.Core
 
         public void Notify(TutorialTrigger trigger)
         {
+            // Gameplay notifications do not advance tutorial in investigation continue-button mode.
             if (steps == null || index >= steps.Count) return;
             var step = steps[index];
+            if (step.Phase == GamePhase.Investigation && step.ShowContinueButton && trigger != TutorialTrigger.ContinueButton)
+            {
+                Debug.Log($"[TUTORIAL] Ignored gameplay trigger during investigation tutorial: {trigger}");
+                return;
+            }
             if (step.CompleteTrigger != trigger) return;
             Advance();
         }
@@ -83,16 +94,22 @@ namespace CardgameProof.Core
                 if (!string.IsNullOrWhiteSpace(step.TargetKey))
                 {
                     targets.TryGetValue(step.TargetKey, out target);
-                    if (target == null) Debug.LogWarning($"[TUTORIAL] Target not found for step {step.Id}: {step.TargetKey}");
+                    if (target == null) Debug.LogWarning($"[TUTORIAL] Missing target for step {step.Id}, continuing without highlight: {step.TargetKey}");
                 }
 
                 bool requireContinue = step.ShowContinueButton || target == null;
                 activeStep = step;
-                overlay.ShowStep(step, requireContinue, requireContinue ? (Action)(() => Notify(TutorialTrigger.ContinueButton)) : null, target, step.BlockOutsideTarget);
+                bool blockOutsideTarget = step.BlockOutsideTarget || step.BlockGameplayInput;
+                overlay.ShowStep(step, requireContinue, requireContinue ? (Action)(() => Notify(TutorialTrigger.ContinueButton)) : null, target, blockOutsideTarget);
                 return;
             }
 
+            activeStep = null;
             overlay.Hide();
+            Debug.Log("[TUTORIAL] Tutorial completed");
+            Action completed = sequenceCompleted;
+            sequenceCompleted = null;
+            completed?.Invoke();
         }
 
 

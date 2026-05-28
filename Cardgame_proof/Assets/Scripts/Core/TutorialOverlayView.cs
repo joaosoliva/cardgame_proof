@@ -61,7 +61,14 @@ namespace CardgameProof.Core
                 confirmButton.onClick.AddListener(() =>
                 {
                     Debug.Log("[TUTORIAL_CLICK_TEST] Entendi clicked");
-                    Debug.Log($"[TUTORIAL] Continue clicked: {currentStepId}");
+                    if (step.Phase == GamePhase.Investigation)
+                    {
+                        Debug.Log($"[TUTORIAL] Investigation continue clicked: {currentStepId}");
+                    }
+                    else
+                    {
+                        Debug.Log($"[TUTORIAL] Continue clicked: {currentStepId}");
+                    }
                     Debug.Log($"[TUTORIAL] Selected GO: {(EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null ? EventSystem.current.currentSelectedGameObject.name : "null")}");
                     onContinue();
                 });
@@ -285,7 +292,7 @@ namespace CardgameProof.Core
             textObj.transform.SetParent(parent, false);
             textObj.GetComponent<LayoutElement>().preferredHeight = preferredHeight;
             TextMeshProUGUI text = textObj.GetComponent<TextMeshProUGUI>();
-            text.alignment = alignment; text.fontSize = fontSize; text.color = color; text.enableWordWrapping = true; text.overflowMode = TextOverflowModes.Overflow; return text;
+            text.alignment = alignment; text.fontSize = fontSize; text.color = color; text.enableWordWrapping = true; text.overflowMode = TextOverflowModes.Overflow; text.raycastTarget = false; return text;
         }
 
         private static Button CreateButton(RectTransform parent, string label, float preferredHeight)

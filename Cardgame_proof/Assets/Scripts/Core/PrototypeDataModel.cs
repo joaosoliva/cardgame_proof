@@ -124,6 +124,7 @@ namespace CardgameProof.Core
         public bool OnlyShowOnce;
         public TutorialTrigger CompleteTrigger = TutorialTrigger.ContinueButton;
         public bool BlockOutsideTarget;
+        public bool BlockGameplayInput;
         public bool ShowContinueButton = true;
         public string RequiredCardType;
         public TutorialPanelPlacement PreferredPlacement = TutorialPanelPlacement.Auto;

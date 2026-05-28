@@ -25,9 +25,13 @@ namespace CardgameProof.Core
         };
         private static readonly IReadOnlyList<TutorialStep> InvestigationTutorialSteps = new List<TutorialStep>
         {
-            new TutorialStep { Id = "investigate_click", Title = "Clique no tabuleiro", Body = "Durante a investigação, toque em uma carta oculta do arquivo adversário.", Phase = GamePhase.Investigation, TargetKey = "board_grid", CompleteTrigger = TutorialTrigger.CellInvestigated, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.UpperBoard, CompactMode = true },
-            new TutorialStep { Id = "reveal_and_guide", Title = "Revelar e usar Guia", Body = "Cartas reveladas ativam ações. Use o botão Guia para pesquisa quando precisar.", Phase = GamePhase.Investigation, TargetKey = "board_grid", CompleteTrigger = TutorialTrigger.GuideOpened, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.Top, CompactMode = true },
-            new TutorialStep { Id = "identify_and_end", Title = "Identificar e encerrar turno", Body = "Use Tentar identificar quando tiver pistas e depois encerre o turno.", Phase = GamePhase.Investigation, TargetKey = null, CompleteTrigger = TutorialTrigger.TurnPassed, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.Center, CompactMode = true }
+            new TutorialStep { Id = "investigation_intro", Title = "Investigue o arquivo adversário", Body = "Em seu turno, você escolhe uma carta virada para baixo no arquivo do outro jogador.", Phase = GamePhase.Investigation, TargetKey = "board_grid", CompleteTrigger = TutorialTrigger.ContinueButton, ShowContinueButton = true, BlockGameplayInput = true, PreferredPlacement = TutorialPanelPlacement.UpperBoard, CompactMode = true },
+            new TutorialStep { Id = "investigation_results", Title = "Três resultados possíveis", Body = "Você pode encontrar Sem Registro, uma Carta de Arquivo ou um Dossiê de Personagem.", Phase = GamePhase.Investigation, TargetKey = "board_grid", CompleteTrigger = TutorialTrigger.ContinueButton, ShowContinueButton = true, BlockGameplayInput = true, PreferredPlacement = TutorialPanelPlacement.UpperBoard, CompactMode = true },
+            new TutorialStep { Id = "no_record_explain", Title = "Sem Registro", Body = "Sem Registro não tem efeito. A carta fica revelada e o turno passa adiante.", Phase = GamePhase.Investigation, TargetKey = "board_grid", CompleteTrigger = TutorialTrigger.ContinueButton, ShowContinueButton = true, BlockGameplayInput = true, PreferredPlacement = TutorialPanelPlacement.UpperBoard, CompactMode = true },
+            new TutorialStep { Id = "archive_explain", Title = "Cartas de Arquivo", Body = "Cartas de Arquivo revelam imediatamente e ativam seu efeito uma única vez.", Phase = GamePhase.Investigation, TargetKey = "rules_card", CompleteTrigger = TutorialTrigger.ContinueButton, ShowContinueButton = true, BlockGameplayInput = true, PreferredPlacement = TutorialPanelPlacement.Top, CompactMode = true },
+            new TutorialStep { Id = "dossier_explain", Title = "Dossiês de Personagem", Body = "Ao encontrar um Dossiê, você recebe uma pista. O nome continua oculto até a identificação correta.", Phase = GamePhase.Investigation, TargetKey = "board_grid", CompleteTrigger = TutorialTrigger.ContinueButton, ShowContinueButton = true, BlockGameplayInput = true, PreferredPlacement = TutorialPanelPlacement.UpperBoard, CompactMode = true },
+            new TutorialStep { Id = "guide_explain", Title = "Guia de Apoio", Body = "Use o Guia de Apoio para consultar mini biografias e comparar com as pistas reveladas.", Phase = GamePhase.Investigation, TargetKey = "guide_button", CompleteTrigger = TutorialTrigger.ContinueButton, ShowContinueButton = true, BlockGameplayInput = true, PreferredPlacement = TutorialPanelPlacement.Top, CompactMode = true },
+            new TutorialStep { Id = "identify_explain", Title = "Identificar Dossiê", Body = "Depois de revelar pelo menos uma pista, você pode tentar identificar um Dossiê encontrado.", Phase = GamePhase.Investigation, TargetKey = "identify_button", CompleteTrigger = TutorialTrigger.ContinueButton, ShowContinueButton = true, BlockGameplayInput = true, PreferredPlacement = TutorialPanelPlacement.Top, CompactMode = true }
         };
         private static readonly IReadOnlyList<TutorialStep> PlayerTwoSetupTutorialSteps = new List<TutorialStep>
         {
@@ -92,6 +96,7 @@ namespace CardgameProof.Core
         private TextMeshProUGUI hudResearch;
         private bool identificationHintShown;
         private bool playerTwoShortTutorialShown;
+        private bool investigationTutorialSeen;
 
         public GameModeConfig ActiveModeConfig { get; private set; }
         public GamePhase CurrentPhase { get; private set; } = GamePhase.MainMenu;
@@ -228,7 +233,7 @@ namespace CardgameProof.Core
         }
 
         public void LoadPrototypeMode(string modeId) => ActiveModeConfig = PrototypeDatabase.GetMode(modeId);
-        public void ShowTutorialSequence(IReadOnlyList<TutorialStep> sequence) { EnsureTutorialOverlay(); tutorialManager?.StartSequence(sequence); }
+        public void ShowTutorialSequence(IReadOnlyList<TutorialStep> sequence, Action onCompleted = null) { EnsureTutorialOverlay(); tutorialManager?.StartSequence(sequence, onCompleted); }
         private void TransitionToTutorialIntro() => SetPhase(GamePhase.TutorialIntro);
 
         private void StartPassAndPlaySetup()
@@ -236,6 +241,7 @@ namespace CardgameProof.Core
             playerBoardStates[PlayerId.PlayerOne] = new List<PlacedCardData>();
             playerBoardStates[PlayerId.PlayerTwo] = new List<PlacedCardData>();
             playerTwoShortTutorialShown = false;
+            investigationTutorialSeen = false;
             BeginSetupForPlayer(PlayerId.PlayerOne);
             matchReportService.StartMatch(ActiveModeConfig.DisplayName);
         }
@@ -712,11 +718,33 @@ namespace CardgameProof.Core
             totalCluesRequested = 0; totalResearchUses = 0; totalGuesses = 0;
             identificationHintShown = false;
             currentTurnPlayer = PlayerId.PlayerOne;
+            EnterInvestigationTurn(startTutorialIfNeeded: true);
+        }
+
+        private void EnterInvestigationTurn(bool startTutorialIfNeeded)
+        {
             matchReportService.TurnStart(currentTurnPlayer);
             ShowOpponentBoardForCurrentTurn();
             UpdateHud();
             RunTurnSoftLockSafeguard();
-            ShowTutorialSequence(InvestigationTutorialSteps);
+            if (startTutorialIfNeeded)
+            {
+                StartInvestigationTutorial();
+            }
+        }
+
+        private void StartInvestigationTutorial()
+        {
+            if (investigationTutorialSeen) return;
+            Debug.Log("[TUTORIAL] Starting investigation tutorial");
+            ShowTutorialSequence(InvestigationTutorialSteps, OnInvestigationTutorialCompleted);
+        }
+
+        private void OnInvestigationTutorialCompleted()
+        {
+            investigationTutorialSeen = true;
+            Debug.Log("[TUTORIAL] Investigation tutorial completed; gameplay input unblocked.");
+            if (hudObjective != null) hudObjective.text = "Escolha uma carta para investigar.";
         }
 
         private void ShowOpponentBoardForCurrentTurn()
@@ -739,6 +767,11 @@ namespace CardgameProof.Core
 
         private void OnInvestigationCellTapped(Vector2Int coordinate)
         {
+            if (tutorialManager != null && tutorialManager.IsBlockingGameplayInput)
+            {
+                Debug.Log("[TUTORIAL] Board input blocked during investigation tutorial.");
+                return;
+            }
             if (CurrentPhase != GamePhase.Investigation || isRevealAnimationPlaying) return;
             PlacedCardData card = boardController.GetPlacedCard(coordinate);
             if (card == null) return;
@@ -925,7 +958,9 @@ namespace CardgameProof.Core
         }
 
         private void EndTurnAfterOverlay() { Debug.Log("[TURN] End turn"); investigationOverlayView.Hide(); EndTurnWithPassScreen(); }
-        private void EndTurnWithPassScreen() { tutorialManager?.Notify(TutorialTrigger.TurnPassed); PlayerId next = currentTurnPlayer == PlayerId.PlayerOne ? PlayerId.PlayerTwo : PlayerId.PlayerOne; ShowReadyScreen("Passe o aparelho para o próximo jogador", "Estou pronto", () => { currentTurnPlayer = next; Debug.Log($"[STATE] CurrentPlayer: {currentTurnPlayer}"); matchReportService.TurnStart(currentTurnPlayer); HideReadyScreen(); ShowOpponentBoardForCurrentTurn(); UpdateHud(); RunTurnSoftLockSafeguard(); }); }
+        private void EndTurnWithPassScreen() { tutorialManager?.Notify(TutorialTrigger.TurnPassed); PlayerId next = currentTurnPlayer == PlayerId.PlayerOne ? PlayerId.PlayerTwo : PlayerId.PlayerOne; ShowReadyScreen("Passe o aparelho para o próximo jogador", "Estou pronto", () => { currentTurnPlayer = next; Debug.Log($"[STATE] CurrentPlayer: {currentTurnPlayer}"); HideReadyScreen(); EnterInvestigationTurn(startTutorialIfNeeded: false); }); }
+
+        private bool IsTutorialBlockingGameplayInput() => tutorialManager != null && tutorialManager.IsBlockingGameplayInput;
 
         private void BuildInvestigationHud()
         {
@@ -952,9 +987,12 @@ namespace CardgameProof.Core
             hudButtonCardsRoot.SetParent(sceneRoot.ActionArea, false);
             hudButtonCardsRoot.anchorMin = Vector2.zero; hudButtonCardsRoot.anchorMax = Vector2.one;
             hudButtonCardsRoot.offsetMin = new Vector2(18f, 8f); hudButtonCardsRoot.offsetMax = new Vector2(-18f, -8f);
-            CreateInfoCardButton(hudButtonCardsRoot, "Guia", "Pesquisar personagens", "Fichas: 0", -460f, OnGuidebookButtonPressed, out guideCardTokensText);
+            Button guideButton = CreateInfoCardButton(hudButtonCardsRoot, "Guia", "Pesquisar personagens", "Fichas: 0", -460f, OnGuidebookButtonPressed, out guideCardTokensText);
             identifyCardButton = CreateInfoCardButton(hudButtonCardsRoot, "Tentar identificar Dossiê", "Use pistas já reveladas", "Sem dossiês elegíveis", 0f, ShowPersistentGuessTargetsOverlay, out identifyCardDetailText);
-            CreateInfoCardButton(hudButtonCardsRoot, "Fluxo", "Ações do protótipo", string.Empty, 460f, ShowRulesOverlay, out _);
+            Button rulesButton = CreateInfoCardButton(hudButtonCardsRoot, "Fluxo", "Ações do protótipo", string.Empty, 460f, ShowRulesOverlay, out _);
+            tutorialManager?.RegisterTarget("guide_button", guideButton.GetComponent<RectTransform>());
+            tutorialManager?.RegisterTarget("identify_button", identifyCardButton.GetComponent<RectTransform>());
+            tutorialManager?.RegisterTarget("rules_card", rulesButton.GetComponent<RectTransform>());
         }
 
         private void UpdateHud()
@@ -1031,7 +1069,7 @@ namespace CardgameProof.Core
         private List<string> GetEligibleGuessTargets(bool allowZeroCluesFallback = false) { List<string> list = new List<string>(); foreach (string characterId in GetDiscoveredButUnidentifiedCharacters()) if (IsCharacterEligibleForGuess(characterId, allowZeroCluesFallback)) list.Add(characterId); return list; }
         private bool HasHiddenCardsRemaining() { PlayerId owner = currentTurnPlayer == PlayerId.PlayerOne ? PlayerId.PlayerTwo : PlayerId.PlayerOne; foreach (PlacedCardData card in playerBoardStates[owner]) if (!card.IsInvestigated && !card.IsRevealed && !card.IsFaceUp) return true; return false; }
         private void ShowDiscoveredCharacterActions(string characterId) { HashSet<ClueCategory> known = GetKnownClues(currentTurnPlayer, characterId); investigationOverlayView.Show("Dossiê encontrado", $"Pistas reveladas: {known.Count}"); foreach (ClueCategory c in known) investigationOverlayView.AddButton(GetCategoryLabel(c), () => { investigationOverlayView.Show("Pista revelada", $"{GetCategoryLabel(c)}\n\n{GetClueText(characterId, c)}"); investigationOverlayView.AddButton("Voltar", () => ShowDiscoveredCharacterActions(characterId)); }); investigationOverlayView.AddButton("Tentar identificar", () => ShowGuessOverlay(characterId, GuessSource.PersistentAction), IsCharacterEligibleForGuess(characterId, true)); investigationOverlayView.AddButton("Encerrar turno", EndTurnAfterOverlay); }
-        private void ShowPersistentGuessTargetsOverlay() { List<string> targets = GetEligibleGuessTargets(); if (targets.Count == 0) { investigationOverlayView.Show("Identificação", "Nenhum Dossiê elegível no momento."); investigationOverlayView.AddButton("Fechar", investigationOverlayView.Hide); return; } investigationOverlayView.Show("Tentar identificar Dossiê", "Escolha um Dossiê encontrado para tentar identificar."); foreach (string characterId in targets) { int clues = GetKnownClues(currentTurnPlayer, characterId).Count; investigationOverlayView.AddButton($"Dossiê encontrado ({clues} pistas reveladas)", () => ShowGuessOverlay(characterId, GuessSource.PersistentAction)); } investigationOverlayView.AddButton("Fechar", investigationOverlayView.Hide); }
+        private void ShowPersistentGuessTargetsOverlay() { if (IsTutorialBlockingGameplayInput()) { Debug.Log("[TUTORIAL] Identify input blocked during investigation tutorial."); return; } List<string> targets = GetEligibleGuessTargets(); if (targets.Count == 0) { investigationOverlayView.Show("Identificação", "Nenhum Dossiê elegível no momento."); investigationOverlayView.AddButton("Fechar", investigationOverlayView.Hide); return; } investigationOverlayView.Show("Tentar identificar Dossiê", "Escolha um Dossiê encontrado para tentar identificar."); foreach (string characterId in targets) { int clues = GetKnownClues(currentTurnPlayer, characterId).Count; investigationOverlayView.AddButton($"Dossiê encontrado ({clues} pistas reveladas)", () => ShowGuessOverlay(characterId, GuessSource.PersistentAction)); } investigationOverlayView.AddButton("Fechar", investigationOverlayView.Hide); }
         private void RefreshPersistentIdentifyButton() { if (identifyCardButton == null) return; int eligible = GetEligibleGuessTargets().Count; bool canUse = eligible > 0; identifyCardButton.interactable = canUse; if (identifyCardDetailText != null) identifyCardDetailText.text = canUse ? $"{eligible} dossiê(s) elegível(is)" : "Sem dossiês elegíveis"; }
         private void RunTurnSoftLockSafeguard() { bool hiddenRemaining = HasHiddenCardsRemaining(); List<string> eligible = GetEligibleGuessTargets(); if (!hiddenRemaining) { matchReportService.OnNoHiddenCardsTurn(); if (eligible.Count > 0) { EnsureInvestigationOverlayView(); investigationOverlayView.Show("Aviso", "Não há mais cartas ocultas. Tente identificar um Dossiê."); investigationOverlayView.AddButton("Abrir identificação", ShowPersistentGuessTargetsOverlay); matchReportService.OnEndgameSafeguardTriggered(); } else { Debug.LogWarning("[SOFTLOCK WARNING] No hidden cards and no eligible guesses."); matchReportService.OnEndgameSafeguardTriggered(); List<string> fallback = GetEligibleGuessTargets(true); if (fallback.Count > 0) { EnsureInvestigationOverlayView(); investigationOverlayView.Show("Aviso", "Sem pistas reveladas suficientes. Identificação foi liberada para evitar soft lock."); foreach (string characterId in fallback) investigationOverlayView.AddButton("Tentar identificar Dossiê", () => ShowGuessOverlay(characterId, GuessSource.PersistentAction)); } } } if (!identificationHintShown && eligible.Count > 0) { identificationHintShown = true; EnsureInvestigationOverlayView(); investigationOverlayView.Show("Identificação disponível", "Você já tem pistas suficientes para tentar identificar um Dossiê. Pode fazer isso agora ou em um turno futuro."); investigationOverlayView.AddButton("Fechar", investigationOverlayView.Hide); } RefreshPersistentIdentifyButton(); }
         private bool TryRevealExtraClue(string characterId, out ClueCategory category, out string clueText)
@@ -1045,6 +1083,11 @@ namespace CardgameProof.Core
 
         private void OnGuidebookButtonPressed()
         {
+            if (IsTutorialBlockingGameplayInput())
+            {
+                Debug.Log("[TUTORIAL] Guide input blocked during investigation tutorial.");
+                return;
+            }
             EnsureInvestigationOverlayView();
             if (researchTokens[currentTurnPlayer] <= 0) { investigationOverlayView.Show("Guia de Apoio", "Você não tem Fichas de Pesquisa restantes."); investigationOverlayView.AddButton("Fechar", investigationOverlayView.Hide); return; }
             investigationOverlayView.Show("Guia de Apoio", "Gastar 1 Ficha de Pesquisa para abrir o guia?");
@@ -1052,7 +1095,7 @@ namespace CardgameProof.Core
             investigationOverlayView.AddButton("Cancelar", investigationOverlayView.Hide);
         }
         private void ShowGuidebookOverlay() { tutorialManager?.Notify(TutorialTrigger.GuideOpened); EnsureGuidebookOverlayView(); guidebookOverlayView.Show(PrototypeDatabase.Characters, researchTokens[currentTurnPlayer]); }
-        private void ShowRulesOverlay() { EnsureInvestigationOverlayView(); investigationOverlayView.Show("Fluxo do Protótipo", "Use este lembrete apenas para interações digitais:\n\n1. Toque em cartas para analisá-las e posicioná-las no arquivo.\n2. Toque em Finalizar montagem.\n3. Toque em cartas ocultas no tabuleiro para revelar.\n4. Use o botão Guia para consultar personagens.\n5. Use Tentar identificar quando tiver pistas.\n6. Encerre o turno para passar o aparelho."); investigationOverlayView.AddButton("Fechar", investigationOverlayView.Hide); }
+        private void ShowRulesOverlay() { if (IsTutorialBlockingGameplayInput()) { Debug.Log("[TUTORIAL] Rules input blocked during investigation tutorial."); return; } EnsureInvestigationOverlayView(); investigationOverlayView.Show("Fluxo do Protótipo", "Use este lembrete apenas para interações digitais:\n\n1. Toque em cartas para analisá-las e posicioná-las no arquivo.\n2. Toque em Finalizar montagem.\n3. Toque em cartas ocultas no tabuleiro para revelar.\n4. Use o botão Guia para consultar personagens.\n5. Use Tentar identificar quando tiver pistas.\n6. Encerre o turno para passar o aparelho."); investigationOverlayView.AddButton("Fechar", investigationOverlayView.Hide); }
 
         private void HideSetupSensitiveUi()
         {
