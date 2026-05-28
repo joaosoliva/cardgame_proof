@@ -89,12 +89,17 @@ namespace CardgameProof.Core
             Debug.Log($"[REVEAL] Completed reveal type: {payload.RevealType}");
         }
 
+        public void Hide()
+        {
+            canContinue = false;
+            if (root != null) root.SetActive(false);
+            Debug.Log("[REVEAL] Blocking input during reveal: false");
+        }
+
         private void Continue()
         {
             if (!canContinue) return;
-            canContinue=false;
-            root.SetActive(false);
-            Debug.Log("[REVEAL] Blocking input during reveal: false");
+            Hide();
             onComplete?.Invoke();
         }
 

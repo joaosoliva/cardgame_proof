@@ -59,13 +59,15 @@ namespace CardgameProof.Core
             public int EndgameSafeguardTriggered;
         }
 
-        private readonly Report report = new Report();
+        private Report report = new Report();
         private readonly Dictionary<string, int> cluesBeforeCorrectByCharacter = new Dictionary<string, int>();
         private DateTime setupStartP1;
         private DateTime setupStartP2;
 
         public void StartMatch(string modeName)
         {
+            report = new Report();
+            cluesBeforeCorrectByCharacter.Clear();
             report.ModeName = modeName;
             report.StartTimeUtc = DateTime.UtcNow;
             report.CluesByCategory = Enum.GetValues(typeof(ClueCategory)).Cast<ClueCategory>().ToDictionary(x => x, _ => 0);

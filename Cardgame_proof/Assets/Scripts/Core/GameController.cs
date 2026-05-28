@@ -87,6 +87,8 @@ namespace CardgameProof.Core
 
         private RectTransform hudRoot;
         private RectTransform hudButtonCardsRoot;
+        private Button guideCardButton;
+        private Button rulesCardButton;
         private TextMeshProUGUI guideCardTokensText;
         private TextMeshProUGUI identifyCardDetailText;
         private Button identifyCardButton;
@@ -185,6 +187,7 @@ namespace CardgameProof.Core
 
             AudioManager.Instance?.PlayButton();
             howToPlayView?.Hide();
+            ResetRuntimeUIState("StartGameMode");
             LoadPrototypeMode(resolvedModeId);
             if (ActiveModeConfig == null) return;
             if (mainMenuRoot != null) mainMenuRoot.gameObject.SetActive(false);
@@ -238,6 +241,7 @@ namespace CardgameProof.Core
 
         private void StartPassAndPlaySetup()
         {
+            ResetRuntimeUIState("StartNewGame");
             playerBoardStates[PlayerId.PlayerOne] = new List<PlacedCardData>();
             playerBoardStates[PlayerId.PlayerTwo] = new List<PlacedCardData>();
             playerTwoShortTutorialShown = false;
@@ -250,6 +254,7 @@ namespace CardgameProof.Core
         {
             currentSetupPlayer = player;
             matchReportService.StartSetup(player);
+            SetInvestigationControlsVisible(false, "EnterSetup");
             SetPhase(GamePhase.Setup);
             selectedCardForInspection = null;
             selectedCardForPlacement = null;
@@ -711,6 +716,7 @@ namespace CardgameProof.Core
         {
             HideReadyScreen();
             SetPhase(GamePhase.Investigation);
+            SetInvestigationControlsVisible(true, "EnterInvestigation");
             Debug.Log("[STATE] Enter investigation");
             RestoreBoardVisualState();
             if (sceneRoot?.CenterBoardArea != null) sceneRoot.CenterBoardArea.gameObject.SetActive(true);
@@ -728,6 +734,7 @@ namespace CardgameProof.Core
 
         private void EnterInvestigationTurn(bool startTutorialIfNeeded)
         {
+            SetInvestigationControlsVisible(true, "EnterInvestigation");
             matchReportService.TurnStart(currentTurnPlayer);
             ShowOpponentBoardForCurrentTurn();
             UpdateHud();
@@ -992,12 +999,13 @@ namespace CardgameProof.Core
             hudButtonCardsRoot.SetParent(sceneRoot.ActionArea, false);
             hudButtonCardsRoot.anchorMin = Vector2.zero; hudButtonCardsRoot.anchorMax = Vector2.one;
             hudButtonCardsRoot.offsetMin = new Vector2(18f, 8f); hudButtonCardsRoot.offsetMax = new Vector2(-18f, -8f);
-            Button guideButton = CreateInfoCardButton(hudButtonCardsRoot, "Guia", "Pesquisar personagens", "Fichas: 0", -460f, OnGuidebookButtonPressed, out guideCardTokensText);
+            guideCardButton = CreateInfoCardButton(hudButtonCardsRoot, "Guia", "Pesquisar personagens", "Fichas: 0", -460f, OnGuidebookButtonPressed, out guideCardTokensText);
             identifyCardButton = CreateInfoCardButton(hudButtonCardsRoot, "Tentar identificar Dossiê", "Use pistas já reveladas", "Sem dossiês elegíveis", 0f, ShowPersistentGuessTargetsOverlay, out identifyCardDetailText);
-            Button rulesButton = CreateInfoCardButton(hudButtonCardsRoot, "Fluxo", "Ações do protótipo", string.Empty, 460f, ShowRulesOverlay, out _);
-            tutorialManager?.RegisterTarget("guide_button", guideButton.GetComponent<RectTransform>());
+            rulesCardButton = CreateInfoCardButton(hudButtonCardsRoot, "Fluxo", "Ações do protótipo", string.Empty, 460f, ShowRulesOverlay, out _);
+            tutorialManager?.RegisterTarget("guide_button", guideCardButton.GetComponent<RectTransform>());
             tutorialManager?.RegisterTarget("identify_button", identifyCardButton.GetComponent<RectTransform>());
-            tutorialManager?.RegisterTarget("rules_card", rulesButton.GetComponent<RectTransform>());
+            tutorialManager?.RegisterTarget("rules_card", rulesCardButton.GetComponent<RectTransform>());
+            SetInvestigationControlsVisible(true, "BuildInvestigationHud");
         }
 
         private void UpdateHud()
@@ -1017,6 +1025,7 @@ namespace CardgameProof.Core
         private void CompleteMatch(PlayerId winner)
         {
             SetPhase(GamePhase.End);
+            SetInvestigationControlsVisible(false, "WinScreen");
             investigationOverlayView.Hide(); guidebookOverlayView.Hide(); HideReadyScreen();
             string modeLabel = ActiveModeConfig != null ? ActiveModeConfig.DisplayName : "Modo desconhecido";
             string winnerLabel = winner == PlayerId.PlayerOne ? "Jogador 1" : "Jogador 2";
@@ -1028,9 +1037,10 @@ namespace CardgameProof.Core
             LogTelemetry("match_finished", $"winner={winner};mode={ActiveModeConfig?.Id};duration={ActiveModeConfig?.DurationMinutes};final_scores={scores[PlayerId.PlayerOne]}-{scores[PlayerId.PlayerTwo]};total_clues_requested={totalCluesRequested};total_research_uses={totalResearchUses};total_guesses={totalGuesses}");
         }
 
-        private void RestartCurrentModeMatch() { winScreenView.Hide(); StartPassAndPlaySetup(); }
+        private void RestartCurrentModeMatch() { winScreenView.Hide(); ResetRuntimeUIState("PlayAgain"); Debug.Log("[GAME] PlayAgain reset complete"); StartPassAndPlaySetup(); }
         private void ReturnToMainMenu()
         {
+            ResetRuntimeUIState("EnterMainMenu");
             winScreenView.Hide();
             if (sceneRoot?.FullScreenRoot == null) return;
             for (int i = sceneRoot.FullScreenRoot.childCount - 1; i >= 0; i--) Destroy(sceneRoot.FullScreenRoot.GetChild(i).gameObject);
@@ -1327,6 +1337,110 @@ namespace CardgameProof.Core
         }
 
 
+
+        private void ResetRuntimeUIState(string reason)
+        {
+            Debug.Log($"[UI_STATE] ResetRuntimeUIState reason={reason}");
+            SetInvestigationControlsVisible(false, reason);
+
+            selectedCardForInspection = null;
+            selectedCardForPlacement = null;
+            selectedPlacedCoordinate = null;
+            isInspectingCard = false;
+            isPlacementModeActive = false;
+            setupReadyToFinalize = false;
+            isAutoFillingNoRecord = false;
+            isRevealAnimationPlaying = false;
+            identificationHintShown = false;
+            currentSetupPlayer = PlayerId.PlayerOne;
+            currentTurnPlayer = PlayerId.PlayerOne;
+
+            focusCardView?.Hide();
+            cardRevealOverlayView?.Hide();
+            guidebookOverlayView?.Hide();
+            investigationOverlayView?.Hide();
+            tutorialOverlay?.Hide();
+            matchReportView?.Hide();
+            winScreenView?.Hide();
+            readyScreenView?.Hide();
+
+            boardController?.SetPlacementHighlights(false);
+            boardController?.SetSelectedCoordinate(null);
+
+            if (setupPlacementInstructionRoot != null) setupPlacementInstructionRoot.gameObject.SetActive(false);
+            if (trayRoot != null) trayRoot.gameObject.SetActive(false);
+            if (placedActionsRoot != null) placedActionsRoot.gameObject.SetActive(false);
+
+            if (hudRoot != null)
+            {
+                Destroy(hudRoot.gameObject);
+                hudRoot = null;
+            }
+            if (hudButtonCardsRoot != null)
+            {
+                Destroy(hudButtonCardsRoot.gameObject);
+                hudButtonCardsRoot = null;
+            }
+
+            guideCardButton = null;
+            identifyCardButton = null;
+            rulesCardButton = null;
+            guideCardTokensText = null;
+            identifyCardDetailText = null;
+            hudCurrentPlayer = null;
+            hudObjective = null;
+            hudScore = null;
+            hudResearch = null;
+
+            playerBoardStates.Clear();
+            identifiedCharacters.Clear();
+            scores.Clear();
+            researchTokens.Clear();
+            discoveredClues.Clear();
+            totalCluesRequested = 0;
+            totalResearchUses = 0;
+            totalGuesses = 0;
+            lastReportText = string.Empty;
+
+            UpdateTutorialLayoutContext();
+        }
+
+        private void SetInvestigationControlsVisible(bool visible, string reason)
+        {
+            bool shouldShow = visible && CurrentPhase == GamePhase.Investigation;
+            Debug.Log($"[UI_STATE] InvestigationControls visible={shouldShow.ToString().ToLowerInvariant()} reason={reason}");
+
+            SetUiRootVisible(hudRoot, shouldShow);
+            SetUiRootVisible(hudButtonCardsRoot, shouldShow);
+
+            SetButtonVisible(guideCardButton, shouldShow);
+            SetButtonVisible(identifyCardButton, shouldShow);
+            SetButtonVisible(rulesCardButton, shouldShow);
+        }
+
+        private static void SetUiRootVisible(RectTransform root, bool visible)
+        {
+            if (root == null) return;
+            root.gameObject.SetActive(visible);
+            CanvasGroup cg = root.GetComponent<CanvasGroup>();
+            if (cg == null) cg = root.gameObject.AddComponent<CanvasGroup>();
+            cg.alpha = visible ? 1f : 0f;
+            cg.interactable = visible;
+            cg.blocksRaycasts = visible;
+        }
+
+        private static void SetButtonVisible(Button button, bool visible)
+        {
+            if (button == null) return;
+            button.gameObject.SetActive(visible);
+            button.interactable = visible;
+            CanvasGroup cg = button.GetComponent<CanvasGroup>();
+            if (cg == null) cg = button.gameObject.AddComponent<CanvasGroup>();
+            cg.alpha = visible ? 1f : 0f;
+            cg.interactable = visible;
+            cg.blocksRaycasts = visible;
+        }
+
         private void PlayCardReveal(CardRevealPayload payload, Action onComplete)
         {
             EnsureCardRevealOverlayView();
@@ -1360,21 +1474,11 @@ namespace CardgameProof.Core
         private void EnsureMatchReportView() { if (matchReportView != null) return; Debug.Log("[UI] Creating MatchReportView"); GameObject go = new GameObject("MatchReportView"); go.transform.SetParent(sceneRoot.OverlayLayer, false); matchReportView = go.AddComponent<MatchReportView>(); matchReportView.Initialize(sceneRoot.OverlayLayer); }
         private void OpenReportFromWinScreen() { EnsureMatchReportView(); winScreenView.Hide(); matchReportView.Show(lastReportText, () => { matchReportView.Hide(); winScreenView.Show("Resultado", "Veja o resumo final", OpenReportFromWinScreen, RestartCurrentModeMatch, ReturnToMainMenu); }); }
         private void EnsureReadyScreenView() { if (readyScreenView != null) return; GameObject go = new GameObject("ReadyScreenView"); go.transform.SetParent(sceneRoot.OverlayLayer, false); readyScreenView = go.AddComponent<ReadyScreenView>(); readyScreenView.Initialize(sceneRoot.OverlayLayer); }
-        private void ShowReadyScreen(string message, string buttonText, Action onConfirm) { EnsureReadyScreenView(); readyScreenView.Show(message, buttonText, onConfirm); }
+        private void ShowReadyScreen(string message, string buttonText, Action onConfirm) { SetInvestigationControlsVisible(false, "ReadyScreen"); EnsureReadyScreenView(); readyScreenView.Show(message, buttonText, onConfirm); }
         private void HideReadyScreen() => readyScreenView?.Hide();
         private void HideAllScreensAndGameplayUi()
         {
-            tutorialOverlay?.Hide();
-            investigationOverlayView?.Hide();
-            guidebookOverlayView?.Hide();
-            readyScreenView?.Hide();
-            winScreenView?.Hide();
-            matchReportView?.Hide();
-            if (trayRoot != null) trayRoot.gameObject.SetActive(false);
-            if (placedActionsRoot != null) placedActionsRoot.gameObject.SetActive(false);
-            focusCardView?.Hide();
-            if (setupPlacementInstructionRoot != null) setupPlacementInstructionRoot.gameObject.SetActive(false);
-            if (hudRoot != null) hudRoot.gameObject.SetActive(false);
+            ResetRuntimeUIState("HideAllScreens");
             if (sceneRoot?.CenterBoardArea != null) sceneRoot.CenterBoardArea.gameObject.SetActive(false);
         }
 
@@ -1480,6 +1584,7 @@ namespace CardgameProof.Core
             Image bg = go.GetComponent<Image>();
             bg.color = new Color(0.9f, 0.92f, 0.96f, 0.98f);
             Button b = go.GetComponent<Button>();
+            b.onClick.RemoveAllListeners();
             b.onClick.AddListener(() => { AudioManager.Instance?.PlayButton(); onClick?.Invoke(); });
             Outline outline = go.AddComponent<Outline>();
             outline.effectColor = new Color(0f, 0f, 0f, 0.2f);
