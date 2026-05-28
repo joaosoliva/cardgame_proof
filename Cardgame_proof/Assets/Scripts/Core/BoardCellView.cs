@@ -20,6 +20,8 @@ namespace CardgameProof.Core
         private TextMeshProUGUI hiddenLabel;
         private Button tapButton;
         private bool isSelected;
+        private bool placementHighlight;
+        private bool placementUnavailable;
         private BoardCellVisualState currentState = BoardCellVisualState.Empty;
 
         public Vector2Int Coordinate { get; private set; }
@@ -106,6 +108,11 @@ namespace CardgameProof.Core
                     break;
             }
 
+            if (placementUnavailable)
+            {
+                color = new Color(color.r * 0.72f, color.g * 0.72f, color.b * 0.72f, 0.72f);
+            }
+
             background.color = color;
             if (hiddenLabel != null)
             {
@@ -113,15 +120,28 @@ namespace CardgameProof.Core
             }
 
             Outline outline = gameObject.GetComponent<Outline>();
-            if (showGridLines)
+            if (showGridLines || placementHighlight || placementUnavailable)
             {
                 if (outline == null)
                 {
                     outline = gameObject.AddComponent<Outline>();
                 }
 
-                outline.effectColor = isSelected ? new Color(0.98f, 0.83f, 0.29f, 1f) : new Color(0f, 0f, 0f, 0.35f);
-                outline.effectDistance = new Vector2(1f, -1f);
+                if (placementHighlight)
+                {
+                    outline.effectColor = new Color(0.12f, 0.62f, 0.34f, 1f);
+                    outline.effectDistance = new Vector2(5f, -5f);
+                }
+                else if (placementUnavailable)
+                {
+                    outline.effectColor = new Color(0f, 0f, 0f, 0.18f);
+                    outline.effectDistance = new Vector2(1f, -1f);
+                }
+                else
+                {
+                    outline.effectColor = isSelected ? new Color(0.98f, 0.83f, 0.29f, 1f) : new Color(0f, 0f, 0f, 0.35f);
+                    outline.effectDistance = new Vector2(1f, -1f);
+                }
             }
             else if (outline != null)
             {
@@ -132,6 +152,13 @@ namespace CardgameProof.Core
         public void SetSelected(bool selected)
         {
             isSelected = selected;
+            SetState(currentState, true);
+        }
+
+        public void SetPlacementHighlight(bool valid, bool unavailable)
+        {
+            placementHighlight = valid;
+            placementUnavailable = unavailable;
             SetState(currentState, true);
         }
     }

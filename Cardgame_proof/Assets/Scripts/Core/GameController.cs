@@ -15,8 +15,10 @@ namespace CardgameProof.Core
         private static readonly IReadOnlyList<TutorialStep> SetupTutorialSteps = new List<TutorialStep>
         {
             new TutorialStep { Id = "setup_intro", Title = "Bem-vindo ao Arquivo", Body = "Monte um arquivo secreto e investigue o arquivo do outro jogador para descobrir personagens acadêmicos usando pistas e pesquisa.", Phase = GamePhase.Setup, TargetKey = null, CompleteTrigger = TutorialTrigger.ContinueButton, ShowContinueButton = true, BlockOutsideTarget = false, PreferredPlacement = TutorialPanelPlacement.Center },
-            new TutorialStep { Id = "setup_archive_card", Title = "Cartas de Arquivo", Body = "Cartas de Arquivo ajudam a investigação. Arraste uma delas para a grade.", Phase = GamePhase.Setup, TargetKey = "archive_card_hand", CompleteTrigger = TutorialTrigger.ArchiveCardPlaced, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.Top, FadeDuringAction = true, CompactMode = true },
-            new TutorialStep { Id = "setup_character_card", Title = "Dossiês de Personagem", Body = "Dossiês escondem personagens. Arraste um Dossiê para a grade sem revelar sua identidade ao outro jogador.", Phase = GamePhase.Setup, TargetKey = "character_card_hand", CompleteTrigger = TutorialTrigger.CharacterCardPlaced, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.Top, FadeDuringAction = true, CompactMode = true },
+            new TutorialStep { Id = "setup_archive_card", Title = "Cartas de Arquivo", Body = "Toque em uma Carta de Arquivo para analisá-la.", Phase = GamePhase.Setup, TargetKey = "archive_card_hand", CompleteTrigger = TutorialTrigger.ArchiveCardFocused, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.Top, FadeDuringAction = true, CompactMode = true },
+            new TutorialStep { Id = "setup_place_archive", Title = "Posicionar no arquivo", Body = "Toque em Posicionar no Arquivo e escolha uma célula da grade.", Phase = GamePhase.Setup, TargetKey = "board_grid", CompleteTrigger = TutorialTrigger.ArchiveCardPlaced, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.Top, FadeDuringAction = true, CompactMode = true },
+            new TutorialStep { Id = "setup_character_card", Title = "Dossiês de Personagem", Body = "Toque em um Dossiê para ver suas informações antes de posicionar.", Phase = GamePhase.Setup, TargetKey = "character_card_hand", CompleteTrigger = TutorialTrigger.CharacterCardFocused, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.Top, FadeDuringAction = true, CompactMode = true },
+            new TutorialStep { Id = "setup_place_character", Title = "Escolha uma posição", Body = "Toque em uma célula destacada para esconder o Dossiê no arquivo.", Phase = GamePhase.Setup, TargetKey = "board_grid", CompleteTrigger = TutorialTrigger.CharacterCardPlaced, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.UpperBoard, CompactMode = true },
             new TutorialStep { Id = "setup_remaining_cards", Title = "Complete sua montagem", Body = "Agora posicione o restante das cartas importantes no arquivo.", Phase = GamePhase.Setup, TargetKey = "board_grid", CompleteTrigger = TutorialTrigger.AllRequiredCardsPlaced, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.UpperBoard, CompactMode = true },
             new TutorialStep { Id = "setup_finalize", Title = "Finalizar montagem", Body = "Toque em Finalizar montagem para completar o arquivo.", Phase = GamePhase.Setup, TargetKey = "confirm_setup_button", CompleteTrigger = TutorialTrigger.SetupConfirmed, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.Top, FadeDuringAction = true, CompactMode = true },
             new TutorialStep { Id = "setup_no_record", Title = "Cartas Sem Registro", Body = "As lacunas serão preenchidas automaticamente com cartas Sem Registro. Elas representam partes do arquivo onde nada útil foi encontrado.", Phase = GamePhase.Setup, TargetKey = "board_grid", CompleteTrigger = TutorialTrigger.AutoNoRecordFillCompleted, ShowContinueButton = false, PreferredPlacement = TutorialPanelPlacement.Top, CompactMode = true }
@@ -51,6 +53,14 @@ namespace CardgameProof.Core
         private readonly List<HowToPlayPageData> howToPlayPages = BuildHowToPlayPages();
 
         private RectTransform trayRoot;
+        private RectTransform trayCardsRow;
+        private RectTransform setupPlacementInstructionRoot;
+        private FocusCardView focusCardView;
+        private PlacedCardData selectedCardForInspection;
+        private PlacedCardData selectedCardForPlacement;
+        private bool isInspectingCard;
+        private bool isPlacementModeActive;
+        private bool setupReadyToFinalize;
         private RectTransform placedActionsRoot;
         private Button finalizeSetupButton;
         private readonly List<SetupCardView> trayCards = new List<SetupCardView>();
@@ -235,6 +245,12 @@ namespace CardgameProof.Core
             currentSetupPlayer = player;
             matchReportService.StartSetup(player);
             SetPhase(GamePhase.Setup);
+            selectedCardForInspection = null;
+            selectedCardForPlacement = null;
+            isInspectingCard = false;
+            isPlacementModeActive = false;
+            focusCardView?.Hide();
+            if (setupPlacementInstructionRoot != null) setupPlacementInstructionRoot.gameObject.SetActive(false);
             Debug.Log("[STATE] Enter setup");
             RestoreBoardVisualState();
             if (sceneRoot?.CenterBoardArea != null) sceneRoot.CenterBoardArea.gameObject.SetActive(true);
@@ -263,20 +279,44 @@ namespace CardgameProof.Core
             boardController.BuildBoard(sceneRoot.CenterBoardArea, ActiveModeConfig.BoardSize, null);
             tutorialManager?.RegisterTarget("board_grid", sceneRoot.CenterBoardArea);
             boardController.OnPlacedCardTapped = OnPlacedCardTapped;
+            boardController.OnCellTapped = OnSetupBoardCellTapped;
             boardController.RefreshVisualsForPhase(CurrentPhase);
         }
 
         private void BuildBottomTray()
         {
             if (trayRoot != null) Destroy(trayRoot.gameObject);
-            GameObject tray = new GameObject("SetupBottomTray", typeof(RectTransform), typeof(Image), typeof(HorizontalLayoutGroup));
+            GameObject tray = new GameObject("SetupBottomTray", typeof(RectTransform), typeof(Image), typeof(VerticalLayoutGroup));
             trayRoot = tray.GetComponent<RectTransform>();
             trayRoot.SetParent(sceneRoot.BottomCardTray, false);
             trayRoot.anchorMin = Vector2.zero; trayRoot.anchorMax = Vector2.one;
             trayRoot.offsetMin = new Vector2(20f, 20f); trayRoot.offsetMax = new Vector2(-20f, -20f);
             tray.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.18f);
-            HorizontalLayoutGroup h = tray.GetComponent<HorizontalLayoutGroup>();
-            h.spacing = 16f; h.childForceExpandWidth = true; h.padding = new RectOffset(16, 16, 16, 16);
+
+            VerticalLayoutGroup vertical = tray.GetComponent<VerticalLayoutGroup>();
+            vertical.spacing = 8f;
+            vertical.padding = new RectOffset(16, 16, 10, 12);
+            vertical.childForceExpandHeight = false;
+            vertical.childForceExpandWidth = true;
+
+            GameObject instructionObj = new GameObject("TrayInstruction", typeof(RectTransform), typeof(TextMeshProUGUI), typeof(LayoutElement));
+            instructionObj.transform.SetParent(trayRoot, false);
+            LayoutElement instructionLayout = instructionObj.GetComponent<LayoutElement>();
+            instructionLayout.preferredHeight = 34f;
+            TextMeshProUGUI instruction = instructionObj.GetComponent<TextMeshProUGUI>();
+            instruction.text = "Toque em uma carta para analisar";
+            instruction.fontSize = 24;
+            instruction.alignment = TextAlignmentOptions.Center;
+            instruction.color = Color.white;
+
+            GameObject row = new GameObject("TrayCardsRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            trayCardsRow = row.GetComponent<RectTransform>();
+            trayCardsRow.SetParent(trayRoot, false);
+            LayoutElement rowLayout = row.GetComponent<LayoutElement>();
+            rowLayout.preferredHeight = 270f;
+            rowLayout.flexibleHeight = 1f;
+            HorizontalLayoutGroup h = row.GetComponent<HorizontalLayoutGroup>();
+            h.spacing = 14f; h.childForceExpandWidth = true; h.padding = new RectOffset(0, 0, 0, 0);
         }
 
         private void BuildPlacedCardActions()
@@ -316,9 +356,9 @@ namespace CardgameProof.Core
                 string cardId = BuildPrototypeCardIdForSetup(player, type, i);
                 var placed = new PlacedCardData { CardId = cardId, CardType = type, Owner = player, Coordinate = Vector2Int.zero, IsFaceUp = false };
                 GameObject go = new GameObject($"SetupCard_{i}", typeof(RectTransform), typeof(Image), typeof(LayoutElement), typeof(CanvasGroup));
-                go.transform.SetParent(trayRoot, false);
+                go.transform.SetParent(trayCardsRow != null ? trayCardsRow : trayRoot, false);
                 SetupCardView view = go.AddComponent<SetupCardView>();
-                view.Initialize(FindFirstObjectByType<Canvas>(), placed, OnSetupCardDrop);
+                view.Initialize(FindFirstObjectByType<Canvas>(), placed, OnSetupCardDrop, OnSetupCardTapped, false);
                 trayCards.Add(view);
                 if (type == CardType.Character) tutorialManager?.RegisterTarget("character_card_hand", view.GetComponent<RectTransform>());
                 if (type == CardType.Archive) tutorialManager?.RegisterTarget("archive_card_hand", view.GetComponent<RectTransform>());
@@ -371,19 +411,232 @@ namespace CardgameProof.Core
             return PrototypeDatabase.ArchiveCards[mapped];
         }
 
+        private void OnSetupCardTapped(SetupCardView cardView)
+        {
+            if (cardView == null || isPlacementModeActive || isAutoFillingNoRecord) return;
+            if (cardView.CardData == null || cardView.CardData.CardType == CardType.SemRegistro) return;
+
+            AudioManager.Instance?.PlayCardPick();
+            selectedCardForInspection = cardView.CardData;
+            isInspectingCard = true;
+            EnsureFocusCardView();
+            focusCardView.Show(selectedCardForInspection, OnFocusPlacePressed, OnFocusBackPressed);
+            tutorialManager?.Notify(selectedCardForInspection.CardType == CardType.Character ? TutorialTrigger.CharacterCardFocused : TutorialTrigger.ArchiveCardFocused);
+        }
+
+        private void OnFocusPlacePressed()
+        {
+            if (selectedCardForInspection == null) return;
+            AudioManager.Instance?.PlayButton();
+            selectedCardForPlacement = selectedCardForInspection;
+            selectedCardForInspection = null;
+            isInspectingCard = false;
+            focusCardView?.Hide();
+            EnterPlacementMode();
+            tutorialManager?.Notify(TutorialTrigger.CardPlacementModeStarted);
+        }
+
+        private void OnFocusBackPressed()
+        {
+            AudioManager.Instance?.PlayButton();
+            selectedCardForInspection = null;
+            isInspectingCard = false;
+            selectedCardForPlacement = null;
+            focusCardView?.Hide();
+            ExitPlacementMode(clearSelection: true);
+        }
+
+        private void EnterPlacementMode()
+        {
+            if (selectedCardForPlacement == null) return;
+            isPlacementModeActive = true;
+            selectedPlacedCoordinate = null;
+            boardController.SetSelectedCoordinate(null);
+            boardController.SetPlacementHighlights(true);
+            ShowPlacementInstruction(true);
+            SetTraySelectionEnabled(false);
+        }
+
+        private void ExitPlacementMode(bool clearSelection)
+        {
+            isPlacementModeActive = false;
+            if (clearSelection) selectedCardForPlacement = null;
+            boardController?.SetPlacementHighlights(false);
+            ShowPlacementInstruction(false);
+            SetTraySelectionEnabled(true);
+        }
+
+        private void OnSetupBoardCellTapped(Vector2Int coordinate)
+        {
+            if (isInspectingCard) return;
+            if (!isPlacementModeActive)
+            {
+                PlacedCardData existing = boardController.GetPlacedCard(coordinate);
+                if (existing != null)
+                {
+                    OnPlacedCardTapped(coordinate);
+                }
+                return;
+            }
+
+            if (selectedCardForPlacement == null)
+            {
+                ExitPlacementMode(clearSelection: true);
+                return;
+            }
+
+            if (!boardController.IsCellEmpty(coordinate))
+            {
+                AudioManager.Instance?.PlayInvalid();
+                matchReportService.OnInvalidPlacement();
+                ShowSetupFeedback("Escolha uma célula vazia.");
+                return;
+            }
+
+            TryPlaceSelectedSetupCard(coordinate);
+        }
+
+        private void TryPlaceSelectedSetupCard(Vector2Int coordinate)
+        {
+            PlacedCardData data = selectedCardForPlacement;
+            data.Coordinate = coordinate;
+            TutorialTrigger placementTrigger = data.CardType == CardType.Character ? TutorialTrigger.CharacterCardPlaced : TutorialTrigger.ArchiveCardPlaced;
+            tutorialManager?.NotifyActionStarted(placementTrigger);
+
+            if (!boardController.PlaceCard(data))
+            {
+                tutorialManager?.NotifyActionEnded(placementTrigger);
+                AudioManager.Instance?.PlayInvalid();
+                matchReportService.OnInvalidPlacement();
+                ShowSetupFeedback("Escolha uma célula vazia.");
+                return;
+            }
+
+            AudioManager.Instance?.PlayCardPlace();
+            SetupCardView trayCard = trayCards.Find(c => c != null && c.CardData.CardId == data.CardId);
+            if (trayCard != null) trayCard.gameObject.SetActive(false);
+            StorePlacedCardForCurrentPlayer(data);
+            tutorialManager?.NotifyActionEnded(placementTrigger);
+            tutorialManager?.Notify(placementTrigger);
+            tutorialManager?.Notify(TutorialTrigger.AnyCardPlaced);
+            ExitPlacementMode(clearSelection: true);
+            ShowSetupFeedback("Carta posicionada");
+            UpdateFinalizeButtonState();
+        }
+
+        private void SetTraySelectionEnabled(bool enabled)
+        {
+            foreach (SetupCardView card in trayCards)
+            {
+                if (card != null && card.gameObject.activeSelf) card.SetInteractionEnabled(enabled);
+            }
+
+            if (trayRoot != null)
+            {
+                CanvasGroup trayCg = trayRoot.GetComponent<CanvasGroup>();
+                if (trayCg == null) trayCg = trayRoot.gameObject.AddComponent<CanvasGroup>();
+                trayCg.alpha = enabled ? 1f : 0.55f;
+                trayCg.interactable = enabled;
+            }
+        }
+
+        private void ShowPlacementInstruction(bool show)
+        {
+            if (!show)
+            {
+                if (setupPlacementInstructionRoot != null) setupPlacementInstructionRoot.gameObject.SetActive(false);
+                return;
+            }
+
+            if (setupPlacementInstructionRoot == null)
+            {
+                GameObject panel = new GameObject("SetupPlacementInstruction", typeof(RectTransform), typeof(Image));
+                setupPlacementInstructionRoot = panel.GetComponent<RectTransform>();
+                setupPlacementInstructionRoot.SetParent(sceneRoot.OverlayLayer, false);
+                setupPlacementInstructionRoot.anchorMin = setupPlacementInstructionRoot.anchorMax = new Vector2(0.5f, 1f);
+                setupPlacementInstructionRoot.pivot = new Vector2(0.5f, 1f);
+                setupPlacementInstructionRoot.sizeDelta = new Vector2(760f, 120f);
+                setupPlacementInstructionRoot.anchoredPosition = new Vector2(0f, -120f);
+                Image image = panel.GetComponent<Image>();
+                image.color = new Color(0.04f, 0.08f, 0.12f, 0.86f);
+                image.raycastTarget = false;
+
+                CreateInstructionText(setupPlacementInstructionRoot, "Title", "Escolha uma posição no arquivo", new Vector2(0.06f, 0.48f), new Vector2(0.94f, 0.94f), 34, FontStyles.Bold);
+                CreateInstructionText(setupPlacementInstructionRoot, "Subtitle", "Toque em uma célula destacada", new Vector2(0.06f, 0.10f), new Vector2(0.94f, 0.48f), 25, FontStyles.Normal);
+            }
+
+            setupPlacementInstructionRoot.gameObject.SetActive(true);
+            setupPlacementInstructionRoot.SetAsLastSibling();
+        }
+
+        private void CreateInstructionText(RectTransform parent, string name, string text, Vector2 anchorMin, Vector2 anchorMax, int size, FontStyles style)
+        {
+            GameObject obj = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
+            RectTransform rect = obj.GetComponent<RectTransform>();
+            rect.SetParent(parent, false);
+            rect.anchorMin = anchorMin;
+            rect.anchorMax = anchorMax;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            TextMeshProUGUI label = obj.GetComponent<TextMeshProUGUI>();
+            label.text = text;
+            label.fontSize = size;
+            label.fontStyle = style;
+            label.alignment = TextAlignmentOptions.Center;
+            label.color = Color.white;
+            label.raycastTarget = false;
+        }
+
+        private void ShowSetupFeedback(string text)
+        {
+            if (sceneRoot?.OverlayLayer == null) return;
+            StartCoroutine(ShowSetupFeedbackCoroutine(text));
+        }
+
+        private IEnumerator ShowSetupFeedbackCoroutine(string text)
+        {
+            GameObject panel = new GameObject("SetupFeedback", typeof(RectTransform), typeof(Image));
+            RectTransform rect = panel.GetComponent<RectTransform>();
+            rect.SetParent(sceneRoot.OverlayLayer, false);
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = new Vector2(700f, 95f);
+            rect.anchoredPosition = new Vector2(0f, 390f);
+            Image image = panel.GetComponent<Image>();
+            image.color = new Color(0f, 0f, 0f, 0.76f);
+            image.raycastTarget = false;
+
+            GameObject labelObj = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
+            RectTransform labelRect = labelObj.GetComponent<RectTransform>();
+            labelRect.SetParent(rect, false);
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.offsetMin = Vector2.zero;
+            labelRect.offsetMax = Vector2.zero;
+            TextMeshProUGUI label = labelObj.GetComponent<TextMeshProUGUI>();
+            label.text = text;
+            label.fontSize = 32;
+            label.alignment = TextAlignmentOptions.Center;
+            label.color = Color.white;
+            label.raycastTarget = false;
+
+            yield return new WaitForSecondsRealtime(0.85f);
+            if (panel != null) Destroy(panel);
+        }
+
         private void OnSetupCardDrop(SetupCardView cardView, UnityEngine.EventSystems.PointerEventData eventData)
         {
+            if (cardView == null || eventData == null) return;
             if (!boardController.TryGetCoordinateFromScreenPosition(eventData.position, out Vector2Int coord)) { cardView.ResetToTray(); return; }
-            PlacedCardData data = cardView.CardData; data.Coordinate = coord;
-            tutorialManager?.NotifyActionStarted(data.CardType == CardType.Character ? TutorialTrigger.CharacterCardPlaced : TutorialTrigger.ArchiveCardPlaced);
-            if (!boardController.PlaceCard(data)) { tutorialManager?.NotifyActionEnded(data.CardType == CardType.Character ? TutorialTrigger.CharacterCardPlaced : TutorialTrigger.ArchiveCardPlaced); cardView.ResetToTray(); Debug.Log("Jogada inválida"); AudioManager.Instance?.PlayInvalid(); matchReportService.OnInvalidPlacement(); return; }
-            AudioManager.Instance?.PlayCardPlace();
-            cardView.gameObject.SetActive(false);
-            StorePlacedCardForCurrentPlayer(data);
-            tutorialManager?.NotifyActionEnded(data.CardType == CardType.Character ? TutorialTrigger.CharacterCardPlaced : TutorialTrigger.ArchiveCardPlaced);
-            tutorialManager?.Notify(data.CardType == CardType.Character ? TutorialTrigger.CharacterCardPlaced : TutorialTrigger.ArchiveCardPlaced);
-            tutorialManager?.Notify(TutorialTrigger.AnyCardPlaced);
-            UpdateFinalizeButtonState();
+            selectedCardForPlacement = cardView.CardData;
+            if (!boardController.IsCellEmpty(coord))
+            {
+                cardView.ResetToTray();
+                AudioManager.Instance?.PlayInvalid();
+                matchReportService.OnInvalidPlacement();
+                ShowSetupFeedback("Escolha uma célula vazia.");
+                return;
+            }
+            TryPlaceSelectedSetupCard(coord);
         }
 
         private void OnPlacedCardTapped(Vector2Int coordinate) { selectedPlacedCoordinate = coordinate; boardController.SetSelectedCoordinate(coordinate); }
@@ -400,7 +653,19 @@ namespace CardgameProof.Core
             boardController.SetSelectedCoordinate(null);
             UpdateFinalizeButtonState();
         }
-        private void UpdateFinalizeButtonState() { int active = 0; foreach (var c in trayCards) if (c != null && c.gameObject.activeSelf) active++; bool ready = active == 0; finalizeSetupButton.interactable = ready; if (ready) tutorialManager?.Notify(TutorialTrigger.AllRequiredCardsPlaced); }
+        private void UpdateFinalizeButtonState()
+        {
+            int active = 0;
+            foreach (var c in trayCards) if (c != null && c.gameObject.activeSelf) active++;
+            bool ready = active == 0;
+            setupReadyToFinalize = ready;
+            finalizeSetupButton.interactable = true;
+            Image buttonImage = finalizeSetupButton.GetComponent<Image>();
+            if (buttonImage != null) buttonImage.color = ready ? new Color(0.18f, 0.55f, 0.26f, 1f) : new Color(0.28f, 0.31f, 0.36f, 1f);
+            TextMeshProUGUI label = finalizeSetupButton.GetComponentInChildren<TextMeshProUGUI>();
+            if (label != null) label.text = ready ? "Finalizar montagem" : $"Finalizar montagem\nCartas restantes: {active}";
+            if (ready) tutorialManager?.Notify(TutorialTrigger.AllRequiredCardsPlaced);
+        }
 
         private void OnFinalizeSetupPressed()
         {
@@ -408,11 +673,10 @@ namespace CardgameProof.Core
             {
                 return;
             }
-            if (!finalizeSetupButton.interactable)
+            if (!setupReadyToFinalize)
             {
-                EnsureInvestigationOverlayView();
-                investigationOverlayView.Show("Montagem", "Posicione todas as cartas antes de finalizar.");
-                investigationOverlayView.AddButton("Fechar", investigationOverlayView.Hide);
+                AudioManager.Instance?.PlayInvalid();
+                ShowSetupFeedback("Posicione todas as cartas antes de finalizar.");
                 return;
             }
             Debug.Log("[STATE] Confirm setup");
@@ -788,12 +1052,14 @@ namespace CardgameProof.Core
             investigationOverlayView.AddButton("Cancelar", investigationOverlayView.Hide);
         }
         private void ShowGuidebookOverlay() { tutorialManager?.Notify(TutorialTrigger.GuideOpened); EnsureGuidebookOverlayView(); guidebookOverlayView.Show(PrototypeDatabase.Characters, researchTokens[currentTurnPlayer]); }
-        private void ShowRulesOverlay() { EnsureInvestigationOverlayView(); investigationOverlayView.Show("Fluxo do Protótipo", "Use este lembrete apenas para interações digitais:\n\n1. Arraste cartas para montar o arquivo.\n2. Toque em Finalizar montagem.\n3. Toque em cartas ocultas no tabuleiro para revelar.\n4. Use o botão Guia para consultar personagens.\n5. Use Tentar identificar quando tiver pistas.\n6. Encerre o turno para passar o aparelho."); investigationOverlayView.AddButton("Fechar", investigationOverlayView.Hide); }
+        private void ShowRulesOverlay() { EnsureInvestigationOverlayView(); investigationOverlayView.Show("Fluxo do Protótipo", "Use este lembrete apenas para interações digitais:\n\n1. Toque em cartas para analisá-las e posicioná-las no arquivo.\n2. Toque em Finalizar montagem.\n3. Toque em cartas ocultas no tabuleiro para revelar.\n4. Use o botão Guia para consultar personagens.\n5. Use Tentar identificar quando tiver pistas.\n6. Encerre o turno para passar o aparelho."); investigationOverlayView.AddButton("Fechar", investigationOverlayView.Hide); }
 
         private void HideSetupSensitiveUi()
         {
             if (trayRoot != null) trayRoot.gameObject.SetActive(false);
             if (placedActionsRoot != null) placedActionsRoot.gameObject.SetActive(false);
+            focusCardView?.Hide();
+            if (setupPlacementInstructionRoot != null) setupPlacementInstructionRoot.gameObject.SetActive(false);
             CanvasGroup cg = sceneRoot.CenterBoardArea.GetComponent<CanvasGroup>(); if (cg == null) cg = sceneRoot.CenterBoardArea.gameObject.AddComponent<CanvasGroup>();
             cg.alpha = 1f;
             cg.interactable = true;
@@ -1027,6 +1293,7 @@ namespace CardgameProof.Core
 
 private void EnsureBoardController() { if (boardController != null) return; GameObject boardObject = new GameObject("BoardController", typeof(RectTransform)); boardObject.transform.SetParent(sceneRoot.CenterBoardArea, false); boardController = boardObject.AddComponent<BoardController>(); }
         private void EnsureCardRevealOverlayView() { if (cardRevealOverlayView != null) return; GameObject go = new GameObject("CardRevealOverlayView"); go.transform.SetParent(sceneRoot.OverlayLayer, false); cardRevealOverlayView = go.AddComponent<CardRevealOverlayView>(); cardRevealOverlayView.Initialize(sceneRoot.OverlayLayer); }
+        private void EnsureFocusCardView() { if (focusCardView != null) return; GameObject go = new GameObject("FocusCardView"); go.transform.SetParent(sceneRoot.OverlayLayer, false); focusCardView = go.AddComponent<FocusCardView>(); focusCardView.Initialize(sceneRoot.OverlayLayer); }
         private void EnsureTutorialOverlay() { if (tutorialOverlay != null) return; Debug.Log("[UI] Creating TutorialOverlayView"); GameObject overlayObject = new GameObject("TutorialOverlayView"); overlayObject.transform.SetParent(sceneRoot.OverlayLayer, false); tutorialOverlay = overlayObject.AddComponent<TutorialOverlayView>(); tutorialOverlay.Initialize(sceneRoot.OverlayLayer);
             tutorialManager = new TutorialManager(tutorialOverlay); }
         private void EnsureInvestigationOverlayView() { if (investigationOverlayView != null) return; Debug.Log("[UI] Creating InvestigationOverlayView"); GameObject go = new GameObject("InvestigationOverlayView"); go.transform.SetParent(sceneRoot.OverlayLayer, false); investigationOverlayView = go.AddComponent<InvestigationOverlayView>(); investigationOverlayView.Initialize(sceneRoot.OverlayLayer); }
@@ -1047,6 +1314,8 @@ private void EnsureBoardController() { if (boardController != null) return; Game
             matchReportView?.Hide();
             if (trayRoot != null) trayRoot.gameObject.SetActive(false);
             if (placedActionsRoot != null) placedActionsRoot.gameObject.SetActive(false);
+            focusCardView?.Hide();
+            if (setupPlacementInstructionRoot != null) setupPlacementInstructionRoot.gameObject.SetActive(false);
             if (hudRoot != null) hudRoot.gameObject.SetActive(false);
             if (sceneRoot?.CenterBoardArea != null) sceneRoot.CenterBoardArea.gameObject.SetActive(false);
         }

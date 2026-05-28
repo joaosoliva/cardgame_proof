@@ -15,6 +15,7 @@ namespace CardgameProof.Core
         private Vector2Int? selectedCoordinate;
 
         public System.Action<Vector2Int> OnPlacedCardTapped;
+        public System.Action<Vector2Int> OnCellTapped;
 
         public bool ShowDebugLabels { get; set; }
         public Vector2Int BoardSize { get; private set; }
@@ -73,7 +74,7 @@ namespace CardgameProof.Core
                     GameObject cellObj = new GameObject($"Cell_{x}_{y}", typeof(RectTransform), typeof(Image), typeof(Button));
                     cellObj.transform.SetParent(boardRoot, false);
                     BoardCellView view = cellObj.AddComponent<BoardCellView>();
-                    view.Initialize(coord, ShowDebugLabels, OnCellTapped);
+                    view.Initialize(coord, ShowDebugLabels, HandleCellTapped);
                     boardViews[coord] = view;
                 }
             }
@@ -92,6 +93,7 @@ namespace CardgameProof.Core
             boardRoot = null;
             grid = null;
             selectedCoordinate = null;
+            OnCellTapped = null;
         }
 
         public bool ValidatePlacement(PlacedCardData cardData)
@@ -212,8 +214,28 @@ namespace CardgameProof.Core
             return boardData.TryGetValue(coordinate, out BoardCellData cell) ? cell.Occupant : null;
         }
 
-        private void OnCellTapped(Vector2Int coordinate)
+        public void SetPlacementHighlights(bool active)
         {
+            foreach (KeyValuePair<Vector2Int, BoardCellView> pair in boardViews)
+            {
+                bool occupied = boardData.TryGetValue(pair.Key, out BoardCellData cell) && cell.IsOccupied;
+                pair.Value.SetPlacementHighlight(active && !occupied, active && occupied);
+            }
+        }
+
+        public bool IsCellEmpty(Vector2Int coordinate)
+        {
+            return boardData.TryGetValue(coordinate, out BoardCellData cell) && !cell.IsOccupied;
+        }
+
+        private void HandleCellTapped(Vector2Int coordinate)
+        {
+            if (OnCellTapped != null)
+            {
+                OnCellTapped.Invoke(coordinate);
+                return;
+            }
+
             if (boardData.TryGetValue(coordinate, out BoardCellData cell) && cell.IsOccupied && cell.Occupant != null)
             {
                 SetSelectedCoordinate(coordinate);

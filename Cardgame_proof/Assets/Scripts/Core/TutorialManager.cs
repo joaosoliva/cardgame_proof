@@ -7,6 +7,9 @@ namespace CardgameProof.Core
     public enum TutorialTrigger
     {
         ContinueButton,
+        CharacterCardFocused,
+        ArchiveCardFocused,
+        CardPlacementModeStarted,
         CharacterCardPlaced,
         ArchiveCardPlaced,
         AnyCardPlaced,
