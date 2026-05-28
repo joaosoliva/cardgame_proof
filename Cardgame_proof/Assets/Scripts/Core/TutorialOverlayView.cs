@@ -15,13 +15,26 @@ namespace CardgameProof.Core
         private TextMeshProUGUI titleText;
         private TextMeshProUGUI bodyText;
         private Button confirmButton;
-        private Image highlightFrame;
+        private RectTransform highlightRoot;
+        private Image highlightTop;
+        private Image highlightBottom;
+        private Image highlightLeft;
+        private Image highlightRight;
+        private CanvasGroup highlightCanvasGroup;
         private CanvasGroup blocker;
         private string currentStepId;
         private RectTransform cardRoot;
         private CanvasGroup cardCanvasGroup;
         private Coroutine fadeCoroutine;
         private bool debugWelcomeStepActive;
+        private RectTransform activeHighlightTarget;
+        private Coroutine pulseCoroutine;
+
+        private readonly Color outlineColor = new Color(1f, 0.82f, 0.22f, 1f);
+        private const float outlineThickness = 8f;
+        private const float outlinePadding = 16f;
+        private const bool pulseEnabled = true;
+        private const float pulseSpeed = 2.2f;
 
         public bool IsVisible => panelObject != null && panelObject.activeSelf;
 
@@ -84,9 +97,17 @@ namespace CardgameProof.Core
             Image blockerImage = panelObject.GetComponent<Image>();
             if (blockerImage != null) blockerImage.raycastTarget = false;
             cardCanvasGroup.alpha = 0f; cardCanvasGroup.interactable = false; cardCanvasGroup.blocksRaycasts = false;
-            highlightFrame.gameObject.SetActive(false);
+            SetHighlightActive(false);
             panelObject.SetActive(false);
             debugWelcomeStepActive = false;
+        }
+
+        private void LateUpdate()
+        {
+            if (activeHighlightTarget != null && highlightRoot != null && highlightRoot.gameObject.activeSelf)
+            {
+                PositionOutlineAroundTarget(activeHighlightTarget);
+            }
         }
 
         public void SetPlacement(TutorialPanelPlacement placement, RectTransform target = null, bool avoidTargetOverlap = true)
@@ -196,17 +217,17 @@ namespace CardgameProof.Core
             panelObject.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.42f);
             blocker = panelObject.GetComponent<CanvasGroup>();
 
-            var frameObj = new GameObject("TargetHighlight", typeof(RectTransform), typeof(Image));
-            frameObj.transform.SetParent(panelRoot, false);
-            highlightFrame = frameObj.GetComponent<Image>();
-            highlightFrame.color = new Color(1f, 0.85f, 0.2f, 0.18f);
-            highlightFrame.raycastTarget = false;
-            CanvasGroup highlightGroup = frameObj.AddComponent<CanvasGroup>();
-            highlightGroup.interactable = false;
-            highlightGroup.blocksRaycasts = false;
-            var outline = frameObj.AddComponent<Outline>();
-            outline.effectColor = new Color(1f, 0.85f, 0.2f, 0.95f);
-            outline.effectDistance = new Vector2(4f, -4f);
+            var highlightObj = new GameObject("TutorialHighlightRoot", typeof(RectTransform), typeof(CanvasGroup));
+            highlightRoot = highlightObj.GetComponent<RectTransform>();
+            highlightRoot.SetParent(panelRoot, false);
+            highlightRoot.anchorMin = highlightRoot.anchorMax = new Vector2(0.5f, 0.5f);
+            highlightCanvasGroup = highlightObj.GetComponent<CanvasGroup>();
+            highlightCanvasGroup.interactable = false;
+            highlightCanvasGroup.blocksRaycasts = false;
+            highlightTop = CreateHighlightBorder("TopBorder", highlightRoot);
+            highlightBottom = CreateHighlightBorder("BottomBorder", highlightRoot);
+            highlightLeft = CreateHighlightBorder("LeftBorder", highlightRoot);
+            highlightRight = CreateHighlightBorder("RightBorder", highlightRoot);
 
             GameObject card = new GameObject("TutorialCard", typeof(RectTransform), typeof(Image), typeof(CanvasGroup));
             cardRoot = card.GetComponent<RectTransform>();
@@ -228,18 +249,30 @@ namespace CardgameProof.Core
 
         private void UpdateHighlight(RectTransform target)
         {
-            if (target == null) { highlightFrame.gameObject.SetActive(false); return; }
-            highlightFrame.gameObject.SetActive(true);
+            activeHighlightTarget = target;
+            if (target == null) { SetHighlightActive(false); return; }
+            SetHighlightActive(true);
+            PositionOutlineAroundTarget(target);
+        }
+
+        private void PositionOutlineAroundTarget(RectTransform target)
+        {
+            if (target == null || panelRoot == null || highlightRoot == null) return;
             Vector3[] corners = new Vector3[4];
             target.GetWorldCorners(corners);
             Vector2 min = RectTransformUtility.WorldToScreenPoint(null, corners[0]);
             Vector2 max = RectTransformUtility.WorldToScreenPoint(null, corners[2]);
             RectTransformUtility.ScreenPointToLocalPointInRectangle(panelRoot, min, null, out Vector2 localMin);
             RectTransformUtility.ScreenPointToLocalPointInRectangle(panelRoot, max, null, out Vector2 localMax);
-            RectTransform hr = highlightFrame.rectTransform;
-            hr.anchorMin = hr.anchorMax = new Vector2(0.5f, 0.5f);
-            hr.sizeDelta = new Vector2(Mathf.Abs(localMax.x - localMin.x) + 24f, Mathf.Abs(localMax.y - localMin.y) + 24f);
-            hr.anchoredPosition = (localMin + localMax) * 0.5f;
+            float width = Mathf.Abs(localMax.x - localMin.x) + (outlinePadding * 2f);
+            float height = Mathf.Abs(localMax.y - localMin.y) + (outlinePadding * 2f);
+            Vector2 center = (localMin + localMax) * 0.5f;
+            highlightRoot.sizeDelta = new Vector2(width, height);
+            highlightRoot.anchoredPosition = center;
+            PositionBorder(highlightTop.rectTransform, new Vector2(0f, (height * 0.5f) - (outlineThickness * 0.5f)), new Vector2(width, outlineThickness));
+            PositionBorder(highlightBottom.rectTransform, new Vector2(0f, (-height * 0.5f) + (outlineThickness * 0.5f)), new Vector2(width, outlineThickness));
+            PositionBorder(highlightLeft.rectTransform, new Vector2((-width * 0.5f) + (outlineThickness * 0.5f), 0f), new Vector2(outlineThickness, height));
+            PositionBorder(highlightRight.rectTransform, new Vector2((width * 0.5f) - (outlineThickness * 0.5f), 0f), new Vector2(outlineThickness, height));
         }
 
         private static TextMeshProUGUI CreateText(RectTransform parent, string name, int fontSize, TextAlignmentOptions alignment, Color color, float preferredHeight)
@@ -275,7 +308,7 @@ namespace CardgameProof.Core
             Image dimImage = panelObject.GetComponent<Image>();
             Image buttonImage = confirmButton.GetComponent<Image>();
             Debug.Log($"[TUTORIAL_UI] dim sibling={panelRoot.GetSiblingIndex()} raycast={(dimImage != null && dimImage.raycastTarget)} blocks={blocker.blocksRaycasts}");
-            Debug.Log($"[TUTORIAL_UI] highlight sibling={highlightFrame.rectTransform.GetSiblingIndex()} active={highlightFrame.gameObject.activeSelf} raycast={highlightFrame.raycastTarget}");
+            Debug.Log($"[TUTORIAL_UI] highlight sibling={(highlightRoot != null ? highlightRoot.GetSiblingIndex() : -1)} active={(highlightRoot != null && highlightRoot.gameObject.activeSelf)} blocks={(highlightCanvasGroup != null && highlightCanvasGroup.blocksRaycasts)}");
             Debug.Log($"[TUTORIAL_UI] card sibling={cardRoot.GetSiblingIndex()} raycast={cardRoot.GetComponent<Image>().raycastTarget}");
             Debug.Log($"[TUTORIAL_UI] continue sibling={confirmButton.transform.GetSiblingIndex()} interactable={confirmButton.interactable} raycast={(buttonImage != null && buttonImage.raycastTarget)}");
             Debug.Log($"[TUTORIAL_UI] blocker alpha={blocker.alpha} interactable={blocker.interactable} blocks={blocker.blocksRaycasts}");
@@ -288,9 +321,7 @@ namespace CardgameProof.Core
             blocker.blocksRaycasts = true;
             Image blockerImage = panelObject.GetComponent<Image>();
             if (blockerImage != null) blockerImage.raycastTarget = true;
-            highlightFrame.raycastTarget = false;
-            CanvasGroup hg = highlightFrame.GetComponent<CanvasGroup>();
-            if (hg != null) { hg.interactable = false; hg.blocksRaycasts = false; }
+            if (highlightCanvasGroup != null) { highlightCanvasGroup.interactable = false; highlightCanvasGroup.blocksRaycasts = false; }
             confirmButton.interactable = true;
             Image bi = confirmButton.GetComponent<Image>();
             if (bi != null) bi.raycastTarget = true;
@@ -339,6 +370,54 @@ namespace CardgameProof.Core
                 bool large = size.x >= Screen.width * 0.75f && size.y >= Screen.height * 0.75f;
                 Debug.Log($"[UI_LAYER] name={c.name} active={c.gameObject.activeInHierarchy} sibling={c.GetSiblingIndex()} alpha={(cg!=null?cg.alpha:-1)} blocks={(cg!=null&&cg.blocksRaycasts)} raycast={(img!=null&&img.raycastTarget)} size={size} large={large}");
             }
+        }
+
+        private Image CreateHighlightBorder(string name, RectTransform parent)
+        {
+            GameObject go = new GameObject(name, typeof(RectTransform), typeof(Image));
+            RectTransform rect = go.GetComponent<RectTransform>();
+            rect.SetParent(parent, false);
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+            Image img = go.GetComponent<Image>();
+            img.color = outlineColor;
+            img.raycastTarget = false;
+            return img;
+        }
+
+        private static void PositionBorder(RectTransform border, Vector2 pos, Vector2 size)
+        {
+            border.anchoredPosition = pos;
+            border.sizeDelta = size;
+        }
+
+        private void SetHighlightActive(bool active)
+        {
+            if (highlightRoot == null) return;
+            highlightRoot.gameObject.SetActive(active);
+            if (!active)
+            {
+                activeHighlightTarget = null;
+                if (pulseCoroutine != null) { StopCoroutine(pulseCoroutine); pulseCoroutine = null; }
+                highlightRoot.localScale = Vector3.one;
+                return;
+            }
+            if (pulseEnabled && pulseCoroutine == null)
+            {
+                pulseCoroutine = StartCoroutine(PulseOutline());
+            }
+        }
+
+        private IEnumerator PulseOutline()
+        {
+            while (highlightRoot != null && highlightRoot.gameObject.activeSelf)
+            {
+                float t = (Mathf.Sin(Time.unscaledTime * pulseSpeed) + 1f) * 0.5f;
+                float scale = Mathf.Lerp(1f, 1.05f, t);
+                highlightRoot.localScale = new Vector3(scale, scale, 1f);
+                if (highlightCanvasGroup != null) highlightCanvasGroup.alpha = Mathf.Lerp(0.8f, 1f, t);
+                yield return null;
+            }
+            pulseCoroutine = null;
         }
     }
 }
