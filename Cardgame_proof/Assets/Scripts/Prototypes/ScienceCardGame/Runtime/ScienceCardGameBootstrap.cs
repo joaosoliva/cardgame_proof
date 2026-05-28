@@ -7,6 +7,8 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime
 {
     public sealed class ScienceCardGameBootstrap : MonoBehaviour
     {
+        [SerializeField] private bool debugRevealAllHands;
+
         private PrototypeRuntimeContext context;
         private ScienceCardGameState state;
         private ScienceTelemetryManager telemetryManager;
@@ -16,8 +18,9 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime
         private ScienceTurnManager turnManager;
         private ScienceCardGameUIManager uiManager;
 
-        public void Initialize(PrototypeRuntimeContext runtimeContext, ScienceCardGameState initialState)
+        public void Initialize(PrototypeRuntimeContext runtimeContext, ScienceCardGameState initialState, bool revealAllHandsForDebug = false)
         {
+            debugRevealAllHands = revealAllHandsForDebug;
             Debug.Log("[ScienceCardGame] Bootstrap initialize begin");
             context = runtimeContext;
             state = initialState ?? new ScienceCardGameState();
@@ -29,7 +32,8 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime
             }
 
             state.InitializeDefaults();
-            Debug.Log("[ScienceCardGame] 00 State initialized for setup");
+            state.SetDebugRevealAllHands(debugRevealAllHands);
+            Debug.Log($"[ScienceCardGame] 00 State initialized for setup debugRevealAllHands={debugRevealAllHands}");
 
             telemetryManager = new ScienceTelemetryManager();
             telemetryManager.Initialize(state);
@@ -82,7 +86,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime
             state.InitializePlayers(playerCount);
             scoreManager?.ResetScores();
             turnManager?.ResetForPlayers();
-            deckManager.DealInitialHands(state.Players, state.InitialHandSize);
+            deckManager.DealInitialHands(state.Players, state.InitialHandSize, state.DebugRevealAllHands);
             state.SetPhase(ScienceCardGamePhase.CardDistribution);
             telemetryManager?.LogEvent("science_setup_confirmed", $"players={state.SelectedPlayerCount};phase={state.CurrentPhase}");
             uiManager.ShowCardDistributionScreen();

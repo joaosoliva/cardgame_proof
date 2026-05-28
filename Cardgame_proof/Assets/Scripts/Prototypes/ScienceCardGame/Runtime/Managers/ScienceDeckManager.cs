@@ -37,9 +37,12 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             return card;
         }
 
-        public void DealInitialHands(IReadOnlyList<SciencePlayerState> players, int cardsPerPlayer)
+        public void DealInitialHands(IReadOnlyList<SciencePlayerState> players, int cardsPerPlayer, bool debugRevealAllHands)
         {
             if (players == null || cardsPerPlayer <= 0) return;
+
+            Shuffle(drawPile);
+            telemetry?.LogEvent("science_deck_shuffled_for_distribution", $"cards={drawPile.Count}");
 
             for (int i = 0; i < players.Count; i++)
             {
@@ -54,6 +57,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                     if (card == null)
                     {
                         telemetry?.LogEvent("science_initial_deal_deck_empty", $"playerIndex={playerIndex};cardIndex={cardIndex}");
+                        LogPlayerHandCounts(players, debugRevealAllHands);
                         return;
                     }
 
@@ -61,6 +65,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                 }
             }
 
+            LogPlayerHandCounts(players, debugRevealAllHands);
             telemetry?.LogEvent("science_initial_hands_dealt", $"players={players.Count};cardsPerPlayer={cardsPerPlayer};remaining={drawPile.Count}");
         }
 
@@ -79,6 +84,35 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             actionCards.Clear();
             telemetry = null;
             random = null;
+        }
+
+
+        private void LogPlayerHandCounts(IReadOnlyList<SciencePlayerState> players, bool debugRevealAllHands)
+        {
+            if (players == null) return;
+
+            for (int i = 0; i < players.Count; i++)
+            {
+                SciencePlayerState player = players[i];
+                if (player == null) continue;
+
+                string revealSuffix = debugRevealAllHands ? $" cards=[{FormatHandForDebug(player)}]" : " cards hidden";
+                Debug.Log($"[ScienceCardGame] Distribution: {player.DisplayName} received {player.Hand.Count} cards.{revealSuffix}");
+            }
+        }
+
+        private static string FormatHandForDebug(SciencePlayerState player)
+        {
+            if (player == null || player.Hand.Count == 0) return "empty";
+
+            List<string> labels = new List<string>();
+            foreach (ScienceCardData card in player.Hand)
+            {
+                if (card == null) continue;
+                labels.Add($"{card.DisplayName} ({card.CardType})");
+            }
+
+            return string.Join(", ", labels);
         }
 
         private void LoadDeck(IReadOnlyList<ScienceCardData> sourceCards)

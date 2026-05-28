@@ -6,8 +6,14 @@ namespace CardgameProof.Prototypes.ScienceCardGame
 {
     public sealed class ScienceCardGameModule : IPrototypeModule
     {
+        private readonly bool debugRevealAllHands;
         private GameObject bootstrapObject;
         private ScienceCardGameBootstrap bootstrap;
+
+        public ScienceCardGameModule(bool debugRevealAllHands = false)
+        {
+            this.debugRevealAllHands = debugRevealAllHands;
+        }
 
         public void StartPrototype(PrototypeRuntimeContext context)
         {
@@ -19,7 +25,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame
 
             bootstrapObject = new GameObject("ScienceCardGameBootstrap");
             bootstrap = bootstrapObject.AddComponent<ScienceCardGameBootstrap>();
-            bootstrap.Initialize(context, new ScienceCardGameState());
+            bootstrap.Initialize(context, new ScienceCardGameState(), debugRevealAllHands);
         }
 
         public void StopPrototype()

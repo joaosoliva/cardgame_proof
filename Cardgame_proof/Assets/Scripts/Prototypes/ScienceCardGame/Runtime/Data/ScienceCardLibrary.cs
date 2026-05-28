@@ -89,7 +89,13 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Data
                     "Pesquisa Rápida",
                     "Use uma mini biografia para apoiar uma conexão.",
                     ScienceActionEffectType.ResearchHint,
-                    "Leia a mini biografia de uma carta e use essa informação para justificar uma conexão.")
+                    "Leia a mini biografia de uma carta e use essa informação para justificar uma conexão."),
+                new ScienceActionCardData(
+                    "action_bonus",
+                    "Síntese Coletiva",
+                    "Ganhe ponto extra ao explicar uma conexão entre ciência e sociedade.",
+                    ScienceActionEffectType.BonusScore,
+                    "Se sua conexão envolver impacto social, ambiental ou de saúde, ganhe +1 ponto no protótipo futuro.")
             };
         }
     }

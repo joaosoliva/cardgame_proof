@@ -3,6 +3,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using CardgameProof.App;
+using CardgameProof.Prototypes.ScienceCardGame.Runtime.Data;
 
 namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 {
@@ -51,10 +52,11 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             ClearChildren(root.transform);
             RectTransform rect = root.GetComponent<RectTransform>();
 
-            CreateText(rect, "Distribuição de Cartas", 54, new Vector2(0.08f, 0.72f), new Vector2(0.92f, 0.86f), FontStyles.Bold);
-            CreateText(rect, BuildDistributionSummary(), 30, new Vector2(0.10f, 0.42f), new Vector2(0.90f, 0.68f), FontStyles.Normal);
-            CreateText(rect, "Próxima etapa: posicionamento no tabuleiro ainda não implementado.", 24, new Vector2(0.12f, 0.32f), new Vector2(0.88f, 0.42f), FontStyles.Italic);
-            CreateButton(rect, "Back to Prototype Selection", new Vector2(0.5f, 0.20f), () => context?.ReturnToSelector?.Invoke());
+            CreateText(rect, "Distribuição de Cartas", 54, new Vector2(0.08f, 0.78f), new Vector2(0.92f, 0.90f), FontStyles.Bold);
+            CreateText(rect, BuildDistributionSummary(), 26, new Vector2(0.10f, 0.64f), new Vector2(0.90f, 0.76f), FontStyles.Normal);
+            CreateText(rect, BuildCurrentPlayerHandText(), 26, new Vector2(0.10f, 0.36f), new Vector2(0.90f, 0.62f), FontStyles.Normal);
+            CreateText(rect, "Próxima etapa: posicionamento no tabuleiro ainda não implementado.", 22, new Vector2(0.12f, 0.28f), new Vector2(0.88f, 0.34f), FontStyles.Italic);
+            CreateButton(rect, "Back to Prototype Selection", new Vector2(0.5f, 0.18f), () => context?.ReturnToSelector?.Invoke());
             telemetry?.LogEvent("science_ui_screen_changed", "screen=card_distribution");
         }
 
@@ -123,6 +125,63 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             int turn = turnManager?.TurnNumber ?? 0;
             int handSize = state?.InitialHandSize ?? 0;
             return $"{playerCount} jogadores inicializados. Cada jogador recebeu {handSize} cartas. Cartas restantes no deck: {deckCount}. Turno inicial: {turn}.";
+        }
+
+        private string BuildCurrentPlayerHandText()
+        {
+            if (state == null || state.Players.Count == 0) return "Nenhuma mão disponível.";
+
+            int currentPlayerIndex = Mathf.Clamp(turnManager?.CurrentPlayerIndex ?? 0, 0, state.Players.Count - 1);
+            SciencePlayerState currentPlayer = state.Players[currentPlayerIndex];
+            int characterCount = CountCardsOfType(currentPlayer, ScienceCardType.Character);
+            int actionCount = CountCardsOfType(currentPlayer, ScienceCardType.Action);
+
+            string handText = $"Mão atual: {currentPlayer.DisplayName}\n{currentPlayer.Hand.Count} cartas ({characterCount} personagens, {actionCount} ações)";
+            if (!state.DebugRevealAllHands)
+            {
+                handText += "\n" + FormatHand(currentPlayer);
+                handText += "\n\nOutras mãos permanecem ocultas. Ative debugRevealAllHands para revelar todas nos logs.";
+                return handText;
+            }
+
+            handText += "\n" + FormatHand(currentPlayer);
+            for (int i = 0; i < state.Players.Count; i++)
+            {
+                if (i == currentPlayerIndex) continue;
+                SciencePlayerState player = state.Players[i];
+                handText += $"\n\n{player.DisplayName}: {player.Hand.Count} cartas\n{FormatHand(player)}";
+            }
+
+            return handText;
+        }
+
+        private static int CountCardsOfType(SciencePlayerState player, ScienceCardType cardType)
+        {
+            if (player == null) return 0;
+            int count = 0;
+            foreach (ScienceCardData card in player.Hand)
+            {
+                if (card != null && card.CardType == cardType) count++;
+            }
+
+            return count;
+        }
+
+        private static string FormatHand(SciencePlayerState player)
+        {
+            if (player == null || player.Hand.Count == 0) return "Sem cartas.";
+
+            string text = string.Empty;
+            for (int i = 0; i < player.Hand.Count; i++)
+            {
+                ScienceCardData card = player.Hand[i];
+                if (card == null) continue;
+                text += $"• {card.DisplayName} [{card.CardType}]";
+                if (card is ScienceActionCardData actionCard) text += $" — {actionCard.EffectType}";
+                if (i < player.Hand.Count - 1) text += "\n";
+            }
+
+            return text;
         }
 
         private static void ClearChildren(Transform parent)
