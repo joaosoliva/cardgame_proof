@@ -16,8 +16,8 @@ namespace CardgameProof.App
             new PrototypeDefinition(
                 PrototypeId.ScienceCardGame,
                 "Science Card Game",
-                "Placeholder para a próxima simulação tabletop de conexões entre personagens científicos.",
-                () => new ScienceCardGamePlaceholderModule())
+                "Módulo inicial para a simulação tabletop de conexões entre personagens científicos.",
+                () => new ScienceCardGameModule())
         };
 
         public static IReadOnlyList<PrototypeDefinition> All => prototypes;
