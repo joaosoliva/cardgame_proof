@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -9,6 +10,9 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 {
     public sealed class ScienceCardGameUIManager
     {
+        private const int MaxLogEntries = 7;
+
+        private readonly List<string> recentActions = new List<string>();
         private PrototypeRuntimeContext context;
         private ScienceCardGameState state;
         private ScienceDeckManager deckManager;
@@ -34,6 +38,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             turnManager = scienceTurnManager;
             telemetry = telemetryManager;
             selectedPlayerCount = state?.SelectedPlayerCount ?? 2;
+            recentActions.Clear();
 
             if (context?.SceneRoot?.FullScreenRoot == null)
             {
@@ -49,15 +54,11 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         public void ShowCardDistributionScreen()
         {
             if (root == null || state == null) return;
-            ClearChildren(root.transform);
-            RectTransform rect = root.GetComponent<RectTransform>();
 
-            CreateText(rect, "Distribuição de Cartas", 54, new Vector2(0.08f, 0.78f), new Vector2(0.92f, 0.90f), FontStyles.Bold);
-            CreateText(rect, BuildDistributionSummary(), 26, new Vector2(0.10f, 0.64f), new Vector2(0.90f, 0.76f), FontStyles.Normal);
-            CreateText(rect, BuildCurrentPlayerHandText(), 26, new Vector2(0.10f, 0.36f), new Vector2(0.90f, 0.62f), FontStyles.Normal);
-            CreateText(rect, "Próxima etapa: posicionamento no tabuleiro ainda não implementado.", 22, new Vector2(0.12f, 0.28f), new Vector2(0.88f, 0.34f), FontStyles.Italic);
-            CreateButton(rect, "Back to Prototype Selection", new Vector2(0.5f, 0.18f), () => context?.ReturnToSelector?.Invoke());
-            telemetry?.LogEvent("science_ui_screen_changed", "screen=card_distribution");
+            AddLog($"Distribuição concluída: {state.Players.Count} jogadores com {state.InitialHandSize} cartas cada.");
+            AddLog($"Turno {turnManager?.TurnNumber ?? 0}: {GetCurrentPlayerName()} começa.");
+            BuildGameplayScreen();
+            telemetry?.LogEvent("science_ui_screen_changed", "screen=gameplay_layout");
         }
 
         public void Cleanup()
@@ -65,10 +66,11 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             if (root != null)
             {
                 root.SetActive(false);
-                Object.Destroy(root);
+                UnityEngine.Object.Destroy(root);
                 root = null;
             }
 
+            recentActions.Clear();
             selectedPlayerCountText = null;
             context = null;
             state = null;
@@ -103,6 +105,162 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             CreateButton(rect, "Back to Prototype Selection", new Vector2(0.5f, 0.20f), () => context?.ReturnToSelector?.Invoke());
         }
 
+        private void BuildGameplayScreen()
+        {
+            RectTransform screen = root.GetComponent<RectTransform>();
+            ClearChildren(root.transform);
+
+            RectTransform topBar = CreatePanel(screen, "TopBar", new Vector2(0.02f, 0.88f), new Vector2(0.98f, 0.98f), new Color(0.10f, 0.13f, 0.18f, 0.96f));
+            RectTransform logPanel = CreatePanel(screen, "LogPanel", new Vector2(0.02f, 0.02f), new Vector2(0.20f, 0.86f), new Color(0.08f, 0.10f, 0.14f, 0.96f));
+            RectTransform boardPanel = CreatePanel(screen, "BoardPanel", new Vector2(0.22f, 0.28f), new Vector2(0.78f, 0.86f), new Color(0.12f, 0.20f, 0.17f, 0.96f));
+            RectTransform handPanel = CreatePanel(screen, "CurrentPlayerHandPanel", new Vector2(0.22f, 0.02f), new Vector2(0.78f, 0.25f), new Color(0.11f, 0.12f, 0.18f, 0.96f));
+            RectTransform actionPanel = CreatePanel(screen, "TurnActionPanel", new Vector2(0.80f, 0.02f), new Vector2(0.98f, 0.86f), new Color(0.09f, 0.11f, 0.16f, 0.96f));
+
+            BuildTopBar(topBar);
+            BuildLogPanel(logPanel);
+            BuildBoardPanel(boardPanel);
+            BuildHandPanel(handPanel);
+            BuildActionPanel(actionPanel);
+        }
+
+        private void BuildTopBar(RectTransform parent)
+        {
+            CreateText(parent, "Protótipo: Jogo de Cartas Científico", 28, new Vector2(0.02f, 0.10f), new Vector2(0.32f, 0.90f), FontStyles.Bold, TextAlignmentOptions.Left);
+            CreateText(parent, $"Jogador atual: {GetCurrentPlayerName()}  |  Turno {turnManager?.TurnNumber ?? 0}", 26, new Vector2(0.33f, 0.10f), new Vector2(0.58f, 0.90f), FontStyles.Bold);
+            CreateText(parent, BuildScoreLine(), 22, new Vector2(0.59f, 0.10f), new Vector2(0.82f, 0.90f), FontStyles.Normal, TextAlignmentOptions.Left);
+            CreateButton(parent, "Back to Prototype Selection", new Vector2(0.91f, 0.50f), () => context?.ReturnToSelector?.Invoke(), new Vector2(280f, 62f));
+        }
+
+        private void BuildLogPanel(RectTransform parent)
+        {
+            CreateText(parent, "Log", 26, new Vector2(0.08f, 0.90f), new Vector2(0.92f, 0.98f), FontStyles.Bold);
+            CreateText(parent, BuildRecentActionLog(), 20, new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.88f), FontStyles.Normal, TextAlignmentOptions.TopLeft);
+        }
+
+        private void BuildBoardPanel(RectTransform parent)
+        {
+            CreateText(parent, "Área Central do Tabuleiro", 28, new Vector2(0.04f, 0.91f), new Vector2(0.96f, 0.98f), FontStyles.Bold);
+            CreateText(parent, "Posicionamento de cartas será implementado na próxima etapa.", 18, new Vector2(0.04f, 0.84f), new Vector2(0.96f, 0.90f), FontStyles.Italic);
+
+            RectTransform grid = CreatePanel(parent, "BoardGrid", new Vector2(0.04f, 0.06f), new Vector2(0.96f, 0.82f), new Color(0.06f, 0.12f, 0.10f, 0.92f));
+            int columns = Mathf.Max(1, state?.BoardSize.x ?? 5);
+            int rows = Mathf.Max(1, state?.BoardSize.y ?? 3);
+
+            for (int y = 0; y < rows; y++)
+            {
+                for (int x = 0; x < columns; x++)
+                {
+                    float minX = x / (float)columns;
+                    float maxX = (x + 1) / (float)columns;
+                    float minY = 1f - ((y + 1) / (float)rows);
+                    float maxY = 1f - (y / (float)rows);
+                    RectTransform slot = CreatePanel(grid, $"BoardSlot_{x}_{y}", new Vector2(minX, minY), new Vector2(maxX, maxY), new Color(0.15f, 0.28f, 0.23f, 0.82f));
+                    slot.offsetMin = new Vector2(slot.offsetMin.x + 6f, slot.offsetMin.y + 6f);
+                    slot.offsetMax = new Vector2(slot.offsetMax.x - 6f, slot.offsetMax.y - 6f);
+                    CreateText(slot, $"{x + 1},{y + 1}", 18, new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.92f), FontStyles.Normal);
+                }
+            }
+        }
+
+        private void BuildHandPanel(RectTransform parent)
+        {
+            SciencePlayerState currentPlayer = GetCurrentPlayer();
+            string title = currentPlayer == null ? "Mão do jogador" : $"Mão de {currentPlayer.DisplayName}";
+            CreateText(parent, title, 25, new Vector2(0.03f, 0.78f), new Vector2(0.34f, 0.96f), FontStyles.Bold, TextAlignmentOptions.Left);
+
+            if (currentPlayer == null || currentPlayer.Hand.Count == 0)
+            {
+                CreateText(parent, "Nenhuma carta na mão atual.", 22, new Vector2(0.04f, 0.20f), new Vector2(0.96f, 0.70f), FontStyles.Italic);
+                return;
+            }
+
+            int characterCount = CountCardsOfType(currentPlayer, ScienceCardType.Character);
+            int actionCount = CountCardsOfType(currentPlayer, ScienceCardType.Action);
+            CreateText(parent, $"{currentPlayer.Hand.Count} cartas: {characterCount} personagens, {actionCount} ações", 19, new Vector2(0.36f, 0.80f), new Vector2(0.96f, 0.95f), FontStyles.Normal, TextAlignmentOptions.Right);
+
+            RectTransform cardRow = CreatePanel(parent, "CurrentPlayerHandCards", new Vector2(0.03f, 0.06f), new Vector2(0.97f, 0.76f), new Color(0.06f, 0.07f, 0.11f, 0.55f));
+            int cardCount = currentPlayer.Hand.Count;
+            for (int i = 0; i < cardCount; i++)
+            {
+                ScienceCardData card = currentPlayer.Hand[i];
+                float center = (i + 0.5f) / cardCount;
+                RectTransform cardRect = CreateCardView(cardRow, card, $"HandCard_{i}");
+                cardRect.anchorMin = new Vector2(center, 0.50f);
+                cardRect.anchorMax = new Vector2(center, 0.50f);
+                cardRect.pivot = new Vector2(0.5f, 0.5f);
+                cardRect.sizeDelta = new Vector2(150f, 142f);
+                cardRect.anchoredPosition = Vector2.zero;
+            }
+        }
+
+        private void BuildActionPanel(RectTransform parent)
+        {
+            CreateText(parent, "Ações", 27, new Vector2(0.08f, 0.91f), new Vector2(0.92f, 0.98f), FontStyles.Bold);
+            CreateText(parent, $"Deck: {deckManager?.DrawPile?.Count ?? 0}\nDescarte: {deckManager?.DiscardPile?.Count ?? 0}", 21, new Vector2(0.10f, 0.78f), new Vector2(0.90f, 0.89f), FontStyles.Normal);
+
+            CreateButton(parent, "Comprar carta", new Vector2(0.50f, 0.66f), DrawCardForCurrentPlayer, new Vector2(260f, 62f));
+            CreateButton(parent, "Registrar conexão", new Vector2(0.50f, 0.55f), () => AddPlaceholderAction("Conexões entre cartas ainda serão implementadas."), new Vector2(260f, 62f));
+            CreateButton(parent, "Encerrar ação", new Vector2(0.50f, 0.44f), () => AddPlaceholderAction("Ação encerrada sem alteração de estado."), new Vector2(260f, 62f));
+            CreateButton(parent, "Próximo turno", new Vector2(0.50f, 0.30f), AdvanceTurn, new Vector2(260f, 72f));
+
+            CreateText(parent, "Os botões já atualizam o layout e o log, mas as regras completas de mesa ainda não foram implementadas.", 18, new Vector2(0.10f, 0.06f), new Vector2(0.90f, 0.22f), FontStyles.Italic, TextAlignmentOptions.Top);
+        }
+
+        private RectTransform CreateCardView(RectTransform parent, ScienceCardData card, string name)
+        {
+            Color cardColor = card != null && card.CardType == ScienceCardType.Action
+                ? new Color(0.32f, 0.22f, 0.45f, 1f)
+                : new Color(0.20f, 0.31f, 0.42f, 1f);
+            RectTransform cardRect = CreatePanel(parent, name, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), cardColor);
+
+            string title = card?.DisplayName ?? "Carta";
+            string type = card == null ? string.Empty : card.CardType.ToString();
+            string details = card?.ShortDescription ?? string.Empty;
+            if (card is ScienceActionCardData actionCard) details = $"{actionCard.EffectType}\n{actionCard.RulesText}";
+            if (card is ScienceCharacterCardData characterCard) details = $"{characterCard.Field}\n{characterCard.FactCategoryA} + {characterCard.FactCategoryB}";
+
+            CreateText(cardRect, title, 17, new Vector2(0.06f, 0.70f), new Vector2(0.94f, 0.96f), FontStyles.Bold);
+            CreateText(cardRect, type, 14, new Vector2(0.08f, 0.56f), new Vector2(0.92f, 0.70f), FontStyles.Italic);
+            CreateText(cardRect, details, 12, new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.54f), FontStyles.Normal, TextAlignmentOptions.Top);
+            return cardRect;
+        }
+
+        private void DrawCardForCurrentPlayer()
+        {
+            SciencePlayerState currentPlayer = GetCurrentPlayer();
+            if (currentPlayer == null)
+            {
+                AddLog("Não há jogador atual para comprar carta.");
+                BuildGameplayScreen();
+                return;
+            }
+
+            ScienceCardData card = deckManager?.DrawCard();
+            if (card == null)
+            {
+                AddLog("Deck vazio: nenhuma carta comprada.");
+                BuildGameplayScreen();
+                return;
+            }
+
+            currentPlayer.AddToHand(card);
+            AddLog($"{currentPlayer.DisplayName} comprou {card.DisplayName} ({card.CardType}).");
+            BuildGameplayScreen();
+        }
+
+        private void AdvanceTurn()
+        {
+            turnManager?.AdvanceTurn();
+            AddLog($"Turno {turnManager?.TurnNumber ?? 0}: vez de {GetCurrentPlayerName()}.");
+            BuildGameplayScreen();
+        }
+
+        private void AddPlaceholderAction(string message)
+        {
+            AddLog(message);
+            BuildGameplayScreen();
+        }
+
         private void SelectPlayerCount(int playerCount)
         {
             selectedPlayerCount = Mathf.Clamp(playerCount, 2, 4);
@@ -118,41 +276,58 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             }
         }
 
-        private string BuildDistributionSummary()
+        private string BuildScoreLine()
         {
-            int playerCount = state?.Players?.Count ?? 0;
-            int deckCount = deckManager?.DrawPile?.Count ?? 0;
-            int turn = turnManager?.TurnNumber ?? 0;
-            int handSize = state?.InitialHandSize ?? 0;
-            return $"{playerCount} jogadores inicializados. Cada jogador recebeu {handSize} cartas. Cartas restantes no deck: {deckCount}. Turno inicial: {turn}.";
-        }
+            if (state == null || state.Players.Count == 0) return "Pontuação: sem jogadores";
 
-        private string BuildCurrentPlayerHandText()
-        {
-            if (state == null || state.Players.Count == 0) return "Nenhuma mão disponível.";
-
-            int currentPlayerIndex = Mathf.Clamp(turnManager?.CurrentPlayerIndex ?? 0, 0, state.Players.Count - 1);
-            SciencePlayerState currentPlayer = state.Players[currentPlayerIndex];
-            int characterCount = CountCardsOfType(currentPlayer, ScienceCardType.Character);
-            int actionCount = CountCardsOfType(currentPlayer, ScienceCardType.Action);
-
-            string handText = $"Mão atual: {currentPlayer.DisplayName}\n{currentPlayer.Hand.Count} cartas ({characterCount} personagens, {actionCount} ações)";
-            if (!state.DebugRevealAllHands)
-            {
-                handText += "\n" + FormatHand(currentPlayer);
-                handText += "\n\nOutras mãos permanecem ocultas. Ative debugRevealAllHands para revelar todas nos logs.";
-                return handText;
-            }
-
-            handText += "\n" + FormatHand(currentPlayer);
+            string text = "Pontuação:";
             for (int i = 0; i < state.Players.Count; i++)
             {
-                if (i == currentPlayerIndex) continue;
                 SciencePlayerState player = state.Players[i];
-                handText += $"\n\n{player.DisplayName}: {player.Hand.Count} cartas\n{FormatHand(player)}";
+                if (player == null) continue;
+                text += $"  {player.DisplayName}: {player.Score}";
             }
 
-            return handText;
+            return text;
+        }
+
+        private string BuildRecentActionLog()
+        {
+            if (recentActions.Count == 0) return "Nenhuma ação registrada ainda.";
+
+            string text = string.Empty;
+            for (int i = recentActions.Count - 1; i >= 0; i--)
+            {
+                text += $"• {recentActions[i]}";
+                if (i > 0) text += "\n\n";
+            }
+
+            return text;
+        }
+
+        private string GetCurrentPlayerName()
+        {
+            SciencePlayerState player = GetCurrentPlayer();
+            return player?.DisplayName ?? "sem jogador";
+        }
+
+        private SciencePlayerState GetCurrentPlayer()
+        {
+            if (state == null || state.Players.Count == 0) return null;
+            int currentPlayerIndex = Mathf.Clamp(turnManager?.CurrentPlayerIndex ?? 0, 0, state.Players.Count - 1);
+            return state.Players[currentPlayerIndex];
+        }
+
+        private void AddLog(string message)
+        {
+            if (string.IsNullOrEmpty(message)) return;
+            recentActions.Add(message);
+            while (recentActions.Count > MaxLogEntries)
+            {
+                recentActions.RemoveAt(0);
+            }
+
+            telemetry?.LogEvent("science_ui_action_log", message);
         }
 
         private static int CountCardsOfType(SciencePlayerState player, ScienceCardType cardType)
@@ -167,23 +342,6 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             return count;
         }
 
-        private static string FormatHand(SciencePlayerState player)
-        {
-            if (player == null || player.Hand.Count == 0) return "Sem cartas.";
-
-            string text = string.Empty;
-            for (int i = 0; i < player.Hand.Count; i++)
-            {
-                ScienceCardData card = player.Hand[i];
-                if (card == null) continue;
-                text += $"• {card.DisplayName} [{card.CardType}]";
-                if (card is ScienceActionCardData actionCard) text += $" — {actionCard.EffectType}";
-                if (i < player.Hand.Count - 1) text += "\n";
-            }
-
-            return text;
-        }
-
         private static void ClearChildren(Transform parent)
         {
             if (parent == null) return;
@@ -191,11 +349,31 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             {
                 GameObject child = parent.GetChild(i).gameObject;
                 child.SetActive(false);
-                Object.Destroy(child);
+                UnityEngine.Object.Destroy(child);
             }
         }
 
+        private static RectTransform CreatePanel(RectTransform parent, string name, Vector2 anchorMin, Vector2 anchorMax, Color color)
+        {
+            GameObject panel = new GameObject(name, typeof(RectTransform), typeof(Image));
+            RectTransform rect = panel.GetComponent<RectTransform>();
+            rect.SetParent(parent, false);
+            rect.anchorMin = anchorMin;
+            rect.anchorMax = anchorMax;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+
+            Image image = panel.GetComponent<Image>();
+            image.color = color;
+            return rect;
+        }
+
         private static TextMeshProUGUI CreateText(RectTransform parent, string value, int size, Vector2 anchorMin, Vector2 anchorMax, FontStyles style)
+        {
+            return CreateText(parent, value, size, anchorMin, anchorMax, style, TextAlignmentOptions.Center);
+        }
+
+        private static TextMeshProUGUI CreateText(RectTransform parent, string value, int size, Vector2 anchorMin, Vector2 anchorMax, FontStyles style, TextAlignmentOptions alignment)
         {
             GameObject go = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
             RectTransform rect = go.GetComponent<RectTransform>();
@@ -209,7 +387,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             text.text = value;
             text.fontSize = size;
             text.fontStyle = style;
-            text.alignment = TextAlignmentOptions.Center;
+            text.alignment = alignment;
             text.color = Color.white;
             text.enableWordWrapping = true;
             text.raycastTarget = false;
@@ -247,7 +425,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             TextMeshProUGUI text = labelObject.GetComponent<TextMeshProUGUI>();
             text.text = label;
-            text.fontSize = size.x < 300f ? 24 : 34;
+            text.fontSize = size.x < 300f ? 20 : 34;
             text.fontStyle = FontStyles.Bold;
             text.alignment = TextAlignmentOptions.Center;
             text.color = Color.white;
