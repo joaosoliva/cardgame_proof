@@ -1380,6 +1380,7 @@ namespace CardgameProof.Core
             winScreenView.Hide();
             if (sceneRoot?.FullScreenRoot == null) return;
             for (int i = sceneRoot.FullScreenRoot.childCount - 1; i >= 0; i--) Destroy(sceneRoot.FullScreenRoot.GetChild(i).gameObject);
+            sceneRoot.Build();
             mainMenuRoot = null;
             SetPhase(GamePhase.MainMenu);
             InitializeMainMenu(sceneRoot);
