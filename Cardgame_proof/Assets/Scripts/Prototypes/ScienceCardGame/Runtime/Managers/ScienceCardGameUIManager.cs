@@ -24,6 +24,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         private ScienceTelemetryManager telemetry;
         private GameObject root;
         private GameObject cardDetailModal;
+        private GameObject debugLogModal;
         private TextMeshProUGUI selectedPlayerCountText;
         private int selectedPlayerCount = 2;
         private int activeVotingPlayerIndex = -1;
@@ -85,6 +86,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         public void Cleanup()
         {
             CloseCardDetailsModal();
+            CloseDebugLogModal();
             if (root != null)
             {
                 root.SetActive(false);
@@ -135,6 +137,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         private void BuildGameplayScreen()
         {
             CloseCardDetailsModal();
+            CloseDebugLogModal();
             RectTransform screen = root.GetComponent<RectTransform>();
             ClearChildren(root.transform);
 
@@ -145,25 +148,22 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             }
 
             RectTransform topBar = CreatePanel(screen, "TopBar", new Vector2(0.02f, 0.88f), new Vector2(0.98f, 0.98f), new Color(0.10f, 0.13f, 0.18f, 0.96f));
-            RectTransform logPanel = CreatePanel(screen, "LogPanel", new Vector2(0.02f, 0.02f), new Vector2(0.20f, 0.86f), new Color(0.08f, 0.10f, 0.14f, 0.96f));
-            RectTransform boardPanel = CreatePanel(screen, "BoardPanel", new Vector2(0.22f, 0.28f), new Vector2(0.78f, 0.86f), new Color(0.12f, 0.20f, 0.17f, 0.96f));
-            RectTransform handPanel = CreatePanel(screen, "CurrentPlayerHandPanel", new Vector2(0.22f, 0.02f), new Vector2(0.78f, 0.25f), new Color(0.11f, 0.12f, 0.18f, 0.96f));
-            RectTransform actionPanel = CreatePanel(screen, "TurnActionPanel", new Vector2(0.80f, 0.02f), new Vector2(0.98f, 0.86f), new Color(0.09f, 0.11f, 0.16f, 0.96f));
+            RectTransform boardPanel = CreatePanel(screen, "BoardPanel", new Vector2(0.02f, 0.31f), new Vector2(0.98f, 0.86f), new Color(0.12f, 0.20f, 0.17f, 0.96f));
+            RectTransform handPanel = CreatePanel(screen, "CurrentPlayerHandPanel", new Vector2(0.02f, 0.02f), new Vector2(0.98f, 0.29f), new Color(0.11f, 0.12f, 0.18f, 0.96f));
 
             BuildTopBar(topBar);
-            BuildLogPanel(logPanel);
             BuildBoardPanel(boardPanel);
             BuildHandPanel(handPanel);
-            BuildActionPanel(actionPanel);
+            BuildContextualTurnPanel(screen);
         }
 
         private void BuildTopBar(RectTransform parent)
         {
-            CreateText(parent, "Protótipo: Jogo de Cartas Científico", 28, new Vector2(0.02f, 0.10f), new Vector2(0.32f, 0.90f), FontStyles.Bold, TextAlignmentOptions.Left);
-            CreateText(parent, $"Jogador atual: {GetCurrentPlayerName()}  |  Turno {turnManager?.TurnNumber ?? 0}", 25, new Vector2(0.33f, 0.34f), new Vector2(0.58f, 0.90f), FontStyles.Bold);
-            CreateText(parent, BuildTurnInstruction(), 18, new Vector2(0.33f, 0.08f), new Vector2(0.58f, 0.34f), FontStyles.Italic);
-            CreateText(parent, BuildScoreLine(), 22, new Vector2(0.59f, 0.10f), new Vector2(0.82f, 0.90f), FontStyles.Normal, TextAlignmentOptions.Left);
-            CreateButton(parent, "Back to Prototype Selection", new Vector2(0.91f, 0.50f), () => context?.ReturnToSelector?.Invoke(), new Vector2(280f, 62f));
+            CreateText(parent, $"{GetCurrentPlayerName()}  |  Turno {turnManager?.TurnNumber ?? 0}", 30, new Vector2(0.02f, 0.42f), new Vector2(0.28f, 0.92f), FontStyles.Bold, TextAlignmentOptions.Left);
+            CreateText(parent, BuildTurnInstruction(), 22, new Vector2(0.02f, 0.08f), new Vector2(0.46f, 0.42f), FontStyles.Italic, TextAlignmentOptions.Left);
+            CreateText(parent, BuildScoreLine(), 24, new Vector2(0.48f, 0.12f), new Vector2(0.80f, 0.90f), FontStyles.Normal, TextAlignmentOptions.Left);
+            CreateButton(parent, "Debug", new Vector2(0.85f, 0.50f), OpenDebugLogModal, new Vector2(150f, 62f));
+            CreateButton(parent, "Menu", new Vector2(0.94f, 0.50f), () => context?.ReturnToSelector?.Invoke(), new Vector2(150f, 62f));
         }
 
         private void BuildLogPanel(RectTransform parent)
@@ -174,10 +174,10 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
         private void BuildBoardPanel(RectTransform parent)
         {
-            CreateText(parent, "Área Central do Tabuleiro", 28, new Vector2(0.04f, 0.92f), new Vector2(0.96f, 0.99f), FontStyles.Bold);
-            CreateText(parent, "Primeira personagem: perto do centro. Depois: adjacente a outra personagem.", 17, new Vector2(0.04f, 0.85f), new Vector2(0.96f, 0.91f), FontStyles.Italic);
+            CreateText(parent, "Tabuleiro", 30, new Vector2(0.03f, 0.91f), new Vector2(0.32f, 0.99f), FontStyles.Bold, TextAlignmentOptions.Left);
+            CreateText(parent, "Toque em um espaço válido para posicionar a carta selecionada.", 21, new Vector2(0.34f, 0.90f), new Vector2(0.97f, 0.99f), FontStyles.Italic, TextAlignmentOptions.Right);
 
-            RectTransform grid = CreatePanel(parent, "BoardGrid", new Vector2(0.04f, 0.04f), new Vector2(0.96f, 0.83f), new Color(0.06f, 0.12f, 0.10f, 0.92f));
+            RectTransform grid = CreatePanel(parent, "BoardGrid", new Vector2(0.02f, 0.04f), new Vector2(0.98f, 0.88f), new Color(0.06f, 0.12f, 0.10f, 0.92f));
             int columns = Mathf.Max(1, state?.BoardSize.x ?? 7);
             int rows = Mathf.Max(1, state?.BoardSize.y ?? 7);
 
@@ -261,7 +261,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         {
             SciencePlayerState currentPlayer = GetCurrentPlayer();
             string title = currentPlayer == null ? "Mão do jogador" : $"Mão de {currentPlayer.DisplayName}";
-            CreateText(parent, title, 25, new Vector2(0.03f, 0.78f), new Vector2(0.34f, 0.96f), FontStyles.Bold, TextAlignmentOptions.Left);
+            CreateText(parent, title, 30, new Vector2(0.03f, 0.80f), new Vector2(0.34f, 0.97f), FontStyles.Bold, TextAlignmentOptions.Left);
 
             if (currentPlayer == null || currentPlayer.Hand.Count == 0)
             {
@@ -271,9 +271,9 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             int characterCount = CountCardsOfType(currentPlayer, ScienceCardType.Character);
             int actionCount = CountCardsOfType(currentPlayer, ScienceCardType.Action);
-            CreateText(parent, $"{currentPlayer.Hand.Count} cartas: {characterCount} personagens, {actionCount} ações", 19, new Vector2(0.36f, 0.80f), new Vector2(0.96f, 0.95f), FontStyles.Normal, TextAlignmentOptions.Right);
+            CreateText(parent, $"{currentPlayer.Hand.Count} cartas: {characterCount} personagens, {actionCount} ações", 23, new Vector2(0.36f, 0.80f), new Vector2(0.96f, 0.96f), FontStyles.Normal, TextAlignmentOptions.Right);
 
-            RectTransform cardRow = CreatePanel(parent, "CurrentPlayerHandCards", new Vector2(0.03f, 0.06f), new Vector2(0.97f, 0.76f), new Color(0.06f, 0.07f, 0.11f, 0.55f));
+            RectTransform cardRow = CreatePanel(parent, "CurrentPlayerHandCards", new Vector2(0.03f, 0.06f), new Vector2(0.97f, 0.78f), new Color(0.06f, 0.07f, 0.11f, 0.55f));
             int cardCount = currentPlayer.Hand.Count;
             for (int i = 0; i < cardCount; i++)
             {
@@ -283,27 +283,49 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                 cardRect.anchorMin = new Vector2(center, 0.50f);
                 cardRect.anchorMax = new Vector2(center, 0.50f);
                 cardRect.pivot = new Vector2(0.5f, 0.5f);
-                cardRect.sizeDelta = new Vector2(150f, 142f);
+                cardRect.sizeDelta = new Vector2(190f, 170f);
                 cardRect.anchoredPosition = Vector2.zero;
             }
         }
 
+        private void BuildContextualTurnPanel(RectTransform screen)
+        {
+            ScienceTurnStep step = turnManager?.CurrentStep ?? ScienceTurnStep.AwaitingCardSelection;
+            if (step == ScienceTurnStep.AwaitingCardSelection) return;
+
+            Vector2 anchorMin = new Vector2(0.25f, 0.32f);
+            Vector2 anchorMax = new Vector2(0.75f, 0.66f);
+            if (step == ScienceTurnStep.ConnectionExplanation || step == ScienceTurnStep.Scoring || step == ScienceTurnStep.ActionResolution)
+            {
+                anchorMin = new Vector2(0.22f, 0.18f);
+                anchorMax = new Vector2(0.78f, 0.84f);
+            }
+            else if (step == ScienceTurnStep.TurnResolved)
+            {
+                anchorMin = new Vector2(0.32f, 0.34f);
+                anchorMax = new Vector2(0.68f, 0.56f);
+            }
+
+            RectTransform contextualPanel = CreatePanel(screen, "ContextualTurnPanel", anchorMin, anchorMax, new Color(0.08f, 0.10f, 0.14f, 0.97f));
+            BuildActionPanel(contextualPanel);
+        }
+
         private void BuildActionPanel(RectTransform parent)
         {
-            CreateText(parent, "Ações do Turno", 27, new Vector2(0.08f, 0.91f), new Vector2(0.92f, 0.98f), FontStyles.Bold);
-            CreateText(parent, $"Deck: {deckManager?.DrawPile?.Count ?? 0}\nDescarte: {deckManager?.DiscardPile?.Count ?? 0}", 21, new Vector2(0.10f, 0.80f), new Vector2(0.90f, 0.89f), FontStyles.Normal);
-            CreateText(parent, BuildSelectedCardText(), 18, new Vector2(0.08f, 0.66f), new Vector2(0.92f, 0.78f), FontStyles.Normal, TextAlignmentOptions.Top);
+            CreateText(parent, "Próxima ação", 31, new Vector2(0.08f, 0.90f), new Vector2(0.92f, 0.98f), FontStyles.Bold);
+            CreateText(parent, $"Deck: {deckManager?.DrawPile?.Count ?? 0}  |  Descarte: {deckManager?.DiscardPile?.Count ?? 0}", 22, new Vector2(0.10f, 0.82f), new Vector2(0.90f, 0.89f), FontStyles.Normal);
+            CreateText(parent, BuildSelectedCardText(), 22, new Vector2(0.08f, 0.66f), new Vector2(0.92f, 0.80f), FontStyles.Normal, TextAlignmentOptions.Top);
 
             ScienceTurnStep step = turnManager?.CurrentStep ?? ScienceTurnStep.AwaitingCardSelection;
             if (step == ScienceTurnStep.AwaitingBoardSlot || step == ScienceTurnStep.AwaitingPlacementConfirmation)
             {
-                CreateButton(parent, "Girar esquerda", new Vector2(0.50f, 0.58f), RotateSelectedCardLeft, new Vector2(260f, 58f));
-                CreateButton(parent, "Girar direita", new Vector2(0.50f, 0.49f), RotateSelectedCardRight, new Vector2(260f, 58f));
+                CreateButton(parent, "Girar esquerda", new Vector2(0.35f, 0.56f), RotateSelectedCardLeft, new Vector2(280f, 72f));
+                CreateButton(parent, "Girar direita", new Vector2(0.65f, 0.56f), RotateSelectedCardRight, new Vector2(280f, 72f));
             }
 
             if (step == ScienceTurnStep.AwaitingPlacementConfirmation)
             {
-                CreateButton(parent, "Confirmar posição", new Vector2(0.50f, 0.38f), ConfirmPlacement, new Vector2(260f, 68f));
+                CreateButton(parent, "Confirmar posição", new Vector2(0.50f, 0.40f), ConfirmPlacement, new Vector2(340f, 82f));
             }
 
             if (step == ScienceTurnStep.ConnectionExplanation)
@@ -323,15 +345,15 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             if (step == ScienceTurnStep.AwaitingBoardSlot || step == ScienceTurnStep.AwaitingPlacementConfirmation)
             {
-                CreateButton(parent, "Cancelar seleção", new Vector2(0.50f, 0.28f), CancelSelection, new Vector2(260f, 58f));
+                CreateButton(parent, "Cancelar seleção", new Vector2(0.50f, 0.22f), CancelSelection, new Vector2(320f, 72f));
             }
 
             if (step == ScienceTurnStep.TurnResolved)
             {
-                CreateButton(parent, "Encerrar turno", new Vector2(0.50f, 0.42f), EndTurn, new Vector2(260f, 78f));
+                CreateButton(parent, "Encerrar turno", new Vector2(0.50f, 0.45f), EndTurn, new Vector2(360f, 92f));
             }
 
-            CreateText(parent, BuildTurnHelpText(), 18, new Vector2(0.10f, 0.06f), new Vector2(0.90f, 0.30f), FontStyles.Italic, TextAlignmentOptions.Top);
+            CreateText(parent, BuildTurnHelpText(), 21, new Vector2(0.10f, 0.04f), new Vector2(0.90f, 0.18f), FontStyles.Italic, TextAlignmentOptions.Top);
         }
 
         private RectTransform CreateCardView(RectTransform parent, ScienceCardData card, string name)
@@ -821,6 +843,38 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         {
             if (boardManager?.BoardCards == null) return null;
             return boardManager.BoardCards.TryGetValue(coordinate, out ScienceCardData card) ? card : null;
+        }
+
+        private void OpenDebugLogModal()
+        {
+            if (root == null) return;
+
+            CloseDebugLogModal();
+            RectTransform parent = root.GetComponent<RectTransform>();
+            debugLogModal = new GameObject("DebugLogModal", typeof(RectTransform), typeof(Image));
+            RectTransform overlay = debugLogModal.GetComponent<RectTransform>();
+            overlay.SetParent(parent, false);
+            overlay.anchorMin = Vector2.zero;
+            overlay.anchorMax = Vector2.one;
+            overlay.offsetMin = Vector2.zero;
+            overlay.offsetMax = Vector2.zero;
+
+            Image overlayImage = debugLogModal.GetComponent<Image>();
+            overlayImage.color = new Color(0f, 0f, 0f, 0.62f);
+            overlayImage.raycastTarget = true;
+
+            RectTransform panel = CreatePanel(overlay, "DebugLogPanel", new Vector2(0.20f, 0.14f), new Vector2(0.80f, 0.86f), new Color(0.08f, 0.10f, 0.14f, 0.98f));
+            CreateText(panel, "Debug Log", 36, new Vector2(0.06f, 0.88f), new Vector2(0.94f, 0.97f), FontStyles.Bold);
+            CreateText(panel, BuildRecentActionLog(), 24, new Vector2(0.08f, 0.20f), new Vector2(0.92f, 0.84f), FontStyles.Normal, TextAlignmentOptions.TopLeft);
+            CreateButton(panel, "Close", new Vector2(0.50f, 0.10f), CloseDebugLogModal, new Vector2(240f, 76f));
+        }
+
+        private void CloseDebugLogModal()
+        {
+            if (debugLogModal == null) return;
+            debugLogModal.SetActive(false);
+            UnityEngine.Object.Destroy(debugLogModal);
+            debugLogModal = null;
         }
 
         private void OpenCardDetailsModal(ScienceCardData card)
