@@ -43,6 +43,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Data
         public string DisplayName { get; }
         public int Score { get; private set; }
         public bool CitationNeededBonusAvailable { get; private set; }
+        public bool InterdisciplinaryLeapBonusAvailable { get; private set; }
         public SciencePreparedActionState ActivePreparedAction { get; private set; }
         public bool HasActivePreparedAction => ActivePreparedAction != null && !ActivePreparedAction.Consumed && !ActivePreparedAction.Expired;
         public IReadOnlyList<ScienceCardData> Hand => hand;
@@ -77,6 +78,10 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Data
             CitationNeededBonusAvailable = available;
         }
 
+        public void SetInterdisciplinaryLeapBonusAvailable(bool available)
+        {
+            InterdisciplinaryLeapBonusAvailable = available;
+        }
 
         public bool TryPrepareAction(ScienceActionCardData actionCard)
         {
@@ -103,6 +108,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Data
         public void ResetActionModifiers()
         {
             CitationNeededBonusAvailable = false;
+            InterdisciplinaryLeapBonusAvailable = false;
             ActivePreparedAction = null;
         }
 

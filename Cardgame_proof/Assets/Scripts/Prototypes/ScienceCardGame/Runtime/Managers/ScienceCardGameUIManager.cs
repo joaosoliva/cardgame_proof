@@ -33,12 +33,18 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         private int activeVotingPlayerIndex = -1;
         private string activeVotingCardId;
         private SciencePlacementConnectionType activeVotingConnectionType = SciencePlacementConnectionType.Invalid;
+        private bool activeVotingPeerReviewRetryAvailable;
+        private bool activeVotingPeerReviewRetryUsed;
+        private bool pendingPeerReviewRetryDecision;
         private int activeScoringPlayerIndex = -1;
         private string activeScoringCardId;
         private SciencePlacementConnectionType activeScoringConnectionType = SciencePlacementConnectionType.Invalid;
         private bool basePointAwarded;
         private bool interestingBonusAwarded;
         private bool guideFactBonusAwarded;
+        private bool actionBonusAwarded;
+        private string actionBonusLabel;
+        private Action onCardDetailsClosed;
         private Action onRestartPrototype;
 
         public GameObject Root => root;
@@ -90,7 +96,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
         public void Cleanup()
         {
-            CloseCardDetailsModal();
+            CloseCardDetailsModal(false);
             CloseDebugLogModal();
             CloseHandCardContextMenu();
             if (root != null)
@@ -142,7 +148,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
         private void BuildGameplayScreen()
         {
-            CloseCardDetailsModal();
+            CloseCardDetailsModal(false);
             CloseDebugLogModal();
             CloseHandCardContextMenu();
             RectTransform screen = root.GetComponent<RectTransform>();
@@ -209,7 +215,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                     ScienceCardData boardCard = GetBoardCardAt(coordinate);
                     if (boardCard != null)
                     {
-                        ScienceCardView boardCardView = ScienceCardView.Create(slot, $"BoardCard_{x}_{y}", boardCard, ScienceCardViewDisplayMode.Board, OpenCardDetailsModal);
+                        ScienceCardView boardCardView = ScienceCardView.Create(slot, $"BoardCard_{x}_{y}", boardCard, ScienceCardViewDisplayMode.Board, card => OpenCardDetailsModal(card));
                         RectTransform boardCardRect = boardCardView.GetComponent<RectTransform>();
                         boardCardRect.anchorMin = new Vector2(0.5f, 0.5f);
                         boardCardRect.anchorMax = new Vector2(0.5f, 0.5f);
@@ -820,11 +826,10 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                 return;
             }
 
-            TriggerPreparedActionForConnection(currentPlayer, selectedCard, validationResult);
-
             currentPlayer.MarkPlayed(selectedCard);
             turnManager.StartConnectionExplanation();
             StartConnectionVoting(currentPlayer, selectedCard, validationResult?.ConnectionType ?? SciencePlacementConnectionType.Invalid);
+            TriggerPreparedActionForConnection(currentPlayer, selectedCard, validationResult);
             AddLog($"{currentPlayer.DisplayName} colocou {selectedCard.DisplayName} em {FormatBoardCoordinate(coordinate)} com rotação {turnManager.SelectedRotationDegrees}°.");
             if (validationResult != null)
             {
@@ -850,15 +855,21 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             string cardName = selectedCard?.DisplayName ?? "carta colocada";
 
             CreateText(parent, "Votação da conexão", 44, new Vector2(0.06f, 0.84f), new Vector2(0.94f, 0.96f), FontStyles.Bold);
+            if (pendingPeerReviewRetryDecision)
+            {
+                BuildPeerReviewRetryPanel(parent);
+                return;
+            }
+
             string votePrompt = $"{activePlayer?.DisplayName ?? "Jogador ativo"} explicou {cardName}.\n{BuildConnectionTypeLine(activeVotingConnectionType)}\nOs jogadores aceitam essa conexão?";
             if (activeVotingConnectionType == SciencePlacementConnectionType.Interpretive)
             {
                 votePrompt += "\nEssa conexão pode ser contestada. Ouçam a explicação antes de votar.";
             }
 
-            if (state != null && state.PeerReviewRequiresUnanimity)
+            if (activePlayer != null && activePlayer.InterdisciplinaryLeapBonusAvailable)
             {
-                votePrompt += "\nPeer Review ativo: todos precisam votar Sim.";
+                votePrompt += "\nSalto Interdisciplinar pode ser ativado nesta conexão.";
             }
 
             CreateText(parent, votePrompt, 28, new Vector2(0.08f, 0.66f), new Vector2(0.92f, 0.82f), FontStyles.Normal);
@@ -932,20 +943,23 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                 else noVotes++;
             }
 
-            bool peerReviewActive = state != null && state.PeerReviewRequiresUnanimity;
+            bool peerReviewRetryActive = activeVotingPeerReviewRetryAvailable && !activeVotingPeerReviewRetryUsed;
             bool tied = yesVotes == noVotes;
             bool tieAccepted = state?.AcceptTiedConnectionVotes ?? true;
-            bool acceptedByVote = peerReviewActive ? noVotes == 0 : yesVotes > noVotes || (tied && tieAccepted);
+            bool acceptedByVote = yesVotes > noVotes || (tied && tieAccepted);
             string resultText = acceptedByVote ? "aceita" : "rejeitada";
-            string tieText = tied && !peerReviewActive ? $" Empate: {(tieAccepted ? "aceito" : "rejeitado")} pela configuração atual." : string.Empty;
-            string peerReviewText = peerReviewActive ? " Peer Review exigiu unanimidade." : string.Empty;
+            string tieText = tied ? $" Empate: {(tieAccepted ? "aceito" : "rejeitado")} pela configuração atual." : string.Empty;
+            string peerReviewText = peerReviewRetryActive ? " Revisão por Pares pode permitir uma reformulação." : string.Empty;
 
             AddLog($"Conexão {resultText}: {yesVotes} Sim / {noVotes} Não.{tieText}{peerReviewText}");
-            telemetry?.LogEvent("science_connection_vote_resolved", $"turn={turnManager?.TurnNumber ?? 0};activePlayer={activeVotingPlayerIndex};card={activeVotingCardId};connectionType={activeVotingConnectionType};yes={yesVotes};no={noVotes};tied={tied};tieAccepted={tieAccepted};peerReview={peerReviewActive};accepted={acceptedByVote}");
-            if (peerReviewActive)
+            telemetry?.LogEvent("science_connection_vote_resolved", $"turn={turnManager?.TurnNumber ?? 0};activePlayer={activeVotingPlayerIndex};card={activeVotingCardId};connectionType={activeVotingConnectionType};yes={yesVotes};no={noVotes};tied={tied};tieAccepted={tieAccepted};peerReviewRetry={peerReviewRetryActive};retryUsed={activeVotingPeerReviewRetryUsed};accepted={acceptedByVote}");
+
+            if (!acceptedByVote && peerReviewRetryActive)
             {
-                state?.SetPeerReviewRequiresUnanimity(false);
-                telemetry?.LogEvent("science_action_modifier_cleared", $"effect={ScienceActionEffectType.PeerReview};turn={turnManager?.TurnNumber ?? 0};card={activeVotingCardId}");
+                pendingPeerReviewRetryDecision = true;
+                telemetry?.LogEvent("science_peer_review_retry_offered", $"turn={turnManager?.TurnNumber ?? 0};player={activeVotingPlayerIndex};card={activeVotingCardId}");
+                BuildGameplayScreen();
+                return;
             }
 
             if (acceptedByVote)
@@ -968,6 +982,9 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             basePointAwarded = false;
             interestingBonusAwarded = false;
             guideFactBonusAwarded = false;
+            actionBonusAwarded = false;
+            actionBonusLabel = null;
+            ApplyAcceptedConnectionActionBonuses();
             ResetConnectionVoting();
             turnManager?.StartScoring();
             telemetry?.LogEvent("science_scoring_started", $"turn={turnManager?.TurnNumber ?? 0};player={activeScoringPlayerIndex};card={activeScoringCardId};connectionType={activeScoringConnectionType}");
@@ -982,8 +999,9 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             state?.RecordRejectedConnection();
             ClearCitationNeededBonus(activeVotingPlayerIndex, "connection_rejected");
+            ClearInterdisciplinaryLeapBonus(activeVotingPlayerIndex, "connection_rejected");
 
-            if (behavior == ScienceRejectedConnectionBehavior.RetryExplanation)
+            if (behavior == ScienceRejectedConnectionBehavior.RetryExplanation && !activeVotingPeerReviewRetryUsed)
             {
                 AddLog("Conexão rejeitada. O jogador pode tentar explicar novamente.");
                 telemetry?.LogEvent("science_connection_rejected", $"turn={turnManager?.TurnNumber ?? 0};player={activeVotingPlayerIndex};card={activeVotingCardId};behavior={behavior}");
@@ -1012,7 +1030,12 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             if (HasCitationNeededBonus(activeScoringPlayerIndex))
             {
-                scoringDescription += "\nCitation Needed ativo: considere o bônus de guia/fato (+1).";
+                scoringDescription += "\nCitação Necessária ativa: O jogador usou um fato da bio na explicação?";
+            }
+
+            if (actionBonusAwarded)
+            {
+                scoringDescription += $"\n✓ {actionBonusLabel}";
             }
 
             CreateText(parent, scoringDescription, 28, new Vector2(0.08f, 0.66f), new Vector2(0.92f, 0.82f), FontStyles.Normal);
@@ -1037,7 +1060,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             if (!guideFactBonusAwarded)
             {
-                CreateButton(parent, "Bônus guia/fato +1", new Vector2(0.50f, 0.27f), AwardGuideFactBonus, new Vector2(420f, 78f));
+                CreateButton(parent, HasCitationNeededBonus(activeScoringPlayerIndex) ? "Sim: usou fato da bio +1" : "Bônus guia/fato +1", new Vector2(0.50f, 0.27f), AwardGuideFactBonus, new Vector2(420f, 78f));
             }
             else
             {
@@ -1086,8 +1109,9 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                 return;
             }
 
-            telemetry?.LogEvent("science_connection_scoring_completed", $"turn={turnManager?.TurnNumber ?? 0};player={activeScoringPlayerIndex};card={activeScoringCardId};connectionType={activeScoringConnectionType};base={basePointAwarded};interesting={interestingBonusAwarded};guideFact={guideFactBonusAwarded};score={GetPlayerScore(activeScoringPlayerIndex)}");
+            telemetry?.LogEvent("science_connection_scoring_completed", $"turn={turnManager?.TurnNumber ?? 0};player={activeScoringPlayerIndex};card={activeScoringCardId};connectionType={activeScoringConnectionType};base={basePointAwarded};interesting={interestingBonusAwarded};guideFact={guideFactBonusAwarded};actionBonus={actionBonusAwarded};score={GetPlayerScore(activeScoringPlayerIndex)}");
             ClearCitationNeededBonus(activeScoringPlayerIndex, "accepted_connection_scoring_complete");
+            ClearInterdisciplinaryLeapBonus(activeScoringPlayerIndex, "accepted_connection_scoring_complete");
             if (TryShowEndGameIfNeeded(ScienceWinCondition.TargetKnowledgePoints))
             {
                 ResetScoringState();
@@ -1096,6 +1120,50 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             ResetScoringState();
             turnManager?.MarkTurnResolved();
+            BuildGameplayScreen();
+        }
+
+        private void ApplyAcceptedConnectionActionBonuses()
+        {
+            SciencePlayerState player = GetPlayerByIndex(activeScoringPlayerIndex);
+            if (player == null) return;
+
+            if (player.InterdisciplinaryLeapBonusAvailable && activeScoringConnectionType == SciencePlacementConnectionType.Interpretive)
+            {
+                actionBonusAwarded = true;
+                actionBonusLabel = "Salto Interdisciplinar concedeu +1 bônus automático.";
+                scoreManager?.AddScore(activeScoringPlayerIndex, 1, "interdisciplinary_leap_bonus");
+                AddLog($"{player.DisplayName} recebeu +1 por Salto Interdisciplinar em conexão interpretativa aceita.");
+                telemetry?.LogEvent("science_connection_score_awarded", $"turn={turnManager?.TurnNumber ?? 0};player={activeScoringPlayerIndex};card={activeScoringCardId};type=interdisciplinary_leap;amount=1;score={GetPlayerScore(activeScoringPlayerIndex)}");
+            }
+        }
+
+        private void BuildPeerReviewRetryPanel(RectTransform parent)
+        {
+            CreateText(parent, "Revisão por Pares ativada", 42, new Vector2(0.06f, 0.74f), new Vector2(0.94f, 0.86f), FontStyles.Bold);
+            CreateText(parent, "Você pode reformular a explicação e pedir uma nova votação. A segunda votação será final.", 30, new Vector2(0.10f, 0.50f), new Vector2(0.90f, 0.70f), FontStyles.Normal);
+            CreateButton(parent, "Reformular", new Vector2(0.36f, 0.30f), ReformulatePeerReviewConnection, new Vector2(340f, 92f));
+            CreateButton(parent, "Aceitar rejeição", new Vector2(0.64f, 0.30f), AcceptPeerReviewRejection, new Vector2(360f, 92f));
+        }
+
+        private void ReformulatePeerReviewConnection()
+        {
+            pendingPeerReviewRetryDecision = false;
+            activeVotingPeerReviewRetryUsed = true;
+            connectionVotes.Clear();
+            AddLog("Revisão por Pares: reformule a explicação e peça uma segunda votação.");
+            telemetry?.LogEvent("science_peer_review_retry_started", $"turn={turnManager?.TurnNumber ?? 0};player={activeVotingPlayerIndex};card={activeVotingCardId}");
+            BuildGameplayScreen();
+        }
+
+        private void AcceptPeerReviewRejection()
+        {
+            pendingPeerReviewRetryDecision = false;
+            activeVotingPeerReviewRetryAvailable = false;
+            activeVotingPeerReviewRetryUsed = true;
+            AddLog("Revisão por Pares: rejeição aceita sem segunda votação.");
+            telemetry?.LogEvent("science_peer_review_retry_declined", $"turn={turnManager?.TurnNumber ?? 0};player={activeVotingPlayerIndex};card={activeVotingCardId}");
+            ResolveRejectedConnection();
             BuildGameplayScreen();
         }
 
@@ -1138,6 +1206,12 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                 return;
             }
 
+            if (actionCard.EffectType == ScienceActionEffectType.CitationNeeded)
+            {
+                BuildCitationNeededChoicePanel(parent, currentPlayer, actionCard);
+                return;
+            }
+
             CreateText(parent, "Resolver ação", 44, new Vector2(0.06f, 0.84f), new Vector2(0.94f, 0.96f), FontStyles.Bold);
             string preparedWarning = actionCard.TimingType == ScienceActionTimingType.Prepared && currentPlayer.HasActivePreparedAction
                 ? "\n\nVocê já tem uma ação preparada. Cancele ou resolva sua próxima conexão antes de preparar outra."
@@ -1148,8 +1222,100 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             CreateButton(parent, "Cancelar", new Vector2(0.64f, 0.16f), CancelSelection, new Vector2(320f, 88f));
         }
 
+        private void BuildCitationNeededChoicePanel(RectTransform parent, SciencePlayerState currentPlayer, ScienceActionCardData actionCard)
+        {
+            CreateText(parent, "Citação Necessária", 44, new Vector2(0.06f, 0.84f), new Vector2(0.94f, 0.96f), FontStyles.Bold);
+            string body = $"{actionCard.RulesText}\n\nEscolha uma carta para abrir a bio. Ao fechar os detalhes, o bônus ficará preparado para sua próxima conexão.";
+            if (currentPlayer.HasActivePreparedAction)
+            {
+                body += "\n\nVocê já tem uma ação preparada. Resolva sua próxima conexão antes de preparar Citação Necessária.";
+            }
+
+            CreateText(parent, body, 27, new Vector2(0.08f, 0.62f), new Vector2(0.92f, 0.82f), FontStyles.Normal, TextAlignmentOptions.TopLeft);
+
+            List<ScienceCardData> choices = BuildCitationCardChoices(currentPlayer);
+            if (choices.Count == 0)
+            {
+                CreateText(parent, "Nenhuma carta disponível para abrir agora.", 28, new Vector2(0.10f, 0.44f), new Vector2(0.90f, 0.54f), FontStyles.Italic);
+            }
+
+            int maxChoices = Mathf.Min(choices.Count, 4);
+            for (int i = 0; i < maxChoices; i++)
+            {
+                ScienceCardData choice = choices[i];
+                float y = 0.52f - (i * 0.11f);
+                CreateButton(parent, choice.DisplayName, new Vector2(0.50f, y), () => OpenCitationBioChoice(currentPlayer, actionCard, choice), new Vector2(620f, 74f));
+            }
+
+            CreateButton(parent, "Cancelar", new Vector2(0.50f, 0.12f), CancelSelection, new Vector2(320f, 82f));
+        }
+
+        private List<ScienceCardData> BuildCitationCardChoices(SciencePlayerState currentPlayer)
+        {
+            List<ScienceCardData> choices = new List<ScienceCardData>();
+            if (currentPlayer != null)
+            {
+                for (int i = 0; i < currentPlayer.Hand.Count; i++)
+                {
+                    ScienceCardData card = currentPlayer.Hand[i];
+                    if (card != null && card.CardType == ScienceCardType.Character) choices.Add(card);
+                }
+            }
+
+            if (boardManager?.BoardCards != null)
+            {
+                foreach (ScienceCardData card in boardManager.BoardCards.Values)
+                {
+                    if (card != null && card.CardType == ScienceCardType.Character && !choices.Contains(card)) choices.Add(card);
+                }
+            }
+
+            return choices;
+        }
+
+        private void OpenCitationBioChoice(SciencePlayerState currentPlayer, ScienceActionCardData actionCard, ScienceCardData chosenCard)
+        {
+            if (currentPlayer == null || actionCard == null || chosenCard == null) return;
+            if (currentPlayer.HasActivePreparedAction)
+            {
+                AddLog("Você já tem uma ação preparada.");
+                telemetry?.LogEvent("science_action_prepare_blocked", $"turn={turnManager?.TurnNumber ?? 0};player={currentPlayer.PlayerIndex};card={actionCard.Id};active={currentPlayer.ActivePreparedAction?.ActionCard?.Id ?? "none"}");
+                CancelSelection();
+                return;
+            }
+
+            OpenCardDetailsModal(chosenCard, () => CompleteCitationNeededAction(currentPlayer, actionCard, chosenCard));
+        }
+
+        private void CompleteCitationNeededAction(SciencePlayerState currentPlayer, ScienceActionCardData actionCard, ScienceCardData chosenCard)
+        {
+            if (currentPlayer == null || actionCard == null) return;
+            if (!currentPlayer.TryPrepareAction(actionCard))
+            {
+                AddLog("Você já tem uma ação preparada.");
+                CancelSelection();
+                return;
+            }
+
+            currentPlayer.MarkPlayed(actionCard);
+            deckManager?.Discard(actionCard);
+            AddLog($"{currentPlayer.DisplayName} abriu {chosenCard?.DisplayName ?? "uma bio"} e preparou Citação Necessária para a próxima conexão.");
+            telemetry?.LogEvent("science_action_card_resolved", $"turn={turnManager?.TurnNumber ?? 0};player={currentPlayer.PlayerIndex};card={actionCard.Id};effect={actionCard.EffectType};timing={actionCard.TimingType};bioCard={chosenCard?.Id ?? "none"}");
+            telemetry?.LogEvent("science_action_prepared", $"turn={turnManager?.TurnNumber ?? 0};player={currentPlayer.PlayerIndex};card={actionCard.Id};effect={actionCard.EffectType};nextConnectionOnly=true;sourceBio={chosenCard?.Id ?? "none"}");
+            if (TryShowEndGameIfNeeded(ScienceWinCondition.EmptyHand)) return;
+
+            turnManager?.MarkActionPlayedAndContinue();
+            BuildGameplayScreen();
+        }
+
         private bool ResolveImmediateAction(SciencePlayerState currentPlayer, ScienceActionCardData actionCard)
         {
+            if (actionCard.EffectType == ScienceActionEffectType.CitationNeeded)
+            {
+                AddLog("Escolha uma carta para abrir a bio antes de preparar Citação Necessária.");
+                return false;
+            }
+
             AddLog($"{actionCard.DisplayName} resolveu imediatamente.");
             telemetry?.LogEvent("science_action_immediate_resolved", $"turn={turnManager?.TurnNumber ?? 0};player={currentPlayer.PlayerIndex};card={actionCard.Id};effect={actionCard.EffectType}");
             return true;
@@ -1184,15 +1350,25 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             switch (actionCard.EffectType)
             {
                 case ScienceActionEffectType.PeerReview:
-                    state?.SetPeerReviewRequiresUnanimity(true);
-                    AddLog("Revisão por Pares ativada: a votação desta conexão precisa de unanimidade.");
+                    activeVotingPeerReviewRetryAvailable = true;
+                    activeVotingPeerReviewRetryUsed = false;
+                    pendingPeerReviewRetryDecision = false;
+                    AddLog("Revisão por Pares preparada: se esta conexão for recusada, você poderá pedir uma segunda votação.");
                     break;
                 case ScienceActionEffectType.CitationNeeded:
                     currentPlayer.SetCitationNeededBonusAvailable(true);
-                    AddLog($"Citação Necessária ativada para {currentPlayer.DisplayName}: se aceita, esta conexão destacará o bônus de guia/fato.");
+                    AddLog($"Citação Necessária ativada para {currentPlayer.DisplayName}: se aceita, pergunte se um fato da bio foi usado.");
                     break;
                 case ScienceActionEffectType.InterdisciplinaryLeap:
-                    AddLog("Salto Interdisciplinar ativado: defenda uma ligação criativa entre áreas; o consenso do grupo decide.");
+                    if (validationResult != null && validationResult.ConnectionType == SciencePlacementConnectionType.Interpretive)
+                    {
+                        currentPlayer.SetInterdisciplinaryLeapBonusAvailable(true);
+                        AddLog("Salto Interdisciplinar pode ser ativado nesta conexão.");
+                    }
+                    else
+                    {
+                        AddLog("Salto Interdisciplinar foi consumido, mas a conexão não era interpretativa.");
+                    }
                     break;
             }
 
@@ -1219,11 +1395,11 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             switch (effectType)
             {
                 case ScienceActionEffectType.PeerReview:
-                    return "prepara Revisão por Pares: a próxima votação de conexão deste jogador exige unanimidade.";
+                    return "prepara Revisão por Pares: se a próxima conexão for recusada, permite uma segunda votação.";
                 case ScienceActionEffectType.CitationNeeded:
-                    return "prepara Citação Necessária: a próxima conexão aceita lembra o bônus de guia/fato.";
+                    return "ação imediata: abre uma bio e prepara um bônus se o fato for usado na próxima explicação aceita.";
                 case ScienceActionEffectType.InterdisciplinaryLeap:
-                    return "prepara Salto Interdisciplinar: a próxima conexão sinaliza uma defesa criativa entre áreas.";
+                    return "prepara Salto Interdisciplinar: a próxima conexão interpretativa aceita concede +1 automático.";
                 default:
                     return "efeito de teste sem resolução adicional.";
             }
@@ -1241,6 +1417,15 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             player.SetCitationNeededBonusAvailable(false);
             telemetry?.LogEvent("science_action_modifier_cleared", $"player={playerIndex};effect={ScienceActionEffectType.CitationNeeded};reason={reason}");
+        }
+
+        private void ClearInterdisciplinaryLeapBonus(int playerIndex, string reason)
+        {
+            SciencePlayerState player = GetPlayerByIndex(playerIndex);
+            if (player == null || !player.InterdisciplinaryLeapBonusAvailable) return;
+
+            player.SetInterdisciplinaryLeapBonusAvailable(false);
+            telemetry?.LogEvent("science_action_modifier_cleared", $"player={playerIndex};effect={ScienceActionEffectType.InterdisciplinaryLeap};reason={reason}");
         }
 
         private void CancelSelection()
@@ -1262,7 +1447,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             if (root == null) return;
 
             CloseDebugLogModal();
-            CloseCardDetailsModal();
+            CloseCardDetailsModal(false);
             CloseHandCardContextMenu();
             RectTransform parent = root.GetComponent<RectTransform>();
             debugLogModal = new GameObject("DebugLogModal", typeof(RectTransform), typeof(Image));
@@ -1291,11 +1476,12 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             debugLogModal = null;
         }
 
-        private void OpenCardDetailsModal(ScienceCardData card)
+        private void OpenCardDetailsModal(ScienceCardData card, Action onClosed = null)
         {
             if (card == null || root == null) return;
 
-            CloseCardDetailsModal();
+            CloseCardDetailsModal(false);
+            onCardDetailsClosed = onClosed;
             CloseDebugLogModal();
             CloseHandCardContextMenu();
             RectTransform parent = root.GetComponent<RectTransform>();
@@ -1321,7 +1507,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             zoomRect.anchoredPosition = Vector2.zero;
 
             CreateText(panel, BuildCardDetailText(card), 24, new Vector2(0.55f, 0.26f), new Vector2(0.92f, 0.82f), FontStyles.Normal, TextAlignmentOptions.TopLeft);
-            CreateButton(panel, "Close", new Vector2(0.74f, 0.14f), CloseCardDetailsModal, new Vector2(220f, 70f));
+            CreateButton(panel, "Close", new Vector2(0.74f, 0.14f), () => CloseCardDetailsModal(), new Vector2(220f, 70f));
 
             telemetry?.LogEvent("science_card_zoom_opened", $"card={card.Id};type={card.CardType}");
             if (card is ScienceCharacterCardData characterCard)
@@ -1330,12 +1516,15 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             }
         }
 
-        private void CloseCardDetailsModal()
+        private void CloseCardDetailsModal(bool invokeCallback = true)
         {
             if (cardDetailModal == null) return;
+            Action callback = invokeCallback ? onCardDetailsClosed : null;
+            onCardDetailsClosed = null;
             cardDetailModal.SetActive(false);
             UnityEngine.Object.Destroy(cardDetailModal);
             cardDetailModal = null;
+            callback?.Invoke();
         }
 
         private static string BuildCardDetailText(ScienceCardData card)
@@ -1449,7 +1638,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         private void BuildEndGameScreen(RectTransform screen, IReadOnlyList<SciencePlayerState> winners, ScienceWinCondition winCondition)
         {
             if (screen == null) return;
-            CloseCardDetailsModal();
+            CloseCardDetailsModal(false);
             ClearChildren(screen);
 
             RectTransform overlay = CreatePanel(screen, "EndGameModalOverlay", Vector2.zero, Vector2.one, new Color(0f, 0f, 0f, 0.68f));
@@ -1799,6 +1988,9 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             activeVotingPlayerIndex = -1;
             activeVotingCardId = null;
             activeVotingConnectionType = SciencePlacementConnectionType.Invalid;
+            activeVotingPeerReviewRetryAvailable = false;
+            activeVotingPeerReviewRetryUsed = false;
+            pendingPeerReviewRetryDecision = false;
         }
 
         private void ResetScoringState()
@@ -1809,6 +2001,8 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             basePointAwarded = false;
             interestingBonusAwarded = false;
             guideFactBonusAwarded = false;
+            actionBonusAwarded = false;
+            actionBonusLabel = null;
         }
 
         private string GetCurrentPlayerName()

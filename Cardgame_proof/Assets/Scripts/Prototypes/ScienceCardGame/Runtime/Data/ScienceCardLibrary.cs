@@ -91,24 +91,24 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Data
                 new ScienceActionCardData(
                     "action_peer_review",
                     "Revisão por Pares",
-                    "Prepare: a próxima votação de conexão deste jogador precisa de unanimidade.",
+                    "Prepare: se sua próxima conexão for recusada, você pode pedir uma segunda votação.",
                     ScienceActionEffectType.PeerReview,
                     ScienceActionTimingType.Prepared,
-                    "Ação preparada. Jogue durante seu turno; ela fica ativa até sua próxima conexão. Quando você colocar uma carta de personagem, a votação dessa conexão exigirá unanimidade."),
+                    "Prepare esta ação. Se sua próxima conexão for recusada, você pode reformular a explicação e pedir uma segunda votação."),
                 new ScienceActionCardData(
                     "action_citation_needed",
                     "Citação Necessária",
-                    "Prepare: sua próxima conexão aceita destaca o bônus de guia/fato.",
+                    "Abra uma bio; se usar um fato dela na próxima explicação aceita, ganhe +1.",
                     ScienceActionEffectType.CitationNeeded,
-                    ScienceActionTimingType.Prepared,
-                    "Ação preparada. Jogue durante seu turno; ela fica ativa até sua próxima conexão. Se a conexão for aceita, o painel de pontuação lembrará o grupo de considerar +1 por uso de fato específico ou guia."),
+                    ScienceActionTimingType.Immediate,
+                    "Abra a bio de uma carta. Se você usar um fato dessa bio na sua próxima explicação e o grupo aceitar, ganhe +1 ponto bônus."),
                 new ScienceActionCardData(
                     "action_interdisciplinary_leap",
                     "Salto Interdisciplinar",
-                    "Prepare: sua próxima conexão pode defender uma ligação ousada entre áreas.",
+                    "Prepare: na próxima conexão entre cores diferentes aceita, ganhe +1 bônus.",
                     ScienceActionEffectType.InterdisciplinaryLeap,
                     ScienceActionTimingType.Prepared,
-                    "Ação preparada. Jogue durante seu turno; ela fica ativa até sua próxima conexão. Use-a para sinalizar que você tentará explicar uma ligação criativa entre áreas diferentes; o consenso do grupo continua decidindo.")
+                    "Prepare esta ação. Na sua próxima conexão entre cores diferentes, se o grupo aceitar sua explicação, ganhe +1 ponto bônus.")
             };
         }
     }
