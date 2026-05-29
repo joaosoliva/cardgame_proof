@@ -610,7 +610,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         {
             ScienceCardView view = ScienceCardView.Create(parent, name, card, ScienceCardViewDisplayMode.Hand);
             RectTransform cardRect = view.GetComponent<RectTransform>();
-            if (turnManager != null && turnManager.CurrentStep == ScienceTurnStep.AwaitingCardSelection)
+            if (CanOpenHandCardContextMenu(card))
             {
                 view.SetOnSelected(selectedCard => ShowHandCardContextMenu(selectedCard, cardRect));
             }
@@ -645,14 +645,57 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             closeButton.onClick.AddListener(CloseHandCardContextMenu);
 
             RectTransform menuPanel = CreatePanel(menuRoot, "HandCardContextPanel", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Color(0.06f, 0.08f, 0.12f, 0.98f));
-            Vector2 menuSize = ScaleVector(new Vector2(460f, 132f));
+            Vector2 menuSize = ScaleVector(new Vector2(500f, 154f));
             menuPanel.pivot = new Vector2(0.5f, 0.5f);
             menuPanel.sizeDelta = menuSize;
             menuPanel.anchoredPosition = ResolveContextMenuPosition(rootRect, cardRect, menuSize);
 
-            CreateText(menuPanel, card.DisplayName, 22, new Vector2(0.05f, 0.66f), new Vector2(0.95f, 0.96f), FontStyles.Bold, TextAlignmentOptions.Center);
-            CreateButton(menuPanel, "Abrir", new Vector2(0.28f, 0.34f), () => OpenContextCardDetails(card), new Vector2(190f, 76f));
-            CreateButton(menuPanel, "Escolher", new Vector2(0.72f, 0.34f), () => ChooseContextCard(card), new Vector2(210f, 76f));
+            bool canChoose = IsCardPlayableNow(card);
+            CreateText(menuPanel, card.DisplayName, 22, new Vector2(0.05f, 0.72f), new Vector2(0.95f, 0.97f), FontStyles.Bold, TextAlignmentOptions.Center);
+            CreateText(menuPanel, BuildContextCardHint(card, canChoose), 17, new Vector2(0.06f, 0.52f), new Vector2(0.94f, 0.70f), FontStyles.Italic, TextAlignmentOptions.Center);
+            CreateButton(menuPanel, "Abrir", new Vector2(0.27f, 0.28f), () => OpenContextCardDetails(card), new Vector2(190f, 70f));
+            CreateButton(menuPanel, BuildChooseContextCardLabel(card), new Vector2(0.72f, 0.28f), () => ChooseContextCard(card), new Vector2(250f, 70f), canChoose);
+        }
+
+        private bool CanOpenHandCardContextMenu(ScienceCardData card)
+        {
+            if (card == null || turnManager == null) return false;
+            ScienceTurnStep step = turnManager.CurrentStep;
+            if (step == ScienceTurnStep.AwaitingCardSelection) return true;
+            return card.CardType == ScienceCardType.Action
+                && !turnManager.HasPlayedActionThisTurn
+                && (step == ScienceTurnStep.AwaitingBoardSlot || step == ScienceTurnStep.AwaitingPlacementConfirmation);
+        }
+
+        private bool IsCardPlayableNow(ScienceCardData card)
+        {
+            if (card == null || turnManager == null) return false;
+            ScienceTurnStep step = turnManager.CurrentStep;
+            if (card.CardType == ScienceCardType.Character) return step == ScienceTurnStep.AwaitingCardSelection;
+            if (card.CardType != ScienceCardType.Action || turnManager.HasPlayedActionThisTurn) return false;
+            return step == ScienceTurnStep.AwaitingCardSelection
+                || step == ScienceTurnStep.AwaitingBoardSlot
+                || step == ScienceTurnStep.AwaitingPlacementConfirmation;
+        }
+
+        private string BuildChooseContextCardLabel(ScienceCardData card)
+        {
+            return card != null && card.CardType == ScienceCardType.Action ? "Usar apoio" : "Escolher";
+        }
+
+        private string BuildContextCardHint(ScienceCardData card, bool canChoose)
+        {
+            if (card == null) return string.Empty;
+            if (!canChoose)
+            {
+                return card.CardType == ScienceCardType.Action
+                    ? "A ação de apoio deste turno já foi usada."
+                    : "Personagens só podem iniciar a colocação antes de escolher uma ação.";
+            }
+
+            return card.CardType == ScienceCardType.Action
+                ? "Apoia a jogada: resolve/prepara e o turno continua."
+                : "Inicia a colocação do personagem no tabuleiro.";
         }
 
         private Vector2 ResolveContextMenuPosition(RectTransform rootRect, RectTransform cardRect, Vector2 menuSize)
@@ -712,9 +755,11 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                 return;
             }
 
-            if (card is ScienceActionCardData && turnManager != null && turnManager.HasPlayedActionThisTurn)
+            if (!IsCardPlayableNow(card))
             {
-                AddLog("Você já jogou uma ação neste turno. Escolha uma carta de personagem.");
+                AddLog(card.CardType == ScienceCardType.Action
+                    ? "A ação de apoio precisa ser usada antes da pontuação e só uma vez por turno."
+                    : "Escolha ou confirme a carta de personagem já selecionada antes de trocar de personagem.");
                 BuildGameplayScreen();
                 return;
             }
@@ -727,7 +772,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             if (card is ScienceActionCardData actionCard)
             {
-                AddLog($"{currentPlayer.DisplayName} selecionou a ação {actionCard.DisplayName}. Revise o efeito antes de resolver.");
+                AddLog($"{currentPlayer.DisplayName} selecionou a ação de apoio {actionCard.DisplayName}. Resolva/prepare; o turno continuará para a carta de personagem.");
                 BuildGameplayScreen();
                 return;
             }
@@ -1212,20 +1257,20 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                 return;
             }
 
-            CreateText(parent, "Resolver ação", 44, new Vector2(0.06f, 0.84f), new Vector2(0.94f, 0.96f), FontStyles.Bold);
+            CreateText(parent, "Ação de apoio", 44, new Vector2(0.06f, 0.84f), new Vector2(0.94f, 0.96f), FontStyles.Bold);
             string preparedWarning = actionCard.TimingType == ScienceActionTimingType.Prepared && currentPlayer.HasActivePreparedAction
                 ? "\n\nVocê já tem uma ação preparada. Cancele ou resolva sua próxima conexão antes de preparar outra."
                 : string.Empty;
-            string body = $"{actionCard.DisplayName} · {BuildActionTimingLabel(actionCard.TimingType)} [{actionCard.EffectType}]\n\n{actionCard.RulesText}\n\nEfeito temporário: {BuildActionEffectSummary(actionCard.EffectType)}{preparedWarning}";
+            string body = $"{actionCard.DisplayName} · {BuildActionTimingLabel(actionCard.TimingType)} [{actionCard.EffectType}]\n\n{actionCard.RulesText}\n\nEfeito temporário: {BuildActionEffectSummary(actionCard.EffectType)}\n\nDepois de resolver/preparar com sucesso, escolha ou confirme uma carta de personagem para completar o turno.{preparedWarning}";
             CreateText(parent, body, 28, new Vector2(0.08f, 0.34f), new Vector2(0.92f, 0.80f), FontStyles.Normal, TextAlignmentOptions.TopLeft);
-            CreateButton(parent, actionCard.TimingType == ScienceActionTimingType.Prepared ? "Preparar ação" : "Aplicar ação", new Vector2(0.38f, 0.16f), () => ResolveActionCard(currentPlayer, actionCard), new Vector2(360f, 88f));
+            CreateButton(parent, actionCard.TimingType == ScienceActionTimingType.Prepared ? "Preparar e continuar" : "Aplicar e continuar", new Vector2(0.38f, 0.16f), () => ResolveActionCard(currentPlayer, actionCard), new Vector2(400f, 88f));
             CreateButton(parent, "Cancelar", new Vector2(0.64f, 0.16f), CancelSelection, new Vector2(320f, 88f));
         }
 
         private void BuildCitationNeededChoicePanel(RectTransform parent, SciencePlayerState currentPlayer, ScienceActionCardData actionCard)
         {
             CreateText(parent, "Citação Necessária", 44, new Vector2(0.06f, 0.84f), new Vector2(0.94f, 0.96f), FontStyles.Bold);
-            string body = $"{actionCard.RulesText}\n\nEscolha uma carta para abrir a bio. Ao fechar os detalhes, o bônus ficará preparado para sua próxima conexão.";
+            string body = $"{actionCard.RulesText}\n\nEscolha uma carta para abrir a bio. Ao fechar os detalhes, o bônus ficará preparado para sua próxima conexão e o turno continuará para a carta de personagem.";
             if (currentPlayer.HasActivePreparedAction)
             {
                 body += "\n\nVocê já tem uma ação preparada. Resolva sua próxima conexão antes de preparar Citação Necessária.";
@@ -1299,7 +1344,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             currentPlayer.MarkPlayed(actionCard);
             deckManager?.Discard(actionCard);
-            AddLog($"{currentPlayer.DisplayName} abriu {chosenCard?.DisplayName ?? "uma bio"} e preparou Citação Necessária para a próxima conexão.");
+            AddLog($"{currentPlayer.DisplayName} abriu {chosenCard?.DisplayName ?? "uma bio"} e preparou Citação Necessária para a próxima conexão. A carta foi descartada e o turno continua.");
             telemetry?.LogEvent("science_action_card_resolved", $"turn={turnManager?.TurnNumber ?? 0};player={currentPlayer.PlayerIndex};card={actionCard.Id};effect={actionCard.EffectType};timing={actionCard.TimingType};bioCard={chosenCard?.Id ?? "none"}");
             telemetry?.LogEvent("science_action_prepared", $"turn={turnManager?.TurnNumber ?? 0};player={currentPlayer.PlayerIndex};card={actionCard.Id};effect={actionCard.EffectType};nextConnectionOnly=true;sourceBio={chosenCard?.Id ?? "none"}");
             if (TryShowEndGameIfNeeded(ScienceWinCondition.EmptyHand)) return;
@@ -1767,14 +1812,15 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         {
             SciencePlayerState currentPlayer = GetCurrentPlayer();
             SciencePreparedActionState preparedAction = currentPlayer?.ActivePreparedAction;
-            if (preparedAction == null || !currentPlayer.HasActivePreparedAction)
+            string actionUseStatus = turnManager != null && turnManager.HasPlayedActionThisTurn
+                ? "Ação de apoio: usada"
+                : "Ação de apoio: disponível antes da pontuação";
+            if (currentPlayer == null || preparedAction == null || !currentPlayer.HasActivePreparedAction)
             {
-                return turnManager != null && turnManager.HasPlayedActionThisTurn
-                    ? "Ação deste turno: já usada"
-                    : "Ação preparada: nenhuma";
+                return $"{actionUseStatus} · Preparada: nenhuma";
             }
 
-            return $"Ação preparada: {preparedAction.ActionCard.DisplayName}";
+            return $"{actionUseStatus} · Preparada: {preparedAction.ActionCard.DisplayName}";
         }
 
         private string BuildTurnInstruction()
@@ -1782,19 +1828,23 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             switch (turnManager?.CurrentStep ?? ScienceTurnStep.AwaitingCardSelection)
             {
                 case ScienceTurnStep.AwaitingBoardSlot:
-                    return "Escolha um espaço livre no tabuleiro.";
+                    return turnManager != null && !turnManager.HasPlayedActionThisTurn
+                        ? "Escolha um espaço livre ou use uma ação de apoio antes de confirmar."
+                        : "Escolha um espaço livre no tabuleiro.";
                 case ScienceTurnStep.AwaitingPlacementConfirmation:
-                    return "Confirme a posição escolhida.";
+                    return turnManager != null && !turnManager.HasPlayedActionThisTurn
+                        ? "Confirme a posição ou use uma ação de apoio antes da votação."
+                        : "Confirme a posição escolhida.";
                 case ScienceTurnStep.ConnectionExplanation:
                     return "Os demais jogadores votam a conexão.";
                 case ScienceTurnStep.Scoring:
                     return "Atribua pontos e bônus.";
                 case ScienceTurnStep.ActionResolution:
-                    return "Leia o texto da ação e aplique seu efeito temporário.";
+                    return "Resolva/prepare a ação de apoio; o turno continua.";
                 case ScienceTurnStep.TurnResolved:
                     return "Turno resolvido. Encerre para passar ao próximo jogador.";
                 default:
-                    return "Selecione uma carta da mão atual.";
+                    return "Selecione uma ação de apoio opcional e/ou uma carta de personagem.";
             }
         }
 
@@ -1903,19 +1953,23 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             switch (turnManager?.CurrentStep ?? ScienceTurnStep.AwaitingCardSelection)
             {
                 case ScienceTurnStep.AwaitingBoardSlot:
-                    return "Gire a carta se quiser alinhar fatos/cores; depois escolha um slot verde.";
+                    return turnManager != null && !turnManager.HasPlayedActionThisTurn
+                        ? "Você ainda pode usar uma ação de apoio da mão; depois escolha um slot verde para o personagem."
+                        : "Gire a carta se quiser alinhar fatos/cores; depois escolha um slot verde.";
                 case ScienceTurnStep.AwaitingPlacementConfirmation:
-                    return "A prévia no tabuleiro mostra a rotação escolhida. Confirme, gire novamente ou cancele.";
+                    return turnManager != null && !turnManager.HasPlayedActionThisTurn
+                        ? "A prévia está pronta. Você ainda pode usar uma ação de apoio; ao terminar, a confirmação volta aqui."
+                        : "A prévia no tabuleiro mostra a rotação escolhida. Confirme, gire novamente ou cancele.";
                 case ScienceTurnStep.ConnectionExplanation:
                     return "O consenso dos jogadores valida a explicação; o sistema não julga automaticamente.";
                 case ScienceTurnStep.Scoring:
                     return "A conexão foi aceita. Atribua o ponto base e bônus manuais antes de continuar.";
                 case ScienceTurnStep.ActionResolution:
-                    return "Ações imediatas resolvem agora; ações preparadas ficam ativas para a próxima conexão.";
+                    return "Ações imediatas resolvem agora; ações preparadas ficam ativas. Em ambos os casos, a jogada de personagem continua.";
                 case ScienceTurnStep.TurnResolved:
                     return "A colocação/ação foi resolvida. O botão Encerrar turno agora está disponível.";
                 default:
-                    return "Clique em uma carta da mão do jogador atual para iniciar a jogada.";
+                    return "Clique em uma ação de apoio opcional ou em um personagem. Uma ação bem-sucedida não encerra o turno.";
             }
         }
 
