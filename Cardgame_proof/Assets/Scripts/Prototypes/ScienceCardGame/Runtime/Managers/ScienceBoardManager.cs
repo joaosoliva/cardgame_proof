@@ -12,20 +12,45 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         Left
     }
 
+    public enum SciencePlacementConnectionType
+    {
+        Invalid,
+        FirstCard,
+        Strong,
+        Interpretive
+    }
+
     public sealed class SciencePlacementValidationResult
     {
-        public SciencePlacementValidationResult(bool isValid, string reasonText, IReadOnlyList<string> matchingSides, IReadOnlyList<string> failingSides)
+        public SciencePlacementValidationResult(
+            bool isSpatiallyValid,
+            SciencePlacementConnectionType connectionType,
+            string feedbackTitle,
+            string feedbackBody,
+            IReadOnlyList<string> matchingSides,
+            IReadOnlyList<string> nonMatchingSides,
+            bool shouldExpectContestation)
         {
-            IsValid = isValid;
-            ReasonText = reasonText;
+            IsSpatiallyValid = isSpatiallyValid;
+            ConnectionType = connectionType;
+            FeedbackTitle = feedbackTitle;
+            FeedbackBody = feedbackBody;
             MatchingSides = matchingSides ?? new List<string>();
-            FailingSides = failingSides ?? new List<string>();
+            NonMatchingSides = nonMatchingSides ?? new List<string>();
+            ShouldExpectContestation = shouldExpectContestation;
         }
 
-        public bool IsValid { get; }
-        public string ReasonText { get; }
+        public bool IsSpatiallyValid { get; }
+        public SciencePlacementConnectionType ConnectionType { get; }
+        public string FeedbackTitle { get; }
+        public string FeedbackBody { get; }
         public IReadOnlyList<string> MatchingSides { get; }
-        public IReadOnlyList<string> FailingSides { get; }
+        public IReadOnlyList<string> NonMatchingSides { get; }
+        public bool ShouldExpectContestation { get; }
+
+        public bool IsValid => IsSpatiallyValid;
+        public string ReasonText => FeedbackBody;
+        public IReadOnlyList<string> FailingSides => NonMatchingSides;
     }
 
     public sealed class ScienceBoardSlotState
@@ -84,30 +109,30 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
         public bool CanPlaceCardAt(Vector2Int coordinate, ScienceCardData card, int rotationDegrees = 0)
         {
-            return ValidatePlacement(coordinate, card, rotationDegrees).IsValid;
+            return ValidatePlacement(coordinate, card, rotationDegrees).IsSpatiallyValid;
         }
 
         public string GetPlacementValidationMessage(Vector2Int coordinate, ScienceCardData card, int rotationDegrees = 0)
         {
             SciencePlacementValidationResult result = ValidatePlacement(coordinate, card, rotationDegrees);
-            return result.IsValid ? string.Empty : result.ReasonText;
+            return result.IsSpatiallyValid ? string.Empty : result.FeedbackBody;
         }
 
         public SciencePlacementValidationResult ValidatePlacement(Vector2Int coordinate, ScienceCardData card, int rotationDegrees = 0)
         {
             List<string> matchingSides = new List<string>();
-            List<string> failingSides = new List<string>();
+            List<string> nonMatchingSides = new List<string>();
 
-            if (card == null) return Invalid("Nenhuma carta selecionada.", matchingSides, failingSides);
-            if (!(card is ScienceCharacterCardData)) return Invalid("Apenas cartas de personagem são colocadas no tabuleiro neste protótipo.", matchingSides, failingSides);
-            if (!IsCoordinateInBounds(coordinate)) return Invalid("Posição fora do tabuleiro.", matchingSides, failingSides);
-            if (boardCards.ContainsKey(coordinate)) return Invalid("Posição ocupada.", matchingSides, failingSides);
+            if (card == null) return Invalid("Nenhuma carta selecionada.", "Escolha uma carta antes de selecionar o tabuleiro.", matchingSides, nonMatchingSides);
+            if (!(card is ScienceCharacterCardData)) return Invalid("Carta inválida", "Apenas cartas de personagem são colocadas no tabuleiro neste protótipo.", matchingSides, nonMatchingSides);
+            if (!IsCoordinateInBounds(coordinate)) return Invalid("Posição inválida", "Essa posição está fora do tabuleiro.", matchingSides, nonMatchingSides);
+            if (boardCards.ContainsKey(coordinate)) return Invalid("Posição ocupada", "Escolha uma casa vazia para colocar a carta.", matchingSides, nonMatchingSides);
 
             if (!HasAnyCharacterCards())
             {
                 return IsNearCenter(coordinate)
-                    ? Valid("Primeira carta válida perto do centro.", matchingSides, failingSides)
-                    : Invalid("A primeira personagem deve ser colocada perto do centro.", matchingSides, failingSides);
+                    ? FirstCard("Primeira carta", "Primeira carta válida perto do centro. A partir dela, as próximas cartas devem tocar a rede.", matchingSides, nonMatchingSides)
+                    : Invalid("Posição inválida", "A primeira personagem deve ser colocada perto do centro.", matchingSides, nonMatchingSides);
             }
 
             int adjacentCharacterCount = 0;
@@ -129,13 +154,13 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
                 if (!cardColor.HasValue)
                 {
-                    failingSides.Add($"sem cor exposta na borda {sideName}");
+                    nonMatchingSides.Add($"borda {sideName} sem cor direta para comparar");
                     continue;
                 }
 
                 if (!neighborColor.HasValue)
                 {
-                    failingSides.Add($"vizinha sem cor exposta em {neighborSideName} ({sideName})");
+                    nonMatchingSides.Add($"vizinha sem cor direta em {neighborSideName} ({sideName})");
                     continue;
                 }
 
@@ -145,26 +170,24 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                 }
                 else
                 {
-                    failingSides.Add($"{cardColor.Value} não conecta com {neighborColor.Value} ({sideName})");
+                    nonMatchingSides.Add($"{cardColor.Value} com {neighborColor.Value} ({sideName})");
                 }
             }
 
             if (adjacentCharacterCount == 0)
             {
-                return Invalid("Escolha uma casa adjacente.", matchingSides, failingSides);
+                return Invalid("Posição inválida", "Coloque a carta adjacente à rede de cartas.", matchingSides, nonMatchingSides);
             }
 
-            if (failingSides.Count > 0)
+            if (matchingSides.Count > 0 && nonMatchingSides.Count == 0)
             {
-                return Invalid($"Inválido: {failingSides[0]}", matchingSides, failingSides);
+                return Strong($"As cores combinam: {matchingSides[0]}. Essa ligação tende a ser fácil de defender.", matchingSides, nonMatchingSides);
             }
 
-            if (matchingSides.Count == 0)
-            {
-                return Invalid("Inválido: nenhuma borda tocando possui cores compatíveis.", matchingSides, failingSides);
-            }
-
-            return Valid($"Conexão válida: {matchingSides[0]}", matchingSides, failingSides);
+            string interpretiveBody = nonMatchingSides.Count > 0
+                ? $"As cores não combinam diretamente ({nonMatchingSides[0]}). Você pode tentar, mas outros jogadores podem contestar. Prepare uma boa explicação."
+                : "As cores não criam uma correspondência direta. Você pode tentar, mas outros jogadores podem contestar. Prepare uma boa explicação.";
+            return Interpretive(interpretiveBody, matchingSides, nonMatchingSides);
         }
 
         public ScienceFactCategory? GetColorOnSide(ScienceCardData cardData, int rotationDegrees, ScienceBoardSide side)
@@ -187,21 +210,21 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         public bool TryPlaceCard(Vector2Int coordinate, ScienceCardData card, int rotationDegrees = 0, bool overrideValidation = false)
         {
             SciencePlacementValidationResult validationResult = ValidatePlacement(coordinate, card, rotationDegrees);
-            if (!validationResult.IsValid && !overrideValidation)
+            if (!validationResult.IsSpatiallyValid && !overrideValidation)
             {
-                telemetry?.LogEvent("science_board_card_rejected", $"card={card?.Id ?? "none"};coord={coordinate};rotation={ScienceBoardSlotState.NormalizeRotation(rotationDegrees)};reason={validationResult.ReasonText}");
+                telemetry?.LogEvent("science_board_card_rejected", $"card={card?.Id ?? "none"};coord={coordinate};rotation={ScienceBoardSlotState.NormalizeRotation(rotationDegrees)};reason={validationResult.FeedbackBody}");
                 return false;
             }
 
-            if (!validationResult.IsValid)
+            if (!validationResult.IsSpatiallyValid)
             {
-                telemetry?.LogEvent("science_board_card_debug_override", $"card={card?.Id ?? "none"};coord={coordinate};rotation={ScienceBoardSlotState.NormalizeRotation(rotationDegrees)};reason={validationResult.ReasonText}");
+                telemetry?.LogEvent("science_board_card_debug_override", $"card={card?.Id ?? "none"};coord={coordinate};rotation={ScienceBoardSlotState.NormalizeRotation(rotationDegrees)};reason={validationResult.FeedbackBody}");
             }
 
             int normalizedRotation = ScienceBoardSlotState.NormalizeRotation(rotationDegrees);
             boardCards[coordinate] = card;
             boardSlots[coordinate] = new ScienceBoardSlotState(coordinate, card, normalizedRotation);
-            telemetry?.LogEvent("science_board_card_placed", $"card={card.Id};coord={coordinate};rotation={normalizedRotation};occupied={boardCards.Count};matches={validationResult.MatchingSides.Count}");
+            telemetry?.LogEvent("science_board_card_placed", $"card={card.Id};coord={coordinate};rotation={normalizedRotation};occupied={boardCards.Count};matches={validationResult.MatchingSides.Count};nonMatches={validationResult.NonMatchingSides.Count};connectionType={validationResult.ConnectionType};contested={validationResult.ShouldExpectContestation}");
             return true;
         }
 
@@ -268,14 +291,24 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             return false;
         }
 
-        private static SciencePlacementValidationResult Valid(string reasonText, IReadOnlyList<string> matchingSides, IReadOnlyList<string> failingSides)
+        private static SciencePlacementValidationResult FirstCard(string feedbackTitle, string feedbackBody, IReadOnlyList<string> matchingSides, IReadOnlyList<string> nonMatchingSides)
         {
-            return new SciencePlacementValidationResult(true, reasonText, matchingSides, failingSides);
+            return new SciencePlacementValidationResult(true, SciencePlacementConnectionType.FirstCard, feedbackTitle, feedbackBody, matchingSides, nonMatchingSides, false);
         }
 
-        private static SciencePlacementValidationResult Invalid(string reasonText, IReadOnlyList<string> matchingSides, IReadOnlyList<string> failingSides)
+        private static SciencePlacementValidationResult Strong(string feedbackBody, IReadOnlyList<string> matchingSides, IReadOnlyList<string> nonMatchingSides)
         {
-            return new SciencePlacementValidationResult(false, reasonText, matchingSides, failingSides);
+            return new SciencePlacementValidationResult(true, SciencePlacementConnectionType.Strong, "Conexão forte", feedbackBody, matchingSides, nonMatchingSides, false);
+        }
+
+        private static SciencePlacementValidationResult Interpretive(string feedbackBody, IReadOnlyList<string> matchingSides, IReadOnlyList<string> nonMatchingSides)
+        {
+            return new SciencePlacementValidationResult(true, SciencePlacementConnectionType.Interpretive, "Conexão interpretativa", feedbackBody, matchingSides, nonMatchingSides, true);
+        }
+
+        private static SciencePlacementValidationResult Invalid(string feedbackTitle, string feedbackBody, IReadOnlyList<string> matchingSides, IReadOnlyList<string> nonMatchingSides)
+        {
+            return new SciencePlacementValidationResult(false, SciencePlacementConnectionType.Invalid, feedbackTitle, feedbackBody, matchingSides, nonMatchingSides, false);
         }
 
         private static ScienceBoardSide RotateSideCounterClockwise(ScienceBoardSide side, int quarterTurns)

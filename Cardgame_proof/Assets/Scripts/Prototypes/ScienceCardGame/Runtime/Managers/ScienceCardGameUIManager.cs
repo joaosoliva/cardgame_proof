@@ -230,8 +230,8 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                             previewRect.anchorMax = new Vector2(0.5f, 0.5f);
                             previewRect.sizeDelta = GetBoardCardSize(columns, rows);
                             previewRect.anchoredPosition = Vector2.zero;
-                            bool previewValid = boardManager != null && boardManager.CanPlaceCardAt(coordinate, selectedCard, turnManager?.SelectedRotationDegrees ?? 0);
-                            ApplyCardOutline(previewRect, previewValid ? new Color(0.42f, 1f, 0.52f, 1f) : new Color(1f, 0.25f, 0.22f, 1f), 4f);
+                            SciencePlacementValidationResult previewResult = GetPlacementResult(coordinate, selectedCard);
+                            ApplyCardOutline(previewRect, GetPlacementFeedbackColor(previewResult), 4f);
                             ApplyBoardCardRotation(previewRect, turnManager?.SelectedRotationDegrees ?? 0);
                         }
                         else
@@ -252,10 +252,10 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
         private Color GetBoardSlotOutlineColor(Vector2Int coordinate, ScienceCardData selectedCard, bool isSelectedSlot)
         {
+            SciencePlacementValidationResult result = GetPlacementResult(coordinate, selectedCard);
             if (isSelectedSlot && IsPlacementStep() && selectedCard != null)
             {
-                bool selectedValid = boardManager != null && boardManager.CanPlaceCardAt(coordinate, selectedCard, turnManager?.SelectedRotationDegrees ?? 0);
-                return selectedValid ? new Color(0.35f, 0.95f, 0.48f, 1f) : new Color(1f, 0.24f, 0.20f, 1f);
+                return GetPlacementFeedbackColor(result);
             }
 
             if (isSelectedSlot) return new Color(1f, 0.86f, 0.24f, 1f);
@@ -263,8 +263,10 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             if (IsPlacementStep() && selectedCard != null)
             {
-                bool isValid = boardManager != null && boardManager.CanPlaceCardAt(coordinate, selectedCard, turnManager?.SelectedRotationDegrees ?? 0);
-                return isValid ? new Color(0.34f, 0.92f, 0.46f, 0.92f) : new Color(0.50f, 0.58f, 0.55f, 0.30f);
+                if (result == null || !result.IsSpatiallyValid) return new Color(0.50f, 0.58f, 0.55f, 0.30f);
+                return result.ConnectionType == SciencePlacementConnectionType.Strong
+                    ? new Color(0.34f, 0.92f, 0.46f, 0.92f)
+                    : new Color(1f, 0.74f, 0.22f, 0.92f);
             }
 
             return new Color(0.38f, 0.52f, 0.48f, 0.28f);
@@ -274,10 +276,11 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         {
             if (IsPlacementStep() && selectedCard != null)
             {
-                bool isValid = boardManager != null && boardManager.CanPlaceCardAt(coordinate, selectedCard, turnManager?.SelectedRotationDegrees ?? 0);
-                if (isValid)
+                SciencePlacementValidationResult result = GetPlacementResult(coordinate, selectedCard);
+                if (result != null && result.IsSpatiallyValid)
                 {
-                    CreateText(slot, "✓", 24, new Vector2(0.18f, 0.18f), new Vector2(0.82f, 0.82f), FontStyles.Bold, TextAlignmentOptions.Center);
+                    string hint = result.ConnectionType == SciencePlacementConnectionType.Strong ? "✓" : "?";
+                    CreateText(slot, hint, 24, new Vector2(0.18f, 0.18f), new Vector2(0.82f, 0.82f), FontStyles.Bold, TextAlignmentOptions.Center);
                 }
                 return;
             }
@@ -313,10 +316,13 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
         private Color GetBoardSlotColor(Vector2Int coordinate, ScienceCardData selectedCard, bool isSelectedSlot)
         {
+            SciencePlacementValidationResult result = GetPlacementResult(coordinate, selectedCard);
             if (isSelectedSlot && IsPlacementStep() && selectedCard != null)
             {
-                bool selectedValid = boardManager != null && boardManager.CanPlaceCardAt(coordinate, selectedCard, turnManager?.SelectedRotationDegrees ?? 0);
-                return selectedValid ? new Color(0.18f, 0.52f, 0.26f, 0.95f) : new Color(0.58f, 0.14f, 0.14f, 0.95f);
+                if (result == null || !result.IsSpatiallyValid) return new Color(0.58f, 0.14f, 0.14f, 0.95f);
+                return result.ConnectionType == SciencePlacementConnectionType.Strong
+                    ? new Color(0.18f, 0.52f, 0.26f, 0.95f)
+                    : new Color(0.55f, 0.35f, 0.10f, 0.95f);
             }
 
             if (isSelectedSlot) return new Color(0.82f, 0.68f, 0.24f, 0.95f);
@@ -324,8 +330,10 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             if (IsPlacementStep() && selectedCard != null)
             {
-                bool isValid = boardManager != null && boardManager.CanPlaceCardAt(coordinate, selectedCard, turnManager?.SelectedRotationDegrees ?? 0);
-                return isValid ? new Color(0.14f, 0.38f, 0.22f, 0.78f) : new Color(0.12f, 0.22f, 0.19f, 0.62f);
+                if (result == null || !result.IsSpatiallyValid) return new Color(0.12f, 0.22f, 0.19f, 0.62f);
+                return result.ConnectionType == SciencePlacementConnectionType.Strong
+                    ? new Color(0.14f, 0.38f, 0.22f, 0.78f)
+                    : new Color(0.38f, 0.27f, 0.10f, 0.78f);
             }
 
             return new Color(0.11f, 0.20f, 0.18f, 0.70f);
@@ -516,9 +524,10 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             CreateText(parent, selectedCard == null ? "Modo de posicionamento" : $"Posicionar: {selectedCard.DisplayName}", 27, new Vector2(0.03f, 0.68f), new Vector2(0.35f, 0.96f), FontStyles.Bold, TextAlignmentOptions.Left);
             CreateText(parent, hasSlot ? $"Slot: {FormatBoardCoordinate(turnManager.SelectedBoardCoordinate)} · Rotação {turnManager.SelectedRotationDegrees}°" : "Toque em um slot vazio destacado no tabuleiro.", 22, new Vector2(0.03f, 0.36f), new Vector2(0.35f, 0.66f), FontStyles.Normal, TextAlignmentOptions.Left);
 
+            SciencePlacementValidationResult selectedPlacementResult = hasSlot ? boardManager?.ValidatePlacement(turnManager.SelectedBoardCoordinate, turnManager.SelectedCard, turnManager.SelectedRotationDegrees) : null;
             string validationText = BuildPlacementValidityText(hasSlot, isValid);
-            TextMeshProUGUI validityLabel = CreateText(parent, validationText, 23, new Vector2(0.37f, 0.58f), new Vector2(0.67f, 0.92f), FontStyles.Bold, TextAlignmentOptions.Center);
-            validityLabel.color = isValid ? new Color(0.42f, 1f, 0.52f, 1f) : new Color(1f, 0.42f, 0.38f, 1f);
+            TextMeshProUGUI validityLabel = CreateText(parent, validationText, 23, new Vector2(0.37f, 0.52f), new Vector2(0.67f, 0.94f), FontStyles.Bold, TextAlignmentOptions.Center);
+            validityLabel.color = GetPlacementFeedbackColor(selectedPlacementResult);
 
             if (showRotation)
             {
@@ -736,7 +745,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                 return;
             }
 
-            string validationMessage = boardManager?.GetPlacementValidationMessage(coordinate, turnManager.SelectedCard, turnManager.SelectedRotationDegrees);
+            SciencePlacementValidationResult validationResult = boardManager?.ValidatePlacement(coordinate, turnManager.SelectedCard, turnManager.SelectedRotationDegrees);
 
             if (!turnManager.SelectBoardSlot(coordinate))
             {
@@ -745,13 +754,13 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                 return;
             }
 
-            if (string.IsNullOrEmpty(validationMessage))
+            if (validationResult != null && validationResult.IsSpatiallyValid)
             {
-                AddLog($"Posição {FormatBoardCoordinate(coordinate)} válida. Confirme para colocar a carta.");
+                AddLog($"{validationResult.FeedbackTitle} em {FormatBoardCoordinate(coordinate)}: {validationResult.FeedbackBody}");
             }
             else
             {
-                AddLog($"Prévia em {FormatBoardCoordinate(coordinate)} inválida: {validationMessage}");
+                AddLog($"Prévia em {FormatBoardCoordinate(coordinate)} inválida: {validationResult?.FeedbackBody ?? "posição inválida"}");
             }
 
             BuildGameplayScreen();
@@ -777,18 +786,18 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             }
 
             Vector2Int coordinate = turnManager.SelectedBoardCoordinate;
-            string validationMessage = boardManager?.GetPlacementValidationMessage(coordinate, selectedCard, turnManager.SelectedRotationDegrees);
+            SciencePlacementValidationResult validationResult = boardManager?.ValidatePlacement(coordinate, selectedCard, turnManager.SelectedRotationDegrees);
             bool overrideValidation = state != null && state.DebugOverridePlacementValidation;
-            if (!string.IsNullOrEmpty(validationMessage) && !overrideValidation)
+            if ((validationResult == null || !validationResult.IsSpatiallyValid) && !overrideValidation)
             {
-                AddLog($"Não foi possível colocar a carta em {FormatBoardCoordinate(coordinate)}: {validationMessage}");
+                AddLog($"Não foi possível colocar a carta em {FormatBoardCoordinate(coordinate)}: {validationResult?.FeedbackBody ?? "posição inválida"}");
                 BuildGameplayScreen();
                 return;
             }
 
             if (boardManager == null || !boardManager.TryPlaceCard(coordinate, selectedCard, turnManager.SelectedRotationDegrees, overrideValidation))
             {
-                AddLog($"Não foi possível colocar a carta em {FormatBoardCoordinate(coordinate)}: {validationMessage ?? "posição inválida"}");
+                AddLog($"Não foi possível colocar a carta em {FormatBoardCoordinate(coordinate)}: {validationResult?.FeedbackBody ?? "posição inválida"}");
                 BuildGameplayScreen();
                 return;
             }
@@ -804,6 +813,10 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             turnManager.StartConnectionExplanation();
             StartConnectionVoting(currentPlayer, selectedCard);
             AddLog($"{currentPlayer.DisplayName} colocou {selectedCard.DisplayName} em {FormatBoardCoordinate(coordinate)} com rotação {turnManager.SelectedRotationDegrees}°.");
+            if (validationResult != null)
+            {
+                AddLog($"{validationResult.FeedbackTitle}: {validationResult.FeedbackBody}");
+            }
             AddLog("Explique a conexão científica proposta; os demais jogadores votam para aceitar a conexão.");
             BuildGameplayScreen();
         }
@@ -1520,15 +1533,40 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             if (!hasSlot) return "Escolha uma casa adjacente.";
 
             SciencePlacementValidationResult result = boardManager?.ValidatePlacement(turnManager.SelectedBoardCoordinate, turnManager.SelectedCard, turnManager.SelectedRotationDegrees);
-            string reason = result?.ReasonText;
-            if (isValid) return string.IsNullOrEmpty(reason) ? "Conexão válida." : reason;
+            if (result == null) return "Posição inválida: revise o slot escolhido.";
+
+            if (result.IsSpatiallyValid) return $"{result.FeedbackTitle}: {result.FeedbackBody}";
 
             if (state != null && state.DebugOverridePlacementValidation)
             {
-                return $"⚠ Debug permite confirmar: {reason}";
+                return $"⚠ Debug permite confirmar: {result.FeedbackBody}";
             }
 
-            return string.IsNullOrEmpty(reason) ? "Inválido: revise o slot escolhido." : reason;
+            return $"{result.FeedbackTitle}: {result.FeedbackBody}";
+        }
+
+        private SciencePlacementValidationResult GetPlacementResult(Vector2Int coordinate, ScienceCardData selectedCard)
+        {
+            if (boardManager == null || selectedCard == null) return null;
+            return boardManager.ValidatePlacement(coordinate, selectedCard, turnManager?.SelectedRotationDegrees ?? 0);
+        }
+
+        private Color GetPlacementFeedbackColor(SciencePlacementValidationResult result)
+        {
+            if (result == null) return new Color(1f, 0.42f, 0.38f, 1f);
+            if (!result.IsSpatiallyValid) return new Color(1f, 0.42f, 0.38f, 1f);
+
+            switch (result.ConnectionType)
+            {
+                case SciencePlacementConnectionType.Strong:
+                    return new Color(0.42f, 1f, 0.52f, 1f);
+                case SciencePlacementConnectionType.Interpretive:
+                    return new Color(1f, 0.76f, 0.28f, 1f);
+                case SciencePlacementConnectionType.FirstCard:
+                    return new Color(0.56f, 0.82f, 1f, 1f);
+                default:
+                    return new Color(1f, 0.42f, 0.38f, 1f);
+            }
         }
 
         private static bool IsDualColorCharacterCard(ScienceCardData card)
