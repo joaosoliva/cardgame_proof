@@ -27,6 +27,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         private GameObject root;
         private GameObject cardDetailModal;
         private GameObject debugLogModal;
+        private GameObject handCardContextMenu;
         private TextMeshProUGUI selectedPlayerCountText;
         private int selectedPlayerCount = 2;
         private int activeVotingPlayerIndex = -1;
@@ -89,6 +90,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         {
             CloseCardDetailsModal();
             CloseDebugLogModal();
+            CloseHandCardContextMenu();
             if (root != null)
             {
                 root.SetActive(false);
@@ -140,6 +142,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         {
             CloseCardDetailsModal();
             CloseDebugLogModal();
+            CloseHandCardContextMenu();
             RectTransform screen = root.GetComponent<RectTransform>();
             ClearChildren(root.transform);
 
@@ -354,6 +357,8 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             Image image = viewportObject.GetComponent<Image>();
             image.color = color;
 
+            CreateHandBlankCloseArea(viewport);
+
             Mask mask = viewportObject.GetComponent<Mask>();
             mask.showMaskGraphic = true;
 
@@ -365,6 +370,24 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             scrollRect.inertia = true;
             scrollRect.scrollSensitivity = ScaleValue(30f);
             return viewport;
+        }
+
+        private void CreateHandBlankCloseArea(RectTransform viewport)
+        {
+            GameObject closeObject = new GameObject("HandBlankCloseArea", typeof(RectTransform), typeof(Image), typeof(Button));
+            RectTransform closeRect = closeObject.GetComponent<RectTransform>();
+            closeRect.SetParent(viewport, false);
+            closeRect.anchorMin = Vector2.zero;
+            closeRect.anchorMax = Vector2.one;
+            closeRect.offsetMin = Vector2.zero;
+            closeRect.offsetMax = Vector2.zero;
+
+            Image closeImage = closeObject.GetComponent<Image>();
+            closeImage.color = new Color(0f, 0f, 0f, 0.01f);
+
+            Button closeButton = closeObject.GetComponent<Button>();
+            closeButton.targetGraphic = closeImage;
+            closeButton.onClick.AddListener(CloseHandCardContextMenu);
         }
 
         private RectTransform CreateHandContent(RectTransform viewport, int cardCount)
@@ -455,11 +478,91 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
         private RectTransform CreateCardView(RectTransform parent, ScienceCardData card, string name)
         {
-            Action<ScienceCardData> onClick = turnManager != null && turnManager.CurrentStep == ScienceTurnStep.AwaitingCardSelection
-                ? SelectCardForTurn
-                : null;
-            ScienceCardView view = ScienceCardView.Create(parent, name, card, ScienceCardViewDisplayMode.Hand, onClick);
-            return view.GetComponent<RectTransform>();
+            ScienceCardView view = ScienceCardView.Create(parent, name, card, ScienceCardViewDisplayMode.Hand);
+            RectTransform cardRect = view.GetComponent<RectTransform>();
+            if (turnManager != null && turnManager.CurrentStep == ScienceTurnStep.AwaitingCardSelection)
+            {
+                view.SetOnSelected(selectedCard => ShowHandCardContextMenu(selectedCard, cardRect));
+            }
+
+            return cardRect;
+        }
+
+        private void ShowHandCardContextMenu(ScienceCardData card, RectTransform cardRect)
+        {
+            SciencePlayerState currentPlayer = GetCurrentPlayer();
+            if (card == null || cardRect == null || root == null || currentPlayer == null || !ContainsCard(currentPlayer.Hand, card))
+            {
+                AddLog("Apenas cartas da mão do jogador atual podem abrir ações contextuais.");
+                CloseHandCardContextMenu();
+                return;
+            }
+
+            CloseHandCardContextMenu();
+
+            RectTransform rootRect = root.GetComponent<RectTransform>();
+            handCardContextMenu = new GameObject("HandCardContextMenu", typeof(RectTransform));
+            RectTransform menuRoot = handCardContextMenu.GetComponent<RectTransform>();
+            menuRoot.SetParent(rootRect, false);
+            menuRoot.anchorMin = Vector2.zero;
+            menuRoot.anchorMax = Vector2.one;
+            menuRoot.offsetMin = Vector2.zero;
+            menuRoot.offsetMax = Vector2.zero;
+
+            RectTransform closeZone = CreatePanel(menuRoot, "HandCardContextCloseZone", new Vector2(0f, 0.32f), Vector2.one, new Color(0f, 0f, 0f, 0.01f));
+            Button closeButton = closeZone.gameObject.AddComponent<Button>();
+            closeButton.targetGraphic = closeZone.GetComponent<Image>();
+            closeButton.onClick.AddListener(CloseHandCardContextMenu);
+
+            RectTransform menuPanel = CreatePanel(menuRoot, "HandCardContextPanel", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Color(0.06f, 0.08f, 0.12f, 0.98f));
+            Vector2 menuSize = ScaleVector(new Vector2(460f, 132f));
+            menuPanel.pivot = new Vector2(0.5f, 0.5f);
+            menuPanel.sizeDelta = menuSize;
+            menuPanel.anchoredPosition = ResolveContextMenuPosition(rootRect, cardRect, menuSize);
+
+            CreateText(menuPanel, card.DisplayName, 22, new Vector2(0.05f, 0.66f), new Vector2(0.95f, 0.96f), FontStyles.Bold, TextAlignmentOptions.Center);
+            CreateButton(menuPanel, "Abrir", new Vector2(0.28f, 0.34f), () => OpenContextCardDetails(card), new Vector2(190f, 76f));
+            CreateButton(menuPanel, "Escolher", new Vector2(0.72f, 0.34f), () => ChooseContextCard(card), new Vector2(210f, 76f));
+        }
+
+        private Vector2 ResolveContextMenuPosition(RectTransform rootRect, RectTransform cardRect, Vector2 menuSize)
+        {
+            Vector3[] corners = new Vector3[4];
+            cardRect.GetWorldCorners(corners);
+            Vector2 screenPoint = RectTransformUtility.WorldToScreenPoint(null, (corners[1] + corners[2]) * 0.5f);
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(rootRect, screenPoint, null, out Vector2 localPoint);
+
+            Rect rootBounds = rootRect.rect;
+            float verticalOffset = (menuSize.y * 0.5f) + ScaleValue(26f);
+            Vector2 position = new Vector2(localPoint.x, localPoint.y + verticalOffset);
+            if (position.y + (menuSize.y * 0.5f) > rootBounds.yMax - ScaleValue(12f))
+            {
+                position.y = localPoint.y - verticalOffset;
+            }
+
+            position.x = Mathf.Clamp(position.x, rootBounds.xMin + (menuSize.x * 0.5f) + ScaleValue(12f), rootBounds.xMax - (menuSize.x * 0.5f) - ScaleValue(12f));
+            position.y = Mathf.Clamp(position.y, rootBounds.yMin + (menuSize.y * 0.5f) + ScaleValue(12f), rootBounds.yMax - (menuSize.y * 0.5f) - ScaleValue(12f));
+            return position;
+        }
+
+        private void OpenContextCardDetails(ScienceCardData card)
+        {
+            CloseHandCardContextMenu();
+            OpenCardDetailsModal(card);
+        }
+
+        private void ChooseContextCard(ScienceCardData card)
+        {
+            CloseHandCardContextMenu();
+            SelectCardForTurn(card);
+        }
+
+        private void CloseHandCardContextMenu()
+        {
+            if (handCardContextMenu == null) return;
+            handCardContextMenu.SetActive(false);
+            UnityEngine.Object.Destroy(handCardContextMenu);
+            handCardContextMenu = null;
         }
 
         private void ConfigureBoardSlotButton(RectTransform slot, Vector2Int coordinate)
@@ -481,7 +584,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             if (turnManager == null || !turnManager.SelectCard(card))
             {
-                OpenCardDetailsModal(card);
+                AddLog("Esta carta não pode ser escolhida agora.");
                 return;
             }
 
@@ -494,7 +597,6 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             AddLog($"{currentPlayer.DisplayName} selecionou {card.DisplayName}. Escolha um espaço livre no tabuleiro.");
             BuildGameplayScreen();
-            OpenCardDetailsModal(card);
         }
 
         private void RotateSelectedCardLeft()
