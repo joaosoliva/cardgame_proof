@@ -153,8 +153,8 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             }
 
             RectTransform topBar = CreatePanel(screen, "TopBar", new Vector2(0.02f, 0.89f), new Vector2(0.98f, 0.985f), new Color(0.10f, 0.13f, 0.18f, 0.96f));
-            RectTransform boardPanel = CreatePanel(screen, "BoardPanel", new Vector2(0.02f, 0.34f), new Vector2(0.98f, 0.875f), new Color(0.12f, 0.20f, 0.17f, 0.96f));
-            RectTransform handPanel = CreatePanel(screen, "CurrentPlayerHandPanel", new Vector2(0.02f, 0.02f), new Vector2(0.98f, 0.32f), new Color(0.11f, 0.12f, 0.18f, 0.96f));
+            RectTransform boardPanel = CreatePanel(screen, "BoardPanel", new Vector2(0.02f, 0.29f), new Vector2(0.98f, 0.875f), new Color(0.12f, 0.20f, 0.17f, 0.96f));
+            RectTransform handPanel = CreatePanel(screen, "CurrentPlayerHandPanel", new Vector2(0.02f, 0.02f), new Vector2(0.98f, 0.27f), new Color(0.11f, 0.12f, 0.18f, 0.96f));
 
             BuildTopBar(topBar);
             BuildBoardPanel(boardPanel);
@@ -182,7 +182,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             CreateText(parent, "Tabuleiro", 32, new Vector2(0.03f, 0.91f), new Vector2(0.30f, 0.99f), FontStyles.Bold, TextAlignmentOptions.Left);
             CreateText(parent, "Verde = válido · Vermelho = inválido · Dourado = selecionado", 23, new Vector2(0.32f, 0.90f), new Vector2(0.97f, 0.99f), FontStyles.Italic, TextAlignmentOptions.Right);
 
-            RectTransform grid = CreatePanel(parent, "BoardGrid", new Vector2(0.025f, 0.045f), new Vector2(0.975f, 0.885f), new Color(0.04f, 0.09f, 0.08f, 0.95f));
+            RectTransform grid = CreatePanel(parent, "BoardGrid", new Vector2(0.015f, 0.035f), new Vector2(0.985f, 0.890f), new Color(0.04f, 0.09f, 0.08f, 0.95f));
             int columns = Mathf.Max(1, state?.BoardSize.x ?? 7);
             int rows = Mathf.Max(1, state?.BoardSize.y ?? 7);
 
@@ -199,7 +199,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                     ScienceCardData selectedCard = turnManager?.SelectedCard;
                     Color slotColor = GetBoardSlotColor(coordinate, selectedCard, isSelectedSlot);
                     RectTransform slot = CreatePanel(grid, $"BoardSlot_{x}_{y}", new Vector2(minX, minY), new Vector2(maxX, maxY), slotColor);
-                    float slotPadding = ScaleValue(5f);
+                    float slotPadding = ScaleValue(4f);
                     slot.offsetMin = new Vector2(slot.offsetMin.x + slotPadding, slot.offsetMin.y + slotPadding);
                     slot.offsetMax = new Vector2(slot.offsetMax.x - slotPadding, slot.offsetMax.y - slotPadding);
                     ApplyBoardSlotOutline(slot, coordinate, selectedCard, isSelectedSlot);
@@ -212,6 +212,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                         boardCardRect.anchorMax = new Vector2(0.5f, 0.5f);
                         boardCardRect.sizeDelta = GetBoardCardSize(columns, rows);
                         boardCardRect.anchoredPosition = Vector2.zero;
+                        ApplyCardOutline(boardCardRect, new Color(0.92f, 0.98f, 1f, 0.95f), 2.5f);
                         ApplyBoardCardRotation(boardCardRect, boardManager?.GetPlacedCardRotationDegrees(coordinate) ?? 0);
                     }
                     else
@@ -229,6 +230,8 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                             previewRect.anchorMax = new Vector2(0.5f, 0.5f);
                             previewRect.sizeDelta = GetBoardCardSize(columns, rows);
                             previewRect.anchoredPosition = Vector2.zero;
+                            bool previewValid = boardManager != null && boardManager.CanPlaceCardAt(coordinate, selectedCard, turnManager?.SelectedRotationDegrees ?? 0);
+                            ApplyCardOutline(previewRect, previewValid ? new Color(0.42f, 1f, 0.52f, 1f) : new Color(1f, 0.25f, 0.22f, 1f), 4f);
                             ApplyBoardCardRotation(previewRect, turnManager?.SelectedRotationDegrees ?? 0);
                         }
                         else
@@ -261,10 +264,10 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             if (IsPlacementStep() && selectedCard != null)
             {
                 bool isValid = boardManager != null && boardManager.CanPlaceCardAt(coordinate, selectedCard, turnManager?.SelectedRotationDegrees ?? 0);
-                return isValid ? new Color(0.35f, 0.95f, 0.48f, 1f) : new Color(1f, 0.38f, 0.32f, 0.95f);
+                return isValid ? new Color(0.34f, 0.92f, 0.46f, 0.92f) : new Color(0.50f, 0.58f, 0.55f, 0.30f);
             }
 
-            return new Color(0.46f, 0.58f, 0.54f, 0.35f);
+            return new Color(0.38f, 0.52f, 0.48f, 0.28f);
         }
 
         private void BuildEmptySlotHint(RectTransform slot, Vector2Int coordinate, ScienceCardData selectedCard)
@@ -272,11 +275,14 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             if (IsPlacementStep() && selectedCard != null)
             {
                 bool isValid = boardManager != null && boardManager.CanPlaceCardAt(coordinate, selectedCard, turnManager?.SelectedRotationDegrees ?? 0);
-                CreateText(slot, isValid ? "✓" : "×", 28, new Vector2(0.12f, 0.12f), new Vector2(0.88f, 0.88f), FontStyles.Bold, TextAlignmentOptions.Center);
+                if (isValid)
+                {
+                    CreateText(slot, "✓", 24, new Vector2(0.18f, 0.18f), new Vector2(0.82f, 0.82f), FontStyles.Bold, TextAlignmentOptions.Center);
+                }
                 return;
             }
 
-            CreateText(slot, "·", 24, new Vector2(0.20f, 0.20f), new Vector2(0.80f, 0.80f), FontStyles.Normal, TextAlignmentOptions.Center);
+            CreateText(slot, "·", 20, new Vector2(0.24f, 0.24f), new Vector2(0.76f, 0.76f), FontStyles.Normal, TextAlignmentOptions.Center);
         }
 
         private Vector2 GetBoardCardSize(int columns, int rows)
@@ -288,6 +294,15 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             float height = Mathf.Clamp(cellHeight - ScaleValue(10f), ScaleValue(56f), ScaleValue(96f));
             float width = Mathf.Clamp(cellWidth - ScaleValue(12f), ScaleValue(74f), ScaleValue(132f));
             return new Vector2(width, height);
+        }
+
+        private void ApplyCardOutline(RectTransform cardRect, Color color, float width)
+        {
+            if (cardRect == null) return;
+
+            Outline outline = cardRect.gameObject.AddComponent<Outline>();
+            outline.effectColor = color;
+            outline.effectDistance = new Vector2(ScaleValue(width), -ScaleValue(width));
         }
 
         private static void ApplyBoardCardRotation(RectTransform cardRect, int rotationDegrees)
@@ -310,10 +325,10 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             if (IsPlacementStep() && selectedCard != null)
             {
                 bool isValid = boardManager != null && boardManager.CanPlaceCardAt(coordinate, selectedCard, turnManager?.SelectedRotationDegrees ?? 0);
-                return isValid ? new Color(0.18f, 0.46f, 0.25f, 0.90f) : new Color(0.40f, 0.18f, 0.18f, 0.70f);
+                return isValid ? new Color(0.14f, 0.38f, 0.22f, 0.78f) : new Color(0.12f, 0.22f, 0.19f, 0.62f);
             }
 
-            return new Color(0.15f, 0.28f, 0.23f, 0.82f);
+            return new Color(0.11f, 0.20f, 0.18f, 0.70f);
         }
 
         private static string FormatBoardCoordinate(Vector2Int coordinate)
@@ -437,7 +452,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             if (step == ScienceTurnStep.AwaitingBoardSlot || step == ScienceTurnStep.AwaitingPlacementConfirmation)
             {
-                RectTransform placementPanel = CreatePanel(screen, "PlacementControlPanel", new Vector2(0.08f, 0.325f), new Vector2(0.92f, 0.50f), new Color(0.06f, 0.08f, 0.12f, 0.98f));
+                RectTransform placementPanel = CreatePanel(screen, "PlacementControlPanel", new Vector2(0.06f, 0.275f), new Vector2(0.94f, 0.445f), new Color(0.06f, 0.08f, 0.12f, 0.98f));
                 BuildPlacementControlPanel(placementPanel);
                 return;
             }
@@ -1464,16 +1479,18 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
         private string BuildPlacementValidityText(bool hasSlot, bool isValid)
         {
-            if (!hasSlot) return "Escolha um slot vazio.";
-            if (isValid) return "✓ Posição válida. Pode confirmar.";
+            if (!hasSlot) return "Escolha uma casa adjacente.";
 
-            string validationMessage = boardManager?.GetPlacementValidationMessage(turnManager.SelectedBoardCoordinate, turnManager.SelectedCard, turnManager.SelectedRotationDegrees);
+            SciencePlacementValidationResult result = boardManager?.ValidatePlacement(turnManager.SelectedBoardCoordinate, turnManager.SelectedCard, turnManager.SelectedRotationDegrees);
+            string reason = result?.ReasonText;
+            if (isValid) return string.IsNullOrEmpty(reason) ? "Conexão válida." : reason;
+
             if (state != null && state.DebugOverridePlacementValidation)
             {
-                return $"⚠ Inválida, mas debug override permite confirmar: {validationMessage}";
+                return $"⚠ Debug permite confirmar: {reason}";
             }
 
-            return $"× Posição inválida: {validationMessage ?? "revise o slot escolhido"}";
+            return string.IsNullOrEmpty(reason) ? "Inválido: revise o slot escolhido." : reason;
         }
 
         private static bool IsDualColorCharacterCard(ScienceCardData card)

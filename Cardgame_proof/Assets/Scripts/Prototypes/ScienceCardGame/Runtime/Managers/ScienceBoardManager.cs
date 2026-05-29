@@ -129,42 +129,42 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
                 if (!cardColor.HasValue)
                 {
-                    failingSides.Add($"{sideName}: esta carta não expõe cor nessa borda.");
+                    failingSides.Add($"sem cor exposta na borda {sideName}");
                     continue;
                 }
 
                 if (!neighborColor.HasValue)
                 {
-                    failingSides.Add($"{sideName}: a carta vizinha não expõe cor na borda {neighborSideName}.");
+                    failingSides.Add($"vizinha sem cor exposta em {neighborSideName} ({sideName})");
                     continue;
                 }
 
                 if (cardColor.Value == neighborColor.Value)
                 {
-                    matchingSides.Add($"{sideName}: {cardColor.Value} combina com {neighborColor.Value}.");
+                    matchingSides.Add($"{cardColor.Value} com {neighborColor.Value} ({sideName})");
                 }
                 else
                 {
-                    failingSides.Add($"{sideName}: {cardColor.Value} não combina com {neighborColor.Value}.");
+                    failingSides.Add($"{cardColor.Value} não conecta com {neighborColor.Value} ({sideName})");
                 }
             }
 
             if (adjacentCharacterCount == 0)
             {
-                return Invalid("Coloque ao lado de pelo menos uma personagem existente.", matchingSides, failingSides);
+                return Invalid("Escolha uma casa adjacente.", matchingSides, failingSides);
             }
 
             if (failingSides.Count > 0)
             {
-                return Invalid($"Conexão de cores inválida. {string.Join(" ", failingSides.ToArray())}", matchingSides, failingSides);
+                return Invalid($"Inválido: {failingSides[0]}", matchingSides, failingSides);
             }
 
             if (matchingSides.Count == 0)
             {
-                return Invalid("Nenhuma borda tocando possui cores compatíveis.", matchingSides, failingSides);
+                return Invalid("Inválido: nenhuma borda tocando possui cores compatíveis.", matchingSides, failingSides);
             }
 
-            return Valid($"Conexão válida. {string.Join(" ", matchingSides.ToArray())}", matchingSides, failingSides);
+            return Valid($"Conexão válida: {matchingSides[0]}", matchingSides, failingSides);
         }
 
         public ScienceFactCategory? GetColorOnSide(ScienceCardData cardData, int rotationDegrees, ScienceBoardSide side)
