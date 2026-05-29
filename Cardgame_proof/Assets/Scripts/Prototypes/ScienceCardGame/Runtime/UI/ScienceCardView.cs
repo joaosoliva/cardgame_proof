@@ -141,21 +141,38 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.UI
         private void BuildCharacterCard(ScienceCharacterCardData characterCard)
         {
             background.color = new Color(0.17f, 0.29f, 0.39f, 1f);
-            CreateText("Name", characterCard.DisplayName, GetTitleSize(), new Vector2(0.07f, 0.75f), new Vector2(0.93f, 0.96f), FontStyles.Bold, TextAlignmentOptions.Center);
-            CreateText("Field", characterCard.Field, GetBodySize(), new Vector2(0.08f, 0.62f), new Vector2(0.92f, 0.74f), FontStyles.Italic, TextAlignmentOptions.Center);
-            CreateBadge("FactBadgeA", characterCard.FactCategoryA, new Vector2(0.08f, 0.48f), new Vector2(0.48f, 0.60f));
-            CreateBadge("FactBadgeB", characterCard.FactCategoryB, new Vector2(0.52f, 0.48f), new Vector2(0.92f, 0.60f));
-            CreateText("Description", characterCard.ShortDescription, GetBodySize(), new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.45f), FontStyles.Normal, TextAlignmentOptions.Top);
+            if (displayMode == ScienceCardViewDisplayMode.ZoomModal)
+            {
+                CreateText("Name", characterCard.DisplayName, GetTitleSize(), new Vector2(0.07f, 0.75f), new Vector2(0.93f, 0.96f), FontStyles.Bold, TextAlignmentOptions.Center);
+                CreateText("Field", characterCard.Field, GetBodySize(), new Vector2(0.08f, 0.62f), new Vector2(0.92f, 0.74f), FontStyles.Italic, TextAlignmentOptions.Center);
+                CreateBadge("FactBadgeA", characterCard.FactCategoryA, new Vector2(0.08f, 0.48f), new Vector2(0.48f, 0.60f));
+                CreateBadge("FactBadgeB", characterCard.FactCategoryB, new Vector2(0.52f, 0.48f), new Vector2(0.92f, 0.60f));
+                CreateText("Description", characterCard.ShortDescription, GetBodySize(), new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.45f), FontStyles.Normal, TextAlignmentOptions.Top);
+                return;
+            }
+
+            CreateText("Name", characterCard.DisplayName, GetTitleSize(), new Vector2(0.07f, 0.58f), new Vector2(0.93f, 0.96f), FontStyles.Bold, TextAlignmentOptions.Center);
+            CreateText("Field", characterCard.Field, GetBodySize(), new Vector2(0.08f, 0.39f), new Vector2(0.92f, 0.56f), FontStyles.Italic, TextAlignmentOptions.Center);
+            CreateBadge("FactBadgeA", characterCard.FactCategoryA, new Vector2(0.08f, 0.10f), new Vector2(0.48f, 0.33f));
+            CreateBadge("FactBadgeB", characterCard.FactCategoryB, new Vector2(0.52f, 0.10f), new Vector2(0.92f, 0.33f));
         }
 
         private void BuildActionCard(ScienceActionCardData actionCard)
         {
             background.color = new Color(0.31f, 0.20f, 0.43f, 1f);
-            CreateText("Name", actionCard.DisplayName, GetTitleSize(), new Vector2(0.07f, 0.76f), new Vector2(0.93f, 0.96f), FontStyles.Bold, TextAlignmentOptions.Center);
-            CreateText("ActionLabel", "AÇÃO", GetBodySize(), new Vector2(0.18f, 0.62f), new Vector2(0.82f, 0.74f), FontStyles.Bold, TextAlignmentOptions.Center, new Color(0.92f, 0.74f, 1f, 1f));
-            CreateText("EffectType", actionCard.EffectType.ToString(), GetBodySize(), new Vector2(0.08f, 0.50f), new Vector2(0.92f, 0.61f), FontStyles.Italic, TextAlignmentOptions.Center);
-            string rules = string.IsNullOrEmpty(actionCard.RulesText) ? actionCard.ShortDescription : actionCard.RulesText;
-            CreateText("RulesText", rules, GetBodySize(), new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.47f), FontStyles.Normal, TextAlignmentOptions.Top);
+            if (displayMode == ScienceCardViewDisplayMode.ZoomModal)
+            {
+                CreateText("Name", actionCard.DisplayName, GetTitleSize(), new Vector2(0.07f, 0.76f), new Vector2(0.93f, 0.96f), FontStyles.Bold, TextAlignmentOptions.Center);
+                CreateText("ActionLabel", "AÇÃO", GetBodySize(), new Vector2(0.18f, 0.62f), new Vector2(0.82f, 0.74f), FontStyles.Bold, TextAlignmentOptions.Center, new Color(0.92f, 0.74f, 1f, 1f));
+                CreateText("EffectType", actionCard.EffectType.ToString(), GetBodySize(), new Vector2(0.08f, 0.50f), new Vector2(0.92f, 0.61f), FontStyles.Italic, TextAlignmentOptions.Center);
+                string rules = string.IsNullOrEmpty(actionCard.RulesText) ? actionCard.ShortDescription : actionCard.RulesText;
+                CreateText("RulesText", rules, GetBodySize(), new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.47f), FontStyles.Normal, TextAlignmentOptions.Top);
+                return;
+            }
+
+            CreateText("Name", actionCard.DisplayName, GetTitleSize(), new Vector2(0.07f, 0.58f), new Vector2(0.93f, 0.96f), FontStyles.Bold, TextAlignmentOptions.Center);
+            CreateText("ActionLabel", "AÇÃO", GetBodySize(), new Vector2(0.18f, 0.36f), new Vector2(0.82f, 0.53f), FontStyles.Bold, TextAlignmentOptions.Center, new Color(0.92f, 0.74f, 1f, 1f));
+            CreateText("EffectType", actionCard.EffectType.ToString(), GetBodySize(), new Vector2(0.08f, 0.10f), new Vector2(0.92f, 0.32f), FontStyles.Italic, TextAlignmentOptions.Center);
         }
 
         private void BuildEmptyCard()
@@ -171,9 +188,9 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.UI
                 case ScienceCardViewDisplayMode.ZoomModal:
                     return 34;
                 case ScienceCardViewDisplayMode.Board:
-                    return 14;
+                    return 15;
                 default:
-                    return 22;
+                    return 24;
             }
         }
 
@@ -184,9 +201,9 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.UI
                 case ScienceCardViewDisplayMode.ZoomModal:
                     return 24;
                 case ScienceCardViewDisplayMode.Board:
-                    return 10;
+                    return 11;
                 default:
-                    return 16;
+                    return 17;
             }
         }
 
@@ -213,9 +230,9 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.UI
                 case ScienceCardViewDisplayMode.ZoomModal:
                     return 20;
                 case ScienceCardViewDisplayMode.Board:
-                    return 7;
+                    return 8;
                 default:
-                    return 11;
+                    return 12;
             }
         }
 

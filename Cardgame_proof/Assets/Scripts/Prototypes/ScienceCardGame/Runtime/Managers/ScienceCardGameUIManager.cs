@@ -12,6 +12,8 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
     public sealed class ScienceCardGameUIManager
     {
         private const int MaxLogEntries = 7;
+        private const float ReferenceLandscapeWidth = 1920f;
+        private const float ReferenceLandscapeHeight = 1080f;
 
         private readonly List<string> recentActions = new List<string>();
         private readonly Dictionary<int, bool> connectionVotes = new Dictionary<int, bool>();
@@ -147,9 +149,9 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                 return;
             }
 
-            RectTransform topBar = CreatePanel(screen, "TopBar", new Vector2(0.02f, 0.88f), new Vector2(0.98f, 0.98f), new Color(0.10f, 0.13f, 0.18f, 0.96f));
-            RectTransform boardPanel = CreatePanel(screen, "BoardPanel", new Vector2(0.02f, 0.31f), new Vector2(0.98f, 0.86f), new Color(0.12f, 0.20f, 0.17f, 0.96f));
-            RectTransform handPanel = CreatePanel(screen, "CurrentPlayerHandPanel", new Vector2(0.02f, 0.02f), new Vector2(0.98f, 0.29f), new Color(0.11f, 0.12f, 0.18f, 0.96f));
+            RectTransform topBar = CreatePanel(screen, "TopBar", new Vector2(0.02f, 0.89f), new Vector2(0.98f, 0.985f), new Color(0.10f, 0.13f, 0.18f, 0.96f));
+            RectTransform boardPanel = CreatePanel(screen, "BoardPanel", new Vector2(0.02f, 0.34f), new Vector2(0.98f, 0.875f), new Color(0.12f, 0.20f, 0.17f, 0.96f));
+            RectTransform handPanel = CreatePanel(screen, "CurrentPlayerHandPanel", new Vector2(0.02f, 0.02f), new Vector2(0.98f, 0.32f), new Color(0.11f, 0.12f, 0.18f, 0.96f));
 
             BuildTopBar(topBar);
             BuildBoardPanel(boardPanel);
@@ -174,10 +176,10 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
         private void BuildBoardPanel(RectTransform parent)
         {
-            CreateText(parent, "Tabuleiro", 30, new Vector2(0.03f, 0.91f), new Vector2(0.32f, 0.99f), FontStyles.Bold, TextAlignmentOptions.Left);
-            CreateText(parent, "Toque em um espaço válido para posicionar a carta selecionada.", 21, new Vector2(0.34f, 0.90f), new Vector2(0.97f, 0.99f), FontStyles.Italic, TextAlignmentOptions.Right);
+            CreateText(parent, "Tabuleiro", 32, new Vector2(0.03f, 0.91f), new Vector2(0.30f, 0.99f), FontStyles.Bold, TextAlignmentOptions.Left);
+            CreateText(parent, "Verde = válido · Vermelho = inválido · Dourado = selecionado", 23, new Vector2(0.32f, 0.90f), new Vector2(0.97f, 0.99f), FontStyles.Italic, TextAlignmentOptions.Right);
 
-            RectTransform grid = CreatePanel(parent, "BoardGrid", new Vector2(0.02f, 0.04f), new Vector2(0.98f, 0.88f), new Color(0.06f, 0.12f, 0.10f, 0.92f));
+            RectTransform grid = CreatePanel(parent, "BoardGrid", new Vector2(0.025f, 0.045f), new Vector2(0.975f, 0.885f), new Color(0.04f, 0.09f, 0.08f, 0.95f));
             int columns = Mathf.Max(1, state?.BoardSize.x ?? 7);
             int rows = Mathf.Max(1, state?.BoardSize.y ?? 7);
 
@@ -194,8 +196,10 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                     ScienceCardData selectedCard = turnManager?.SelectedCard;
                     Color slotColor = GetBoardSlotColor(coordinate, selectedCard, isSelectedSlot);
                     RectTransform slot = CreatePanel(grid, $"BoardSlot_{x}_{y}", new Vector2(minX, minY), new Vector2(maxX, maxY), slotColor);
-                    slot.offsetMin = new Vector2(slot.offsetMin.x + 3f, slot.offsetMin.y + 3f);
-                    slot.offsetMax = new Vector2(slot.offsetMax.x - 3f, slot.offsetMax.y - 3f);
+                    float slotPadding = ScaleValue(5f);
+                    slot.offsetMin = new Vector2(slot.offsetMin.x + slotPadding, slot.offsetMin.y + slotPadding);
+                    slot.offsetMax = new Vector2(slot.offsetMax.x - slotPadding, slot.offsetMax.y - slotPadding);
+                    ApplyBoardSlotOutline(slot, coordinate, selectedCard, isSelectedSlot);
                     ScienceCardData boardCard = GetBoardCardAt(coordinate);
                     if (boardCard != null)
                     {
@@ -203,6 +207,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                         RectTransform boardCardRect = boardCardView.GetComponent<RectTransform>();
                         boardCardRect.anchorMin = new Vector2(0.5f, 0.5f);
                         boardCardRect.anchorMax = new Vector2(0.5f, 0.5f);
+                        boardCardRect.sizeDelta = GetBoardCardSize(columns, rows);
                         boardCardRect.anchoredPosition = Vector2.zero;
                         ApplyBoardCardRotation(boardCardRect, boardManager?.GetPlacedCardRotationDegrees(coordinate) ?? 0);
                     }
@@ -219,17 +224,61 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                             RectTransform previewRect = previewCardView.GetComponent<RectTransform>();
                             previewRect.anchorMin = new Vector2(0.5f, 0.5f);
                             previewRect.anchorMax = new Vector2(0.5f, 0.5f);
+                            previewRect.sizeDelta = GetBoardCardSize(columns, rows);
                             previewRect.anchoredPosition = Vector2.zero;
                             ApplyBoardCardRotation(previewRect, turnManager?.SelectedRotationDegrees ?? 0);
                         }
                         else
                         {
-                            string label = FormatBoardCoordinate(coordinate);
-                            CreateText(slot, label, 12, new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.92f), FontStyles.Normal);
+                            BuildEmptySlotHint(slot, coordinate, selectedCard);
                         }
                     }
                 }
             }
+        }
+
+        private void ApplyBoardSlotOutline(RectTransform slot, Vector2Int coordinate, ScienceCardData selectedCard, bool isSelectedSlot)
+        {
+            Outline outline = slot.gameObject.AddComponent<Outline>();
+            outline.effectDistance = new Vector2(ScaleValue(2.5f), -ScaleValue(2.5f));
+            outline.effectColor = GetBoardSlotOutlineColor(coordinate, selectedCard, isSelectedSlot);
+        }
+
+        private Color GetBoardSlotOutlineColor(Vector2Int coordinate, ScienceCardData selectedCard, bool isSelectedSlot)
+        {
+            if (isSelectedSlot) return new Color(1f, 0.86f, 0.24f, 1f);
+            if (GetBoardCardAt(coordinate) != null) return new Color(0.72f, 0.82f, 0.92f, 0.95f);
+
+            if (turnManager != null && turnManager.CurrentStep == ScienceTurnStep.AwaitingBoardSlot && selectedCard != null)
+            {
+                bool isValid = boardManager != null && boardManager.CanPlaceCardAt(coordinate, selectedCard);
+                return isValid ? new Color(0.35f, 0.95f, 0.48f, 1f) : new Color(1f, 0.38f, 0.32f, 0.95f);
+            }
+
+            return new Color(0.46f, 0.58f, 0.54f, 0.35f);
+        }
+
+        private void BuildEmptySlotHint(RectTransform slot, Vector2Int coordinate, ScienceCardData selectedCard)
+        {
+            if (turnManager != null && turnManager.CurrentStep == ScienceTurnStep.AwaitingBoardSlot && selectedCard != null)
+            {
+                bool isValid = boardManager != null && boardManager.CanPlaceCardAt(coordinate, selectedCard);
+                CreateText(slot, isValid ? "✓" : "×", 28, new Vector2(0.12f, 0.12f), new Vector2(0.88f, 0.88f), FontStyles.Bold, TextAlignmentOptions.Center);
+                return;
+            }
+
+            CreateText(slot, "·", 24, new Vector2(0.20f, 0.20f), new Vector2(0.80f, 0.80f), FontStyles.Normal, TextAlignmentOptions.Center);
+        }
+
+        private Vector2 GetBoardCardSize(int columns, int rows)
+        {
+            float boardWidth = Mathf.Max(Screen.width, 1) * 0.96f * 0.95f;
+            float boardHeight = Mathf.Max(Screen.height, 1) * 0.535f * 0.84f;
+            float cellWidth = boardWidth / Mathf.Max(1, columns);
+            float cellHeight = boardHeight / Mathf.Max(1, rows);
+            float height = Mathf.Clamp(cellHeight - ScaleValue(10f), ScaleValue(56f), ScaleValue(96f));
+            float width = Mathf.Clamp(cellWidth - ScaleValue(12f), ScaleValue(74f), ScaleValue(132f));
+            return new Vector2(width, height);
         }
 
         private static void ApplyBoardCardRotation(RectTransform cardRect, int rotationDegrees)
@@ -261,31 +310,79 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         {
             SciencePlayerState currentPlayer = GetCurrentPlayer();
             string title = currentPlayer == null ? "Mão do jogador" : $"Mão de {currentPlayer.DisplayName}";
-            CreateText(parent, title, 30, new Vector2(0.03f, 0.80f), new Vector2(0.34f, 0.97f), FontStyles.Bold, TextAlignmentOptions.Left);
+            CreateText(parent, title, 32, new Vector2(0.03f, 0.80f), new Vector2(0.34f, 0.97f), FontStyles.Bold, TextAlignmentOptions.Left);
 
             if (currentPlayer == null || currentPlayer.Hand.Count == 0)
             {
-                CreateText(parent, "Nenhuma carta na mão atual.", 22, new Vector2(0.04f, 0.20f), new Vector2(0.96f, 0.70f), FontStyles.Italic);
+                CreateText(parent, "Nenhuma carta na mão atual.", 26, new Vector2(0.04f, 0.20f), new Vector2(0.96f, 0.70f), FontStyles.Italic);
                 return;
             }
 
             int characterCount = CountCardsOfType(currentPlayer, ScienceCardType.Character);
             int actionCount = CountCardsOfType(currentPlayer, ScienceCardType.Action);
-            CreateText(parent, $"{currentPlayer.Hand.Count} cartas: {characterCount} personagens, {actionCount} ações", 23, new Vector2(0.36f, 0.80f), new Vector2(0.96f, 0.96f), FontStyles.Normal, TextAlignmentOptions.Right);
+            CreateText(parent, $"{currentPlayer.Hand.Count} cartas: {characterCount} personagens, {actionCount} ações", 25, new Vector2(0.36f, 0.80f), new Vector2(0.96f, 0.96f), FontStyles.Normal, TextAlignmentOptions.Right);
 
-            RectTransform cardRow = CreatePanel(parent, "CurrentPlayerHandCards", new Vector2(0.03f, 0.06f), new Vector2(0.97f, 0.78f), new Color(0.06f, 0.07f, 0.11f, 0.55f));
-            int cardCount = currentPlayer.Hand.Count;
-            for (int i = 0; i < cardCount; i++)
+            RectTransform viewport = CreateScrollViewport(parent, "CurrentPlayerHandScroll", new Vector2(0.03f, 0.05f), new Vector2(0.97f, 0.78f), new Color(0.06f, 0.07f, 0.11f, 0.55f), out ScrollRect scrollRect);
+            RectTransform content = CreateHandContent(viewport, currentPlayer.Hand.Count);
+            scrollRect.content = content;
+
+            Vector2 cardSize = GetHandCardSize();
+            float spacing = ScaleValue(18f);
+            float leftPadding = ScaleValue(18f);
+            for (int i = 0; i < currentPlayer.Hand.Count; i++)
             {
                 ScienceCardData card = currentPlayer.Hand[i];
-                float center = (i + 0.5f) / cardCount;
-                RectTransform cardRect = CreateCardView(cardRow, card, $"HandCard_{i}");
-                cardRect.anchorMin = new Vector2(center, 0.50f);
-                cardRect.anchorMax = new Vector2(center, 0.50f);
+                RectTransform cardRect = CreateCardView(content, card, $"HandCard_{i}");
+                cardRect.anchorMin = new Vector2(0f, 0.5f);
+                cardRect.anchorMax = new Vector2(0f, 0.5f);
                 cardRect.pivot = new Vector2(0.5f, 0.5f);
-                cardRect.sizeDelta = new Vector2(190f, 170f);
-                cardRect.anchoredPosition = Vector2.zero;
+                cardRect.sizeDelta = cardSize;
+                cardRect.anchoredPosition = new Vector2(leftPadding + (cardSize.x * 0.5f) + (i * (cardSize.x + spacing)), 0f);
             }
+        }
+
+        private RectTransform CreateScrollViewport(RectTransform parent, string name, Vector2 anchorMin, Vector2 anchorMax, Color color, out ScrollRect scrollRect)
+        {
+            GameObject viewportObject = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Mask), typeof(ScrollRect));
+            RectTransform viewport = viewportObject.GetComponent<RectTransform>();
+            viewport.SetParent(parent, false);
+            viewport.anchorMin = anchorMin;
+            viewport.anchorMax = anchorMax;
+            viewport.offsetMin = Vector2.zero;
+            viewport.offsetMax = Vector2.zero;
+
+            Image image = viewportObject.GetComponent<Image>();
+            image.color = color;
+
+            Mask mask = viewportObject.GetComponent<Mask>();
+            mask.showMaskGraphic = true;
+
+            scrollRect = viewportObject.GetComponent<ScrollRect>();
+            scrollRect.viewport = viewport;
+            scrollRect.horizontal = true;
+            scrollRect.vertical = false;
+            scrollRect.movementType = ScrollRect.MovementType.Clamped;
+            scrollRect.inertia = true;
+            scrollRect.scrollSensitivity = ScaleValue(30f);
+            return viewport;
+        }
+
+        private RectTransform CreateHandContent(RectTransform viewport, int cardCount)
+        {
+            GameObject contentObject = new GameObject("HandScrollContent", typeof(RectTransform));
+            RectTransform content = contentObject.GetComponent<RectTransform>();
+            content.SetParent(viewport, false);
+            content.anchorMin = new Vector2(0f, 0f);
+            content.anchorMax = new Vector2(0f, 1f);
+            content.pivot = new Vector2(0f, 0.5f);
+
+            Vector2 cardSize = GetHandCardSize();
+            float spacing = ScaleValue(18f);
+            float padding = ScaleValue(36f);
+            float contentWidth = Mathf.Max(Screen.width * 0.90f, padding + (cardCount * cardSize.x) + (Mathf.Max(0, cardCount - 1) * spacing));
+            content.sizeDelta = new Vector2(contentWidth, 0f);
+            content.anchoredPosition = Vector2.zero;
+            return content;
         }
 
         private void BuildContextualTurnPanel(RectTransform screen)
@@ -1341,6 +1438,33 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             return count;
         }
 
+        private static Vector2 GetHandCardSize()
+        {
+            return ScaleVector(new Vector2(230f, 188f));
+        }
+
+        private static float GetUiScale()
+        {
+            float widthScale = Mathf.Max(Screen.width, 1) / ReferenceLandscapeWidth;
+            float heightScale = Mathf.Max(Screen.height, 1) / ReferenceLandscapeHeight;
+            return Mathf.Clamp(Mathf.Min(widthScale, heightScale), 0.85f, 1.25f);
+        }
+
+        private static float ScaleValue(float value)
+        {
+            return value * GetUiScale();
+        }
+
+        private static Vector2 ScaleVector(Vector2 value)
+        {
+            return value * GetUiScale();
+        }
+
+        private static int ScaleFont(int size)
+        {
+            return Mathf.RoundToInt(size * GetUiScale());
+        }
+
         private static void ClearChildren(Transform parent)
         {
             if (parent == null) return;
@@ -1384,7 +1508,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             TextMeshProUGUI text = go.GetComponent<TextMeshProUGUI>();
             text.text = value;
-            text.fontSize = size;
+            text.fontSize = ScaleFont(size);
             text.fontStyle = style;
             text.alignment = alignment;
             text.color = Color.white;
@@ -1406,7 +1530,8 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             rect.anchorMin = anchor;
             rect.anchorMax = anchor;
             rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.sizeDelta = size;
+            Vector2 scaledSize = ScaleVector(size);
+            rect.sizeDelta = scaledSize;
 
             Image image = buttonObject.GetComponent<Image>();
             image.color = new Color(0.18f, 0.45f, 0.82f, 1f);
@@ -1424,7 +1549,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             TextMeshProUGUI text = labelObject.GetComponent<TextMeshProUGUI>();
             text.text = label;
-            text.fontSize = size.x < 300f ? 20 : 34;
+            text.fontSize = ScaleFont(scaledSize.x < ScaleValue(300f) ? 24 : 36);
             text.fontStyle = FontStyles.Bold;
             text.alignment = TextAlignmentOptions.Center;
             text.color = Color.white;
