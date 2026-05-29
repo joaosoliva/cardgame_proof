@@ -24,6 +24,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         public int TurnNumber { get; private set; }
         public ScienceTurnStep CurrentStep { get; private set; } = ScienceTurnStep.AwaitingCardSelection;
         public ScienceCardData SelectedCard { get; private set; }
+        public int SelectedRotationDegrees { get; private set; }
         public bool HasSelectedBoardCoordinate => hasSelectedBoardCoordinate;
         public Vector2Int SelectedBoardCoordinate => selectedBoardCoordinate;
 
@@ -64,8 +65,15 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             selectedBoardCoordinate = coordinate;
             hasSelectedBoardCoordinate = true;
             CurrentStep = ScienceTurnStep.AwaitingPlacementConfirmation;
-            telemetry?.LogEvent("science_turn_board_slot_selected", $"turn={TurnNumber};player={CurrentPlayerIndex};coord={coordinate}");
+            telemetry?.LogEvent("science_turn_board_slot_selected", $"turn={TurnNumber};player={CurrentPlayerIndex};coord={coordinate};rotation={SelectedRotationDegrees}");
             return true;
+        }
+
+        public void RotateSelectedCard(int deltaDegrees)
+        {
+            if (SelectedCard == null) return;
+            SelectedRotationDegrees = ScienceBoardSlotState.NormalizeRotation(SelectedRotationDegrees + deltaDegrees);
+            telemetry?.LogEvent("science_turn_card_rotated", $"turn={TurnNumber};player={CurrentPlayerIndex};card={SelectedCard.Id};rotation={SelectedRotationDegrees}");
         }
 
         public void CancelSelection()
@@ -111,6 +119,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         private void ClearSelection()
         {
             SelectedCard = null;
+            SelectedRotationDegrees = 0;
             hasSelectedBoardCoordinate = false;
             selectedBoardCoordinate = Vector2Int.zero;
         }

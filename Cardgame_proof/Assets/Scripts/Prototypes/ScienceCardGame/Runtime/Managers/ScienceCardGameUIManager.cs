@@ -178,6 +178,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                         boardCardRect.anchorMin = new Vector2(0.5f, 0.5f);
                         boardCardRect.anchorMax = new Vector2(0.5f, 0.5f);
                         boardCardRect.anchoredPosition = Vector2.zero;
+                        ApplyBoardCardRotation(boardCardRect, boardManager?.GetPlacedCardRotationDegrees(coordinate) ?? 0);
                     }
                     else
                     {
@@ -186,11 +187,29 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                             ConfigureBoardSlotButton(slot, coordinate);
                         }
 
-                        string label = isSelectedSlot ? "Selecionado" : FormatBoardCoordinate(coordinate);
-                        CreateText(slot, label, isSelectedSlot ? 13 : 12, new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.92f), isSelectedSlot ? FontStyles.Bold : FontStyles.Normal);
+                        if (isSelectedSlot && selectedCard != null)
+                        {
+                            ScienceCardView previewCardView = ScienceCardView.Create(slot, $"BoardPreview_{x}_{y}", selectedCard, ScienceCardViewDisplayMode.Board);
+                            RectTransform previewRect = previewCardView.GetComponent<RectTransform>();
+                            previewRect.anchorMin = new Vector2(0.5f, 0.5f);
+                            previewRect.anchorMax = new Vector2(0.5f, 0.5f);
+                            previewRect.anchoredPosition = Vector2.zero;
+                            ApplyBoardCardRotation(previewRect, turnManager?.SelectedRotationDegrees ?? 0);
+                        }
+                        else
+                        {
+                            string label = FormatBoardCoordinate(coordinate);
+                            CreateText(slot, label, 12, new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.92f), FontStyles.Normal);
+                        }
                     }
                 }
             }
+        }
+
+        private static void ApplyBoardCardRotation(RectTransform cardRect, int rotationDegrees)
+        {
+            if (cardRect == null) return;
+            cardRect.localEulerAngles = new Vector3(0f, 0f, -ScienceBoardSlotState.NormalizeRotation(rotationDegrees));
         }
 
         private Color GetBoardSlotColor(Vector2Int coordinate, ScienceCardData selectedCard, bool isSelectedSlot)
@@ -250,9 +269,15 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             CreateText(parent, BuildSelectedCardText(), 18, new Vector2(0.08f, 0.66f), new Vector2(0.92f, 0.78f), FontStyles.Normal, TextAlignmentOptions.Top);
 
             ScienceTurnStep step = turnManager?.CurrentStep ?? ScienceTurnStep.AwaitingCardSelection;
+            if (step == ScienceTurnStep.AwaitingBoardSlot || step == ScienceTurnStep.AwaitingPlacementConfirmation)
+            {
+                CreateButton(parent, "Girar esquerda", new Vector2(0.50f, 0.58f), RotateSelectedCardLeft, new Vector2(260f, 58f));
+                CreateButton(parent, "Girar direita", new Vector2(0.50f, 0.49f), RotateSelectedCardRight, new Vector2(260f, 58f));
+            }
+
             if (step == ScienceTurnStep.AwaitingPlacementConfirmation)
             {
-                CreateButton(parent, "Confirmar posição", new Vector2(0.50f, 0.56f), ConfirmPlacement, new Vector2(260f, 68f));
+                CreateButton(parent, "Confirmar posição", new Vector2(0.50f, 0.38f), ConfirmPlacement, new Vector2(260f, 68f));
             }
 
             if (step == ScienceTurnStep.ConnectionExplanation)
@@ -262,7 +287,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             if (step == ScienceTurnStep.AwaitingBoardSlot || step == ScienceTurnStep.AwaitingPlacementConfirmation)
             {
-                CreateButton(parent, "Cancelar seleção", new Vector2(0.50f, 0.44f), CancelSelection, new Vector2(260f, 62f));
+                CreateButton(parent, "Cancelar seleção", new Vector2(0.50f, 0.28f), CancelSelection, new Vector2(260f, 58f));
             }
 
             if (step == ScienceTurnStep.TurnResolved)
@@ -316,6 +341,30 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             OpenCardDetailsModal(card);
         }
 
+        private void RotateSelectedCardLeft()
+        {
+            RotateSelectedCard(-90);
+        }
+
+        private void RotateSelectedCardRight()
+        {
+            RotateSelectedCard(90);
+        }
+
+        private void RotateSelectedCard(int deltaDegrees)
+        {
+            if (turnManager == null || turnManager.SelectedCard == null)
+            {
+                AddLog("Selecione uma carta antes de girar.");
+                BuildGameplayScreen();
+                return;
+            }
+
+            turnManager.RotateSelectedCard(deltaDegrees);
+            AddLog($"Rotação da carta selecionada: {turnManager.SelectedRotationDegrees}°.");
+            BuildGameplayScreen();
+        }
+
         private void SelectBoardSlot(Vector2Int coordinate)
         {
             if (turnManager == null)
@@ -365,7 +414,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             Vector2Int coordinate = turnManager.SelectedBoardCoordinate;
             string validationMessage = boardManager?.GetPlacementValidationMessage(coordinate, selectedCard);
-            if (!string.IsNullOrEmpty(validationMessage) || boardManager == null || !boardManager.TryPlaceCard(coordinate, selectedCard))
+            if (!string.IsNullOrEmpty(validationMessage) || boardManager == null || !boardManager.TryPlaceCard(coordinate, selectedCard, turnManager.SelectedRotationDegrees))
             {
                 AddLog($"Não foi possível colocar a carta em {FormatBoardCoordinate(coordinate)}: {validationMessage ?? "posição inválida"}");
                 turnManager.CancelSelection();
@@ -375,7 +424,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             currentPlayer.MarkPlayed(selectedCard);
             turnManager.StartConnectionExplanation();
-            AddLog($"{currentPlayer.DisplayName} colocou {selectedCard.DisplayName} em {FormatBoardCoordinate(coordinate)}.");
+            AddLog($"{currentPlayer.DisplayName} colocou {selectedCard.DisplayName} em {FormatBoardCoordinate(coordinate)} com rotação {turnManager.SelectedRotationDegrees}°.");
             AddLog("Explique a conexão científica proposta; a votação será implementada depois.");
             BuildGameplayScreen();
         }
@@ -552,7 +601,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             ScienceCardData selectedCard = turnManager?.SelectedCard;
             if (selectedCard == null) return "Nenhuma carta selecionada.";
 
-            string text = $"Selecionada: {selectedCard.DisplayName} [{selectedCard.CardType}]";
+            string text = $"Selecionada: {selectedCard.DisplayName} [{selectedCard.CardType}]\nRotação: {turnManager?.SelectedRotationDegrees ?? 0}°";
             if (turnManager != null && turnManager.HasSelectedBoardCoordinate)
             {
                 Vector2Int coord = turnManager.SelectedBoardCoordinate;
@@ -567,9 +616,9 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             switch (turnManager?.CurrentStep ?? ScienceTurnStep.AwaitingCardSelection)
             {
                 case ScienceTurnStep.AwaitingBoardSlot:
-                    return "Slots verdes são válidos; slots vermelhos precisam ficar perto do centro ou adjacentes a uma personagem.";
+                    return "Gire a carta se quiser alinhar fatos/cores; depois escolha um slot verde.";
                 case ScienceTurnStep.AwaitingPlacementConfirmation:
-                    return "Confirme para colocar a carta, ou cancele para voltar à seleção da mão.";
+                    return "A prévia no tabuleiro mostra a rotação escolhida. Confirme, gire novamente ou cancele.";
                 case ScienceTurnStep.ConnectionExplanation:
                     return "Fluxo de explicação/votação iniciado como placeholder. Conclua para liberar o fim do turno.";
                 case ScienceTurnStep.TurnResolved:

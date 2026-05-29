@@ -4,14 +4,37 @@ using UnityEngine;
 
 namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 {
+    public sealed class ScienceBoardSlotState
+    {
+        public ScienceBoardSlotState(Vector2Int coordinate, ScienceCardData card, int rotationDegrees)
+        {
+            Coordinate = coordinate;
+            Card = card;
+            RotationDegrees = NormalizeRotation(rotationDegrees);
+        }
+
+        public Vector2Int Coordinate { get; }
+        public ScienceCardData Card { get; }
+        public int RotationDegrees { get; }
+
+        public static int NormalizeRotation(int rotationDegrees)
+        {
+            int normalized = rotationDegrees % 360;
+            if (normalized < 0) normalized += 360;
+            return (normalized / 90) * 90;
+        }
+    }
+
     public sealed class ScienceBoardManager
     {
         private readonly Dictionary<Vector2Int, ScienceCardData> boardCards = new Dictionary<Vector2Int, ScienceCardData>();
+        private readonly Dictionary<Vector2Int, ScienceBoardSlotState> boardSlots = new Dictionary<Vector2Int, ScienceBoardSlotState>();
         private readonly List<Vector2Int> slots = new List<Vector2Int>();
         private ScienceCardGameState state;
         private ScienceTelemetryManager telemetry;
 
         public IReadOnlyDictionary<Vector2Int, ScienceCardData> BoardCards => boardCards;
+        public IReadOnlyDictionary<Vector2Int, ScienceBoardSlotState> BoardSlots => boardSlots;
         public IReadOnlyList<Vector2Int> Slots => slots;
         public Vector2Int BoardSize => state?.BoardSize ?? Vector2Int.zero;
         public Vector2Int CenterCoordinate => new Vector2Int(BoardSize.x / 2, BoardSize.y / 2);
@@ -21,6 +44,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             state = gameState;
             telemetry = telemetryManager;
             boardCards.Clear();
+            boardSlots.Clear();
             BuildLogicalSlots();
             Debug.Log($"[ScienceCardGame] 03 BoardManager initialized boardSize={state.BoardSize.x}x{state.BoardSize.y} slots={slots.Count}");
             telemetry?.LogEvent("science_board_initialized", $"size={state.BoardSize.x}x{state.BoardSize.y};slots={slots.Count};center={CenterCoordinate}");
@@ -46,7 +70,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             return HasAdjacentCharacterCard(coordinate) ? string.Empty : "Coloque ao lado de pelo menos uma personagem existente.";
         }
 
-        public bool TryPlaceCard(Vector2Int coordinate, ScienceCardData card)
+        public bool TryPlaceCard(Vector2Int coordinate, ScienceCardData card, int rotationDegrees = 0)
         {
             string validationMessage = GetPlacementValidationMessage(coordinate, card);
             if (!string.IsNullOrEmpty(validationMessage))
@@ -55,14 +79,22 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                 return false;
             }
 
+            int normalizedRotation = ScienceBoardSlotState.NormalizeRotation(rotationDegrees);
             boardCards[coordinate] = card;
-            telemetry?.LogEvent("science_board_card_placed", $"card={card.Id};coord={coordinate};occupied={boardCards.Count}");
+            boardSlots[coordinate] = new ScienceBoardSlotState(coordinate, card, normalizedRotation);
+            telemetry?.LogEvent("science_board_card_placed", $"card={card.Id};coord={coordinate};rotation={normalizedRotation};occupied={boardCards.Count}");
             return true;
+        }
+
+        public int GetPlacedCardRotationDegrees(Vector2Int coordinate)
+        {
+            return boardSlots.TryGetValue(coordinate, out ScienceBoardSlotState slotState) ? slotState.RotationDegrees : 0;
         }
 
         public void Cleanup()
         {
             boardCards.Clear();
+            boardSlots.Clear();
             slots.Clear();
             state = null;
             telemetry = null;
