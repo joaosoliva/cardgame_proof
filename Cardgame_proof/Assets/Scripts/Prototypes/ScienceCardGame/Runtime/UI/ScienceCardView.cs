@@ -75,24 +75,38 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.UI
         {
             switch (category)
             {
-                case ScienceFactCategory.Observation:
-                    return new Color(0.20f, 0.56f, 0.90f, 1f);
-                case ScienceFactCategory.Experimentation:
-                    return new Color(0.95f, 0.55f, 0.20f, 1f);
-                case ScienceFactCategory.Theory:
-                    return new Color(0.58f, 0.42f, 0.86f, 1f);
-                case ScienceFactCategory.Technology:
-                    return new Color(0.20f, 0.74f, 0.70f, 1f);
-                case ScienceFactCategory.Society:
-                    return new Color(0.93f, 0.38f, 0.55f, 1f);
-                case ScienceFactCategory.Environment:
-                    return new Color(0.28f, 0.68f, 0.32f, 1f);
-                case ScienceFactCategory.Health:
-                    return new Color(0.86f, 0.25f, 0.28f, 1f);
-                case ScienceFactCategory.Mathematics:
-                    return new Color(0.96f, 0.82f, 0.23f, 1f);
+                case ScienceFactCategory.LifeSciences:
+                    return new Color(0.16f, 0.72f, 0.32f, 1f);
+                case ScienceFactCategory.PhysicalSciences:
+                    return new Color(0.15f, 0.48f, 0.95f, 1f);
+                case ScienceFactCategory.MathAndComputation:
+                    return new Color(0.96f, 0.78f, 0.16f, 1f);
+                case ScienceFactCategory.TechnologyAndInvention:
+                    return new Color(0.92f, 0.34f, 0.16f, 1f);
+                case ScienceFactCategory.SocietyAndEducation:
+                    return new Color(0.70f, 0.34f, 0.92f, 1f);
                 default:
                     return new Color(0.55f, 0.58f, 0.64f, 1f);
+            }
+        }
+
+
+        public static string GetFactCategoryLabel(ScienceFactCategory category)
+        {
+            switch (category)
+            {
+                case ScienceFactCategory.LifeSciences:
+                    return "Life";
+                case ScienceFactCategory.PhysicalSciences:
+                    return "Physical";
+                case ScienceFactCategory.MathAndComputation:
+                    return "Math/Comp";
+                case ScienceFactCategory.TechnologyAndInvention:
+                    return "Tech";
+                case ScienceFactCategory.SocietyAndEducation:
+                    return "Society";
+                default:
+                    return category.ToString();
             }
         }
 
@@ -286,7 +300,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.UI
             badgeImage.color = GetFactCategoryColor(category);
             badgeImage.raycastTarget = false;
 
-            CreateText(badgeRect, "Label", category.ToString(), GetBadgeTextSize(), Vector2.zero, Vector2.one, FontStyles.Bold, TextAlignmentOptions.Center, Color.black);
+            CreateText(badgeRect, "Label", GetFactCategoryLabel(category), GetBadgeTextSize(), Vector2.zero, Vector2.one, FontStyles.Bold, TextAlignmentOptions.Center, Color.black);
         }
 
         private int GetBadgeTextSize()
