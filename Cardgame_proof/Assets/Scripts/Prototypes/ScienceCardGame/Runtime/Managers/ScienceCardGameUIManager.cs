@@ -32,8 +32,10 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         private int selectedPlayerCount = 2;
         private int activeVotingPlayerIndex = -1;
         private string activeVotingCardId;
+        private SciencePlacementConnectionType activeVotingConnectionType = SciencePlacementConnectionType.Invalid;
         private int activeScoringPlayerIndex = -1;
         private string activeScoringCardId;
+        private SciencePlacementConnectionType activeScoringConnectionType = SciencePlacementConnectionType.Invalid;
         private bool basePointAwarded;
         private bool interestingBonusAwarded;
         private bool guideFactBonusAwarded;
@@ -460,7 +462,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             if (step == ScienceTurnStep.AwaitingBoardSlot || step == ScienceTurnStep.AwaitingPlacementConfirmation)
             {
-                RectTransform placementPanel = CreatePanel(screen, "PlacementControlPanel", new Vector2(0.06f, 0.275f), new Vector2(0.94f, 0.445f), new Color(0.06f, 0.08f, 0.12f, 0.98f));
+                RectTransform placementPanel = CreatePanel(screen, "PlacementControlPanel", new Vector2(0.05f, 0.245f), new Vector2(0.95f, 0.505f), new Color(0.06f, 0.08f, 0.12f, 0.98f));
                 BuildPlacementControlPanel(placementPanel);
                 return;
             }
@@ -521,13 +523,21 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             bool canConfirm = CanConfirmSelectedPlacement();
             bool showRotation = IsDualColorCharacterCard(selectedCard);
 
-            CreateText(parent, selectedCard == null ? "Modo de posicionamento" : $"Posicionar: {selectedCard.DisplayName}", 27, new Vector2(0.03f, 0.68f), new Vector2(0.35f, 0.96f), FontStyles.Bold, TextAlignmentOptions.Left);
-            CreateText(parent, hasSlot ? $"Slot: {FormatBoardCoordinate(turnManager.SelectedBoardCoordinate)} · Rotação {turnManager.SelectedRotationDegrees}°" : "Toque em um slot vazio destacado no tabuleiro.", 22, new Vector2(0.03f, 0.36f), new Vector2(0.35f, 0.66f), FontStyles.Normal, TextAlignmentOptions.Left);
+            CreateText(parent, selectedCard == null ? "Modo de posicionamento" : $"Posicionar: {selectedCard.DisplayName}", 28, new Vector2(0.03f, 0.72f), new Vector2(0.31f, 0.96f), FontStyles.Bold, TextAlignmentOptions.Left);
+            CreateText(parent, hasSlot ? $"Slot: {FormatBoardCoordinate(turnManager.SelectedBoardCoordinate)} · Rotação {turnManager.SelectedRotationDegrees}°" : "Toque em um slot vazio destacado no tabuleiro.", 22, new Vector2(0.03f, 0.48f), new Vector2(0.31f, 0.70f), FontStyles.Normal, TextAlignmentOptions.Left);
 
             SciencePlacementValidationResult selectedPlacementResult = hasSlot ? boardManager?.ValidatePlacement(turnManager.SelectedBoardCoordinate, turnManager.SelectedCard, turnManager.SelectedRotationDegrees) : null;
+            string validationTitle = BuildPlacementFeedbackTitle(hasSlot, selectedPlacementResult);
             string validationText = BuildPlacementValidityText(hasSlot, isValid);
-            TextMeshProUGUI validityLabel = CreateText(parent, validationText, 23, new Vector2(0.37f, 0.52f), new Vector2(0.67f, 0.94f), FontStyles.Bold, TextAlignmentOptions.Center);
-            validityLabel.color = GetPlacementFeedbackColor(selectedPlacementResult);
+            TextMeshProUGUI validityTitle = CreateText(parent, validationTitle, 31, new Vector2(0.34f, 0.70f), new Vector2(0.70f, 0.94f), FontStyles.Bold, TextAlignmentOptions.Center);
+            validityTitle.color = GetPlacementFeedbackColor(selectedPlacementResult);
+            TextMeshProUGUI validityLabel = CreateText(parent, validationText, 23, new Vector2(0.33f, 0.36f), new Vector2(0.71f, 0.70f), FontStyles.Normal, TextAlignmentOptions.Center);
+            validityLabel.color = Color.white;
+            if (selectedPlacementResult != null && selectedPlacementResult.ShouldExpectContestation)
+            {
+                TextMeshProUGUI warningLabel = CreateText(parent, "Essa conexão pode ser contestada. Explique a relação entre as áreas.", 22, new Vector2(0.33f, 0.14f), new Vector2(0.71f, 0.36f), FontStyles.Bold, TextAlignmentOptions.Center);
+                warningLabel.color = new Color(1f, 0.78f, 0.30f, 1f);
+            }
 
             if (showRotation)
             {
@@ -811,7 +821,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             currentPlayer.MarkPlayed(selectedCard);
             turnManager.StartConnectionExplanation();
-            StartConnectionVoting(currentPlayer, selectedCard);
+            StartConnectionVoting(currentPlayer, selectedCard, validationResult?.ConnectionType ?? SciencePlacementConnectionType.Invalid);
             AddLog($"{currentPlayer.DisplayName} colocou {selectedCard.DisplayName} em {FormatBoardCoordinate(coordinate)} com rotação {turnManager.SelectedRotationDegrees}°.");
             if (validationResult != null)
             {
@@ -821,12 +831,13 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             BuildGameplayScreen();
         }
 
-        private void StartConnectionVoting(SciencePlayerState activePlayer, ScienceCardData placedCard)
+        private void StartConnectionVoting(SciencePlayerState activePlayer, ScienceCardData placedCard, SciencePlacementConnectionType connectionType)
         {
             connectionVotes.Clear();
             activeVotingPlayerIndex = activePlayer?.PlayerIndex ?? -1;
             activeVotingCardId = placedCard?.Id;
-            telemetry?.LogEvent("science_connection_vote_started", $"turn={turnManager?.TurnNumber ?? 0};activePlayer={activeVotingPlayerIndex};card={activeVotingCardId};acceptTies={state?.AcceptTiedConnectionVotes ?? true}");
+            activeVotingConnectionType = connectionType;
+            telemetry?.LogEvent("science_connection_vote_started", $"turn={turnManager?.TurnNumber ?? 0};activePlayer={activeVotingPlayerIndex};card={activeVotingCardId};connectionType={activeVotingConnectionType};acceptTies={state?.AcceptTiedConnectionVotes ?? true}");
         }
 
         private void BuildConnectionVotingPanel(RectTransform parent)
@@ -836,7 +847,12 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             string cardName = selectedCard?.DisplayName ?? "carta colocada";
 
             CreateText(parent, "Votação da conexão", 44, new Vector2(0.06f, 0.84f), new Vector2(0.94f, 0.96f), FontStyles.Bold);
-            string votePrompt = $"{activePlayer?.DisplayName ?? "Jogador ativo"} explicou {cardName}.\nOs jogadores aceitam essa conexão?";
+            string votePrompt = $"{activePlayer?.DisplayName ?? "Jogador ativo"} explicou {cardName}.\n{BuildConnectionTypeLine(activeVotingConnectionType)}\nOs jogadores aceitam essa conexão?";
+            if (activeVotingConnectionType == SciencePlacementConnectionType.Interpretive)
+            {
+                votePrompt += "\nEssa conexão pode ser contestada. Ouçam a explicação antes de votar.";
+            }
+
             if (state != null && state.PeerReviewRequiresUnanimity)
             {
                 votePrompt += "\nPeer Review ativo: todos precisam votar Sim.";
@@ -922,7 +938,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             string peerReviewText = peerReviewActive ? " Peer Review exigiu unanimidade." : string.Empty;
 
             AddLog($"Conexão {resultText}: {yesVotes} Sim / {noVotes} Não.{tieText}{peerReviewText}");
-            telemetry?.LogEvent("science_connection_vote_resolved", $"turn={turnManager?.TurnNumber ?? 0};activePlayer={activeVotingPlayerIndex};card={activeVotingCardId};yes={yesVotes};no={noVotes};tied={tied};tieAccepted={tieAccepted};peerReview={peerReviewActive};accepted={acceptedByVote}");
+            telemetry?.LogEvent("science_connection_vote_resolved", $"turn={turnManager?.TurnNumber ?? 0};activePlayer={activeVotingPlayerIndex};card={activeVotingCardId};connectionType={activeVotingConnectionType};yes={yesVotes};no={noVotes};tied={tied};tieAccepted={tieAccepted};peerReview={peerReviewActive};accepted={acceptedByVote}");
             if (peerReviewActive)
             {
                 state?.SetPeerReviewRequiresUnanimity(false);
@@ -945,12 +961,13 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         {
             activeScoringPlayerIndex = activeVotingPlayerIndex;
             activeScoringCardId = activeVotingCardId;
+            activeScoringConnectionType = activeVotingConnectionType;
             basePointAwarded = false;
             interestingBonusAwarded = false;
             guideFactBonusAwarded = false;
             ResetConnectionVoting();
             turnManager?.StartScoring();
-            telemetry?.LogEvent("science_scoring_started", $"turn={turnManager?.TurnNumber ?? 0};player={activeScoringPlayerIndex};card={activeScoringCardId}");
+            telemetry?.LogEvent("science_scoring_started", $"turn={turnManager?.TurnNumber ?? 0};player={activeScoringPlayerIndex};card={activeScoringCardId};connectionType={activeScoringConnectionType}");
         }
 
         private void ResolveRejectedConnection()
@@ -966,8 +983,9 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             {
                 AddLog("Conexão rejeitada. O jogador pode tentar explicar novamente.");
                 telemetry?.LogEvent("science_connection_rejected", $"turn={turnManager?.TurnNumber ?? 0};player={activeVotingPlayerIndex};card={activeVotingCardId};behavior={behavior}");
+                SciencePlacementConnectionType retryConnectionType = activeVotingConnectionType;
                 ResetConnectionVoting();
-                StartConnectionVoting(currentPlayer, selectedCard);
+                StartConnectionVoting(currentPlayer, selectedCard, retryConnectionType);
                 return;
             }
 
@@ -982,7 +1000,12 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         private void BuildScoringPanel(RectTransform parent)
         {
             CreateText(parent, "Pontuação da conexão", 44, new Vector2(0.06f, 0.84f), new Vector2(0.94f, 0.96f), FontStyles.Bold);
-            string scoringDescription = $"{GetPlayerDisplayName(activeScoringPlayerIndex)} teve a conexão aceita.\nO grupo decide manualmente os bônus.";
+            string scoringDescription = $"{GetPlayerDisplayName(activeScoringPlayerIndex)} teve a conexão aceita.\n{BuildConnectionTypeLine(activeScoringConnectionType)}\nO grupo decide manualmente os bônus.";
+            if (activeScoringConnectionType == SciencePlacementConnectionType.Interpretive)
+            {
+                scoringDescription += "\nA aceitação veio do consenso do grupo, não de uma decisão automática das cores.";
+            }
+
             if (HasCitationNeededBonus(activeScoringPlayerIndex))
             {
                 scoringDescription += "\nCitation Needed ativo: considere o bônus de guia/fato (+1).";
@@ -1059,7 +1082,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                 return;
             }
 
-            telemetry?.LogEvent("science_connection_scoring_completed", $"turn={turnManager?.TurnNumber ?? 0};player={activeScoringPlayerIndex};card={activeScoringCardId};base={basePointAwarded};interesting={interestingBonusAwarded};guideFact={guideFactBonusAwarded};score={GetPlayerScore(activeScoringPlayerIndex)}");
+            telemetry?.LogEvent("science_connection_scoring_completed", $"turn={turnManager?.TurnNumber ?? 0};player={activeScoringPlayerIndex};card={activeScoringCardId};connectionType={activeScoringConnectionType};base={basePointAwarded};interesting={interestingBonusAwarded};guideFact={guideFactBonusAwarded};score={GetPlayerScore(activeScoringPlayerIndex)}");
             ClearCitationNeededBonus(activeScoringPlayerIndex, "accepted_connection_scoring_complete");
             if (TryShowEndGameIfNeeded(ScienceWinCondition.TargetKnowledgePoints))
             {
@@ -1528,6 +1551,27 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             return IsSelectedPlacementValid() || (state != null && state.DebugOverridePlacementValidation);
         }
 
+        private static string BuildConnectionTypeLine(SciencePlacementConnectionType connectionType)
+        {
+            switch (connectionType)
+            {
+                case SciencePlacementConnectionType.FirstCard:
+                    return "Tipo: primeira carta da rede.";
+                case SciencePlacementConnectionType.Strong:
+                    return "Tipo: Conexão forte — as cores combinam.";
+                case SciencePlacementConnectionType.Interpretive:
+                    return "Tipo: Conexão interpretativa — as cores não combinam diretamente.";
+                default:
+                    return "Tipo: posição inválida.";
+            }
+        }
+
+        private static string BuildPlacementFeedbackTitle(bool hasSlot, SciencePlacementValidationResult result)
+        {
+            if (!hasSlot) return "Escolha um slot";
+            return result?.FeedbackTitle ?? "Posição inválida";
+        }
+
         private string BuildPlacementValidityText(bool hasSlot, bool isValid)
         {
             if (!hasSlot) return "Escolha uma casa adjacente.";
@@ -1678,12 +1722,14 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             connectionVotes.Clear();
             activeVotingPlayerIndex = -1;
             activeVotingCardId = null;
+            activeVotingConnectionType = SciencePlacementConnectionType.Invalid;
         }
 
         private void ResetScoringState()
         {
             activeScoringPlayerIndex = -1;
             activeScoringCardId = null;
+            activeScoringConnectionType = SciencePlacementConnectionType.Invalid;
             basePointAwarded = false;
             interestingBonusAwarded = false;
             guideFactBonusAwarded = false;
