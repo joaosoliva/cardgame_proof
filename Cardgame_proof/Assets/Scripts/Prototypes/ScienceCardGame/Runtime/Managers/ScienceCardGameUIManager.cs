@@ -251,7 +251,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         {
             if (isSelectedSlot && IsPlacementStep() && selectedCard != null)
             {
-                bool selectedValid = boardManager != null && boardManager.CanPlaceCardAt(coordinate, selectedCard);
+                bool selectedValid = boardManager != null && boardManager.CanPlaceCardAt(coordinate, selectedCard, turnManager?.SelectedRotationDegrees ?? 0);
                 return selectedValid ? new Color(0.35f, 0.95f, 0.48f, 1f) : new Color(1f, 0.24f, 0.20f, 1f);
             }
 
@@ -260,7 +260,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             if (IsPlacementStep() && selectedCard != null)
             {
-                bool isValid = boardManager != null && boardManager.CanPlaceCardAt(coordinate, selectedCard);
+                bool isValid = boardManager != null && boardManager.CanPlaceCardAt(coordinate, selectedCard, turnManager?.SelectedRotationDegrees ?? 0);
                 return isValid ? new Color(0.35f, 0.95f, 0.48f, 1f) : new Color(1f, 0.38f, 0.32f, 0.95f);
             }
 
@@ -271,7 +271,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         {
             if (IsPlacementStep() && selectedCard != null)
             {
-                bool isValid = boardManager != null && boardManager.CanPlaceCardAt(coordinate, selectedCard);
+                bool isValid = boardManager != null && boardManager.CanPlaceCardAt(coordinate, selectedCard, turnManager?.SelectedRotationDegrees ?? 0);
                 CreateText(slot, isValid ? "✓" : "×", 28, new Vector2(0.12f, 0.12f), new Vector2(0.88f, 0.88f), FontStyles.Bold, TextAlignmentOptions.Center);
                 return;
             }
@@ -300,7 +300,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         {
             if (isSelectedSlot && IsPlacementStep() && selectedCard != null)
             {
-                bool selectedValid = boardManager != null && boardManager.CanPlaceCardAt(coordinate, selectedCard);
+                bool selectedValid = boardManager != null && boardManager.CanPlaceCardAt(coordinate, selectedCard, turnManager?.SelectedRotationDegrees ?? 0);
                 return selectedValid ? new Color(0.18f, 0.52f, 0.26f, 0.95f) : new Color(0.58f, 0.14f, 0.14f, 0.95f);
             }
 
@@ -309,7 +309,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             if (IsPlacementStep() && selectedCard != null)
             {
-                bool isValid = boardManager != null && boardManager.CanPlaceCardAt(coordinate, selectedCard);
+                bool isValid = boardManager != null && boardManager.CanPlaceCardAt(coordinate, selectedCard, turnManager?.SelectedRotationDegrees ?? 0);
                 return isValid ? new Color(0.18f, 0.46f, 0.25f, 0.90f) : new Color(0.40f, 0.18f, 0.18f, 0.70f);
             }
 
@@ -690,7 +690,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                 return;
             }
 
-            string validationMessage = boardManager?.GetPlacementValidationMessage(coordinate, turnManager.SelectedCard);
+            string validationMessage = boardManager?.GetPlacementValidationMessage(coordinate, turnManager.SelectedCard, turnManager.SelectedRotationDegrees);
 
             if (!turnManager.SelectBoardSlot(coordinate))
             {
@@ -731,7 +731,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             }
 
             Vector2Int coordinate = turnManager.SelectedBoardCoordinate;
-            string validationMessage = boardManager?.GetPlacementValidationMessage(coordinate, selectedCard);
+            string validationMessage = boardManager?.GetPlacementValidationMessage(coordinate, selectedCard, turnManager.SelectedRotationDegrees);
             bool overrideValidation = state != null && state.DebugOverridePlacementValidation;
             if (!string.IsNullOrEmpty(validationMessage) && !overrideValidation)
             {
@@ -1453,7 +1453,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         private bool IsSelectedPlacementValid()
         {
             if (turnManager == null || !turnManager.HasSelectedBoardCoordinate || boardManager == null) return false;
-            return boardManager.CanPlaceCardAt(turnManager.SelectedBoardCoordinate, turnManager.SelectedCard);
+            return boardManager.CanPlaceCardAt(turnManager.SelectedBoardCoordinate, turnManager.SelectedCard, turnManager.SelectedRotationDegrees);
         }
 
         private bool CanConfirmSelectedPlacement()
@@ -1467,7 +1467,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             if (!hasSlot) return "Escolha um slot vazio.";
             if (isValid) return "✓ Posição válida. Pode confirmar.";
 
-            string validationMessage = boardManager?.GetPlacementValidationMessage(turnManager.SelectedBoardCoordinate, turnManager.SelectedCard);
+            string validationMessage = boardManager?.GetPlacementValidationMessage(turnManager.SelectedBoardCoordinate, turnManager.SelectedCard, turnManager.SelectedRotationDegrees);
             if (state != null && state.DebugOverridePlacementValidation)
             {
                 return $"⚠ Inválida, mas debug override permite confirmar: {validationMessage}";
