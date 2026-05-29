@@ -209,12 +209,11 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
             RectTransform cardPanel = CreateMainCardPanel(screen, "ChallengeCard", new Color(0.18f, 0.13f, 0.18f, 0.98f));
             CreateText(cardPanel, "Desafio", 24, new Vector2(0.08f, 0.88f), new Vector2(0.92f, 0.95f), FontStyles.Bold, TextAlignmentOptions.Center, HighlightTextColor);
             CreateText(cardPanel, challenge.Title, 42, new Vector2(0.08f, 0.76f), new Vector2(0.92f, 0.88f), FontStyles.Bold, TextAlignmentOptions.Center);
-            CreateText(cardPanel, challenge.Situation, 28, new Vector2(0.08f, 0.59f), new Vector2(0.92f, 0.73f), FontStyles.Normal, TextAlignmentOptions.Center);
-            CreateText(cardPanel, "Tags recomendadas: " + ForgottenNamesExpeditionContent.JoinTags(challenge.RecommendedTags), 22, new Vector2(0.08f, 0.50f), new Vector2(0.92f, 0.57f), FontStyles.Bold, TextAlignmentOptions.Center, HighlightTextColor);
-            CreateText(cardPanel, "Escolha uma figura da Party para ajudar, ou improvise se ninguém se encaixar.", 23, new Vector2(0.10f, 0.39f), new Vector2(0.90f, 0.48f), FontStyles.Normal, TextAlignmentOptions.Center, MutedTextColor);
+            CreateText(cardPanel, challenge.Situation, 28, new Vector2(0.08f, 0.60f), new Vector2(0.92f, 0.73f), FontStyles.Normal, TextAlignmentOptions.Center);
+            CreateText(cardPanel, "Tags recomendadas: " + ForgottenNamesExpeditionContent.JoinTags(challenge.RecommendedTags), 22, new Vector2(0.08f, 0.51f), new Vector2(0.92f, 0.58f), FontStyles.Bold, TextAlignmentOptions.Center, HighlightTextColor);
+            CreateText(cardPanel, "Escolha uma figura ativa na Party para ajudar agora.", 23, new Vector2(0.10f, 0.43f), new Vector2(0.90f, 0.50f), FontStyles.Normal, TextAlignmentOptions.Center, MutedTextColor);
             CreateChallengeHelperButtons(cardPanel, challengeIndex, challenge);
 
-            CreateButton(screen, "Improvisar sem especialidade", new Vector2(0.5f, 0.19f), () => ResolveChallenge(challengeIndex, -1), new Vector2(620f, 82f), PrimaryButtonColor, 24);
             CreateButton(screen, "Encerrar", new Vector2(0.5f, 0.10f), ShowSessionSummary, new Vector2(360f, 74f), SecondaryButtonColor, 23);
         }
 
@@ -229,10 +228,13 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
             string helperName = scientistIndex >= 0 ? ForgottenNamesExpeditionContent.Scientists[scientistIndex].Name : "Improviso do grupo";
             CreateText(cardPanel, matched ? "Conexão forte" : "Solução improvisada", 24, new Vector2(0.08f, 0.86f), new Vector2(0.92f, 0.94f), FontStyles.Bold, TextAlignmentOptions.Center, HighlightTextColor);
             CreateText(cardPanel, helperName, 40, new Vector2(0.08f, 0.72f), new Vector2(0.92f, 0.84f), FontStyles.Bold, TextAlignmentOptions.Center);
-            CreateText(cardPanel, matched ? challenge.MatchedPrompt : challenge.UnmatchedPrompt, 31, new Vector2(0.08f, 0.40f), new Vector2(0.92f, 0.68f), FontStyles.Normal, TextAlignmentOptions.Center);
-            CreateText(cardPanel, "Respondam em voz alta antes de avançar.", 24, new Vector2(0.10f, 0.24f), new Vector2(0.90f, 0.34f), FontStyles.Italic, TextAlignmentOptions.Center, MutedTextColor);
+            string resolutionPrompt = scientistIndex < 0 && state.PartyScientistIndexes.Count == 0
+                ? "Sem uma figura ativa na Party, o grupo resolve junto. Que esforço extra foi necessário?"
+                : matched ? challenge.MatchedPrompt : challenge.UnmatchedPrompt;
+            CreateText(cardPanel, resolutionPrompt, 31, new Vector2(0.08f, 0.40f), new Vector2(0.92f, 0.68f), FontStyles.Normal, TextAlignmentOptions.Center);
+            CreateText(cardPanel, "Responda em voz alta. Quando terminar, toque em Concluir.", 24, new Vector2(0.10f, 0.24f), new Vector2(0.90f, 0.34f), FontStyles.Italic, TextAlignmentOptions.Center, MutedTextColor);
 
-            CreateButton(screen, "Desafio resolvido: próxima carta", new Vector2(0.5f, 0.19f), () => CompleteCurrentPrompt($"Desafio resolvido: {challenge.Title} com {helperName}"));
+            CreateButton(screen, "Concluir", new Vector2(0.5f, 0.19f), () => CompleteCurrentPrompt($"Desafio resolvido: {challenge.Title} com {helperName}"));
             CreateButton(screen, "Encerrar", new Vector2(0.5f, 0.10f), ShowSessionSummary, new Vector2(360f, 74f), SecondaryButtonColor, 23);
         }
 
@@ -255,18 +257,22 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
         {
             if (state.PartyScientistIndexes.Count == 0)
             {
-                CreateText(cardPanel, "Party vazia: avance improvisando ou registre mais cientistas na Party nas próximas partidas.", 22, new Vector2(0.10f, 0.20f), new Vector2(0.90f, 0.34f), FontStyles.Italic, TextAlignmentOptions.Center, MutedTextColor);
+                CreateText(cardPanel, "Sem uma figura ativa na Party, o grupo resolve junto. Que esforço extra foi necessário?", 26, new Vector2(0.10f, 0.21f), new Vector2(0.90f, 0.38f), FontStyles.Bold, TextAlignmentOptions.Center, HighlightTextColor);
+                CreateButton(cardPanel, "Resolver em grupo", new Vector2(0.50f, 0.14f), () => ResolveChallenge(challengeIndex, -1), new Vector2(420f, 72f), PrimaryButtonColor, 22);
                 return;
             }
 
-            int count = Mathf.Min(3, state.PartyScientistIndexes.Count);
+            int count = state.PartyScientistIndexes.Count;
             for (int i = 0; i < count; i++)
             {
                 int scientistIndex = state.PartyScientistIndexes[i];
                 ForgottenNamesScientist scientist = ForgottenNamesExpeditionContent.Scientists[scientistIndex];
                 bool matched = ForgottenNamesExpeditionContent.HasMatchingTag(scientist, challenge);
-                float x = count == 1 ? 0.50f : 0.25f + (i * 0.25f);
-                CreateButton(cardPanel, scientist.Name + (matched ? " ✓" : ""), new Vector2(x, 0.26f), () => ResolveChallenge(challengeIndex, scientistIndex), new Vector2(245f, 72f), matched ? PrimaryButtonColor : SecondaryButtonColor, 20);
+                float x = count == 1 ? 0.50f : 0.22f + (i * 0.28f);
+                RectTransform helperCard = CreatePanel(cardPanel, $"ChallengePartyScientist_{scientistIndex}", new Vector2(x - 0.13f, 0.13f), new Vector2(x + 0.13f, 0.32f), matched ? new Color(0.18f, 0.42f, 0.28f, 0.98f) : new Color(0.16f, 0.17f, 0.23f, 0.98f));
+                CreateText(helperCard, scientist.Name, 18, new Vector2(0.08f, 0.54f), new Vector2(0.92f, 0.92f), FontStyles.Bold, TextAlignmentOptions.Center);
+                CreateText(helperCard, matched ? "Tag compatível" : "Outra perspectiva", 15, new Vector2(0.08f, 0.32f), new Vector2(0.92f, 0.54f), FontStyles.Italic, TextAlignmentOptions.Center, matched ? HighlightTextColor : MutedTextColor);
+                CreateButton(helperCard, "Escolher", new Vector2(0.50f, 0.16f), () => ResolveChallenge(challengeIndex, scientistIndex), new Vector2(190f, 44f), matched ? PrimaryButtonColor : SecondaryButtonColor, 15);
             }
         }
 
@@ -283,7 +289,55 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
 
         private void AddScientistToParty(int scientistIndex)
         {
-            state.AddScientistToParty(scientistIndex);
+            if (state.TryAddScientistToParty(scientistIndex))
+            {
+                ShowMainCardTable();
+                return;
+            }
+
+            ShowPartyFullModal(scientistIndex);
+        }
+
+        private void ShowPartyFullModal(int newScientistIndex)
+        {
+            CloseModal();
+            if (root == null) return;
+
+            ForgottenNamesScientist newScientist = ForgottenNamesExpeditionContent.Scientists[newScientistIndex];
+            modalOverlay = new GameObject("ForgottenNamesPartyFullModal", typeof(RectTransform), typeof(Image));
+            RectTransform overlayRect = modalOverlay.GetComponent<RectTransform>();
+            overlayRect.SetParent(root.transform, false);
+            overlayRect.anchorMin = Vector2.zero;
+            overlayRect.anchorMax = Vector2.one;
+            overlayRect.offsetMin = Vector2.zero;
+            overlayRect.offsetMax = Vector2.zero;
+            modalOverlay.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.70f);
+
+            RectTransform panel = CreatePanel(overlayRect, "PartyFullPanel", new Vector2(0.07f, 0.10f), new Vector2(0.93f, 0.88f), new Color(0.08f, 0.11f, 0.17f, 0.98f));
+            CreateText(panel, "A Party está cheia", 43, new Vector2(0.08f, 0.86f), new Vector2(0.92f, 0.96f), FontStyles.Bold, TextAlignmentOptions.Center, HighlightTextColor);
+            CreateText(panel, "A Party está cheia. Escolha uma figura para mover ao Archive.", 27, new Vector2(0.10f, 0.75f), new Vector2(0.90f, 0.84f), FontStyles.Normal, TextAlignmentOptions.Center);
+            CreateText(panel, $"Chegando agora: {newScientist.Name} — {newScientist.Field}", 24, new Vector2(0.10f, 0.68f), new Vector2(0.90f, 0.74f), FontStyles.Bold, TextAlignmentOptions.Center, MutedTextColor);
+            CreateText(panel, "Tags: " + ForgottenNamesExpeditionContent.JoinTags(newScientist.Tags), 18, new Vector2(0.10f, 0.63f), new Vector2(0.90f, 0.68f), FontStyles.Italic, TextAlignmentOptions.Center, HighlightTextColor);
+
+            for (int i = 0; i < state.PartyScientistIndexes.Count; i++)
+            {
+                int partyScientistIndex = state.PartyScientistIndexes[i];
+                ForgottenNamesScientist partyScientist = ForgottenNamesExpeditionContent.Scientists[partyScientistIndex];
+                float centerY = 0.57f - (i * 0.16f);
+                CreatePanel(panel, $"PartyChoice_{partyScientistIndex}", new Vector2(0.08f, centerY - 0.055f), new Vector2(0.92f, centerY + 0.055f), CardColor);
+                CreateText(panel, partyScientist.Name, 24, new Vector2(0.12f, centerY + 0.005f), new Vector2(0.58f, centerY + 0.045f), FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
+                CreateText(panel, partyScientist.Field, 18, new Vector2(0.12f, centerY - 0.040f), new Vector2(0.58f, centerY + 0.000f), FontStyles.Italic, TextAlignmentOptions.MidlineLeft, MutedTextColor);
+                CreateButton(panel, "Mover para o Archive", new Vector2(0.73f, centerY), () => MovePartyScientistToArchiveAndAddNew(partyScientistIndex, newScientistIndex), new Vector2(310f, 58f), PrimaryButtonColor, 19);
+            }
+
+            CreateText(panel, "Todos continuam reconhecidos: a Party ajuda agora, e o Archive guarda nomes para lembrar depois.", 21, new Vector2(0.10f, 0.14f), new Vector2(0.90f, 0.23f), FontStyles.Italic, TextAlignmentOptions.Center, MutedTextColor);
+            CreateButton(panel, "Cancelar", new Vector2(0.50f, 0.08f), CloseModal, new Vector2(300f, 58f), SecondaryButtonColor, 18);
+        }
+
+        private void MovePartyScientistToArchiveAndAddNew(int partyScientistIndex, int newScientistIndex)
+        {
+            state.ReplacePartyScientist(partyScientistIndex, newScientistIndex);
+            CloseModal();
             ShowMainCardTable();
         }
 
@@ -330,8 +384,10 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
         private string BuildSummaryText()
         {
             StringBuilder builder = new StringBuilder();
+            builder.AppendLine($"Premissa: {state.SelectedPremise.Title}");
             builder.AppendLine($"Cartas concluídas: {Mathf.Min(state.CurrentDeckIndex, state.TotalCards)} de {state.TotalCards}");
             builder.AppendLine($"Jogadores: {state.PlayerCount}");
+            builder.AppendLine("Papéis: " + BuildRoleSummary());
             builder.AppendLine();
             builder.AppendLine("Party: " + FormatScientistList(state.PartyScientistIndexes));
             builder.AppendLine("Archive: " + FormatScientistList(state.ArchiveScientistIndexes));
@@ -339,6 +395,17 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
             builder.AppendLine("Frase final sugerida:");
             builder.AppendLine(ForgottenNamesExpeditionContent.FinalCard.GroupSentence);
             return builder.ToString();
+        }
+
+        private string BuildRoleSummary()
+        {
+            List<string> roles = new List<string>();
+            for (int i = 0; i < state.PlayerCount; i++)
+            {
+                roles.Add($"J{i + 1} {state.GetRoleForPlayer(i).Title}");
+            }
+
+            return string.Join("; ", roles);
         }
 
         private static string FormatScientistList(List<int> indexes)
