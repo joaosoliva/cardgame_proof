@@ -22,14 +22,7 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
         private ForgottenNamesExpeditionState state;
         private GameObject root;
         private GameObject modalOverlay;
-        private ForgottenNamesExpeditionFeedbackAnimator animator;
         private bool sessionStarted;
-        private bool pendingPartyPulse;
-        private bool pendingArchivePulse;
-        private int feedbackClarityScore;
-        private int feedbackParticipationScore;
-        private TMP_InputField rememberedFigureInput;
-        private TMP_InputField improvementInput;
 
         public void Initialize(PrototypeRuntimeContext runtimeContext, ForgottenNamesExpeditionState initialState)
         {
@@ -68,21 +61,10 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
             CreateText(screen, PrototypeSubtitle, 28, new Vector2(0.12f, 0.69f), new Vector2(0.88f, 0.78f), FontStyles.Italic, TextAlignmentOptions.Center);
             CreateText(screen, PrototypeDescription, 27, new Vector2(0.11f, 0.57f), new Vector2(0.89f, 0.68f), FontStyles.Normal, TextAlignmentOptions.Center);
 
-            CreateButton(screen, "Iniciar teste rápido", new Vector2(0.5f, 0.42f), StartQuickTest);
+            CreateButton(screen, "Iniciar teste rápido", new Vector2(0.5f, 0.42f), ShowPremiseSelection);
             CreateButton(screen, "Como jogar", new Vector2(0.5f, 0.31f), ShowHowToPlayModal);
             CreateButton(screen, "Guia de Campo", new Vector2(0.5f, 0.20f), ShowFieldGuideScreen);
             CreateButton(screen, "Voltar", new Vector2(0.5f, 0.09f), ReturnToSelector, new Vector2(640f, 86f), SecondaryButtonColor);
-        }
-
-        private void StartQuickTest()
-        {
-            state = new ForgottenNamesExpeditionState();
-            sessionStarted = false;
-            pendingPartyPulse = false;
-            pendingArchivePulse = false;
-            feedbackClarityScore = 0;
-            feedbackParticipationScore = 0;
-            ShowPremiseSelection();
         }
 
         private void ShowPremiseSelection()
@@ -223,7 +205,7 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
 
             CreateButton(screen, "Adicionar à Party", new Vector2(0.28f, 0.19f), () => AddScientistToParty(scientistIndex), new Vector2(430f, 92f), PrimaryButtonColor, 26);
             CreateButton(screen, "Registrar no Archive", new Vector2(0.72f, 0.19f), () => AddScientistToArchive(scientistIndex), new Vector2(430f, 92f), PrimaryButtonColor, 26);
-            CreateButton(screen, "Ler mini bio", new Vector2(0.30f, 0.09f), () => ShowScientistBioModal(scientist), new Vector2(400f, 82f), SecondaryButtonColor, 24);
+            CreateButton(screen, "Ver bio no Guia", new Vector2(0.30f, 0.09f), () => ShowScientistBioModal(scientist), new Vector2(400f, 82f), SecondaryButtonColor, 24);
             CreateButton(screen, "Encerrar", new Vector2(0.70f, 0.09f), ShowSessionSummary, new Vector2(320f, 82f), SecondaryButtonColor, 24);
         }
 
@@ -264,9 +246,8 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
         private void BuildFinalCard(RectTransform screen)
         {
             ForgottenNamesFinalCard finalCard = ForgottenNamesExpeditionContent.FinalCard;
-            RectTransform cardPanel = CreateMainCardPanel(screen, "FinalCard", new Color(0.25f, 0.17f, 0.07f, 0.99f));
-            animator?.PulseGraphic(cardPanel.GetComponent<Image>(), new Color(0.55f, 0.40f, 0.14f, 1f));
-            CreateText(cardPanel, "✦ Final ✦", 27, new Vector2(0.08f, 0.86f), new Vector2(0.92f, 0.94f), FontStyles.Bold, TextAlignmentOptions.Center, HighlightTextColor);
+            RectTransform cardPanel = CreateMainCardPanel(screen, "FinalCard", new Color(0.17f, 0.14f, 0.10f, 0.98f));
+            CreateText(cardPanel, "Final", 25, new Vector2(0.08f, 0.86f), new Vector2(0.92f, 0.94f), FontStyles.Bold, TextAlignmentOptions.Center, HighlightTextColor);
             CreateText(cardPanel, finalCard.Title, 40, new Vector2(0.08f, 0.75f), new Vector2(0.92f, 0.84f), FontStyles.Bold, TextAlignmentOptions.Center);
             CreateText(cardPanel, finalCard.Body, 28, new Vector2(0.08f, 0.61f), new Vector2(0.92f, 0.72f), FontStyles.Normal, TextAlignmentOptions.Center, MutedTextColor);
             CreateText(cardPanel, finalCard.FinalPrompt, 32, new Vector2(0.08f, 0.42f), new Vector2(0.92f, 0.58f), FontStyles.Bold, TextAlignmentOptions.Center);
@@ -316,7 +297,6 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
         {
             if (state.TryAddScientistToParty(scientistIndex))
             {
-                pendingPartyPulse = true;
                 ShowMainCardTable();
                 return;
             }
@@ -340,9 +320,7 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
             modalOverlay.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.70f);
 
             RectTransform panel = CreatePanel(overlayRect, "PartyFullPanel", new Vector2(0.07f, 0.10f), new Vector2(0.93f, 0.88f), new Color(0.08f, 0.11f, 0.17f, 0.98f));
-            animator?.PulseGraphic(panel.GetComponent<Image>(), new Color(0.55f, 0.28f, 0.18f, 1f));
-            animator?.PulseScale(panel);
-            CreateText(panel, "A Party está cheia", 43, new Vector2(0.08f, 0.86f), new Vector2(0.92f, 0.96f), FontStyles.Bold, TextAlignmentOptions.Center, WarningTextColor);
+            CreateText(panel, "A Party está cheia", 43, new Vector2(0.08f, 0.86f), new Vector2(0.92f, 0.96f), FontStyles.Bold, TextAlignmentOptions.Center, HighlightTextColor);
             CreateText(panel, "A Party está cheia. Escolha uma figura para mover ao Archive.", 27, new Vector2(0.10f, 0.75f), new Vector2(0.90f, 0.84f), FontStyles.Normal, TextAlignmentOptions.Center);
             CreateText(panel, $"Chegando agora: {newScientist.Name} — {newScientist.Field}", 24, new Vector2(0.10f, 0.68f), new Vector2(0.90f, 0.74f), FontStyles.Bold, TextAlignmentOptions.Center, MutedTextColor);
             CreateText(panel, "Tags: " + ForgottenNamesExpeditionContent.JoinTags(newScientist.Tags), 18, new Vector2(0.10f, 0.63f), new Vector2(0.90f, 0.68f), FontStyles.Italic, TextAlignmentOptions.Center, HighlightTextColor);
@@ -365,8 +343,6 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
         private void MovePartyScientistToArchiveAndAddNew(int partyScientistIndex, int newScientistIndex)
         {
             state.ReplacePartyScientist(partyScientistIndex, newScientistIndex);
-            pendingPartyPulse = true;
-            pendingArchivePulse = true;
             CloseModal();
             ShowMainCardTable();
         }
@@ -374,7 +350,6 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
         private void AddScientistToArchive(int scientistIndex)
         {
             state.AddScientistToArchive(scientistIndex);
-            pendingArchivePulse = true;
             ShowArchivePromptThenContinue(scientistIndex);
         }
 
@@ -408,9 +383,8 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
             CreatePanel(screen, "SummaryPanel", new Vector2(0.07f, 0.22f), new Vector2(0.93f, 0.73f), CardColor);
             CreateText(screen, BuildSummaryText(), 25, new Vector2(0.11f, 0.25f), new Vector2(0.89f, 0.70f), FontStyles.Normal, TextAlignmentOptions.TopLeft);
 
-            CreateButton(screen, "Responder feedback", new Vector2(0.5f, 0.17f), ShowFeedbackScreen, new Vector2(620f, 84f), PrimaryButtonColor, 26);
-            CreateButton(screen, "Nova expedição", new Vector2(0.32f, 0.065f), RestartSession, new Vector2(390f, 74f), SecondaryButtonColor, 23);
-            CreateButton(screen, "Voltar ao menu", new Vector2(0.70f, 0.065f), ShowRootScreen, new Vector2(390f, 74f), SecondaryButtonColor, 23);
+            CreateButton(screen, "Nova expedição", new Vector2(0.5f, 0.14f), RestartSession);
+            CreateButton(screen, "Voltar aos protótipos", new Vector2(0.5f, 0.055f), ReturnToSelector, new Vector2(620f, 72f), SecondaryButtonColor, 24);
         }
 
         private string BuildSummaryText()
@@ -454,61 +428,9 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
 
         private void RestartSession()
         {
-            StartQuickTest();
-        }
-
-        private void ShowFeedbackScreen()
-        {
-            RectTransform screen = BeginScreen();
-            CreateText(screen, "Feedback rápido", 52, new Vector2(0.08f, 0.84f), new Vector2(0.92f, 0.94f), FontStyles.Bold, TextAlignmentOptions.Center);
-            CreateText(screen, "Opcional: ajude a melhorar este protótipo. Nada é enviado online; o feedback aparece no Console.", 24, new Vector2(0.10f, 0.76f), new Vector2(0.90f, 0.83f), FontStyles.Italic, TextAlignmentOptions.Center, MutedTextColor);
-
-            CreatePanel(screen, "FeedbackPanel", new Vector2(0.06f, 0.20f), new Vector2(0.94f, 0.73f), CardColor);
-            CreateText(screen, "A partida foi clara?", 27, new Vector2(0.10f, 0.66f), new Vector2(0.90f, 0.71f), FontStyles.Bold, TextAlignmentOptions.MidlineLeft, HighlightTextColor);
-            CreateScoreButtons(screen, 0.61f, true);
-            CreateText(screen, "Você sentiu que conseguiu participar?", 27, new Vector2(0.10f, 0.54f), new Vector2(0.90f, 0.59f), FontStyles.Bold, TextAlignmentOptions.MidlineLeft, HighlightTextColor);
-            CreateScoreButtons(screen, 0.49f, false);
-
-            rememberedFigureInput = CreateInputField(screen, "Você lembra de alguma figura encontrada?", new Vector2(0.10f, 0.36f), new Vector2(0.90f, 0.46f));
-            improvementInput = CreateInputField(screen, "O que confundiu ou poderia melhorar?", new Vector2(0.10f, 0.23f), new Vector2(0.90f, 0.33f));
-
-            CreateButton(screen, "Enviar feedback", new Vector2(0.5f, 0.15f), SubmitFeedback, new Vector2(660f, 82f), PrimaryButtonColor, 27);
-            CreateButton(screen, "Reiniciar teste", new Vector2(0.30f, 0.065f), RestartSession, new Vector2(380f, 72f), SecondaryButtonColor, 23);
-            CreateButton(screen, "Voltar ao menu", new Vector2(0.70f, 0.065f), ShowRootScreen, new Vector2(380f, 72f), SecondaryButtonColor, 23);
-        }
-
-        private void CreateScoreButtons(RectTransform screen, float y, bool clarity)
-        {
-            for (int score = 1; score <= 5; score++)
-            {
-                int capturedScore = score;
-                bool selected = clarity ? feedbackClarityScore == score : feedbackParticipationScore == score;
-                CreateButton(screen, score.ToString(), new Vector2(0.20f + ((score - 1) * 0.15f), y), () => SetFeedbackScore(clarity, capturedScore), new Vector2(108f, 62f), selected ? PrimaryButtonColor : SecondaryButtonColor, 23);
-            }
-        }
-
-        private void SetFeedbackScore(bool clarity, int score)
-        {
-            if (clarity) feedbackClarityScore = score;
-            else feedbackParticipationScore = score;
-            Debug.Log($"[ForgottenNamesExpedition][FeedbackDraft] {(clarity ? "clarity" : "participation")}={score}");
-        }
-
-        private void SubmitFeedback()
-        {
-            string remembered = rememberedFigureInput != null ? rememberedFigureInput.text : string.Empty;
-            string improvement = improvementInput != null ? improvementInput.text : string.Empty;
-            Debug.Log($"[ForgottenNamesExpedition][Feedback] clarity={feedbackClarityScore};participation={feedbackParticipationScore};remembered={remembered};improvement={improvement}");
-            ShowFeedbackThanksScreen();
-        }
-
-        private void ShowFeedbackThanksScreen()
-        {
-            RectTransform screen = BeginScreen();
-            CreateText(screen, "Obrigado pelo feedback", 52, new Vector2(0.08f, 0.60f), new Vector2(0.92f, 0.72f), FontStyles.Bold, TextAlignmentOptions.Center);
-            CreateText(screen, "As respostas foram registradas no Console para apoiar o playtest local.", 28, new Vector2(0.10f, 0.45f), new Vector2(0.90f, 0.56f), FontStyles.Normal, TextAlignmentOptions.Center, MutedTextColor);
-            CreateButton(screen, "Reiniciar teste", new Vector2(0.5f, 0.30f), RestartSession, new Vector2(620f, 84f), PrimaryButtonColor, 27);
-            CreateButton(screen, "Voltar ao menu", new Vector2(0.5f, 0.20f), ShowRootScreen, new Vector2(620f, 84f), SecondaryButtonColor, 27);
+            state = new ForgottenNamesExpeditionState();
+            sessionStarted = false;
+            ShowPremiseSelection();
         }
 
         private void ShowFieldGuideScreen()
@@ -574,14 +496,11 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
             RectTransform row = rowObject.GetComponent<RectTransform>();
             row.SetParent(content, false);
             rowObject.GetComponent<Image>().color = CardColor;
-            rowObject.GetComponent<LayoutElement>().preferredHeight = 420f;
+            rowObject.GetComponent<LayoutElement>().preferredHeight = 210f;
 
-            CreateText(row, scientist.Name, 30, new Vector2(0.05f, 0.84f), new Vector2(0.95f, 0.97f), FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
-            CreateText(row, scientist.Field, 22, new Vector2(0.05f, 0.76f), new Vector2(0.95f, 0.85f), FontStyles.Italic, TextAlignmentOptions.MidlineLeft, HighlightTextColor);
-            CreateText(row, "Por que talvez você não conheça: " + scientist.HumanHook, 21, new Vector2(0.05f, 0.58f), new Vector2(0.95f, 0.75f), FontStyles.Normal, TextAlignmentOptions.TopLeft, MutedTextColor);
-            CreateText(row, "O que mudou: " + scientist.ShortContribution, 21, new Vector2(0.05f, 0.40f), new Vector2(0.95f, 0.57f), FontStyles.Normal, TextAlignmentOptions.TopLeft, MutedTextColor);
-            CreateText(row, "Como ajuda a expedição: " + scientist.EncounterPrompt, 20, new Vector2(0.05f, 0.15f), new Vector2(0.95f, 0.39f), FontStyles.Normal, TextAlignmentOptions.TopLeft, MutedTextColor);
-            CreateText(row, "Use quando: " + ForgottenNamesExpeditionContent.JoinTags(scientist.Tags), 20, new Vector2(0.05f, 0.03f), new Vector2(0.95f, 0.14f), FontStyles.Bold, TextAlignmentOptions.MidlineLeft, HighlightTextColor);
+            CreateText(row, scientist.Name, 27, new Vector2(0.05f, 0.68f), new Vector2(0.95f, 0.94f), FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
+            CreateText(row, scientist.Field, 21, new Vector2(0.05f, 0.54f), new Vector2(0.95f, 0.70f), FontStyles.Italic, TextAlignmentOptions.MidlineLeft, HighlightTextColor);
+            CreateText(row, scientist.FieldGuideBio, 21, new Vector2(0.05f, 0.08f), new Vector2(0.95f, 0.52f), FontStyles.Normal, TextAlignmentOptions.TopLeft, MutedTextColor);
         }
 
         private void ShowHowToPlayModal()
@@ -632,17 +551,10 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
             overlayRect.offsetMax = Vector2.zero;
             modalOverlay.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.68f);
 
-            RectTransform panel = CreatePanel(overlayRect, "ScientistBioPanel", new Vector2(0.06f, 0.08f), new Vector2(0.94f, 0.90f), new Color(0.08f, 0.11f, 0.17f, 0.98f));
-            CreateText(panel, scientist.Name, 44, new Vector2(0.08f, 0.86f), new Vector2(0.92f, 0.96f), FontStyles.Bold, TextAlignmentOptions.Center);
-            CreateText(panel, scientist.Field, 25, new Vector2(0.08f, 0.79f), new Vector2(0.92f, 0.86f), FontStyles.Italic, TextAlignmentOptions.Center, HighlightTextColor);
-            CreateText(panel, "Por que talvez você não conheça", 22, new Vector2(0.08f, 0.70f), new Vector2(0.92f, 0.76f), FontStyles.Bold, TextAlignmentOptions.MidlineLeft, HighlightTextColor);
-            CreateText(panel, scientist.HumanHook, 22, new Vector2(0.08f, 0.60f), new Vector2(0.92f, 0.70f), FontStyles.Normal, TextAlignmentOptions.TopLeft, MutedTextColor);
-            CreateText(panel, "O que mudou", 22, new Vector2(0.08f, 0.52f), new Vector2(0.92f, 0.58f), FontStyles.Bold, TextAlignmentOptions.MidlineLeft, HighlightTextColor);
-            CreateText(panel, scientist.ShortContribution, 22, new Vector2(0.08f, 0.42f), new Vector2(0.92f, 0.52f), FontStyles.Normal, TextAlignmentOptions.TopLeft, MutedTextColor);
-            CreateText(panel, "Como ajuda a expedição", 22, new Vector2(0.08f, 0.34f), new Vector2(0.92f, 0.40f), FontStyles.Bold, TextAlignmentOptions.MidlineLeft, HighlightTextColor);
-            CreateText(panel, scientist.EncounterPrompt, 21, new Vector2(0.08f, 0.18f), new Vector2(0.92f, 0.34f), FontStyles.Normal, TextAlignmentOptions.TopLeft, MutedTextColor);
-            CreateText(panel, "Tags / Use quando: " + ForgottenNamesExpeditionContent.JoinTags(scientist.Tags), 21, new Vector2(0.08f, 0.11f), new Vector2(0.92f, 0.17f), FontStyles.Bold, TextAlignmentOptions.Center, HighlightTextColor);
-            CreateButton(panel, "Fechar", new Vector2(0.5f, 0.055f), CloseModal, new Vector2(420f, 76f), PrimaryButtonColor, 24);
+            RectTransform panel = CreatePanel(overlayRect, "ScientistBioPanel", new Vector2(0.08f, 0.18f), new Vector2(0.92f, 0.82f), new Color(0.08f, 0.11f, 0.17f, 0.98f));
+            CreateText(panel, scientist.Name, 44, new Vector2(0.08f, 0.78f), new Vector2(0.92f, 0.92f), FontStyles.Bold, TextAlignmentOptions.Center);
+            CreateText(panel, scientist.FieldGuideBio, 28, new Vector2(0.10f, 0.28f), new Vector2(0.90f, 0.74f), FontStyles.Normal, TextAlignmentOptions.Center);
+            CreateButton(panel, "Fechar", new Vector2(0.5f, 0.16f), CloseModal, new Vector2(420f, 82f), PrimaryButtonColor);
         }
 
         private void ReturnToSelector()
@@ -656,7 +568,6 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
             CloseModal();
             RectTransform screen = root.GetComponent<RectTransform>();
             ClearChildren(screen);
-            animator?.PlayReveal(root);
             return screen;
         }
 
@@ -672,7 +583,6 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
             rect.offsetMin = Vector2.zero;
             rect.offsetMax = Vector2.zero;
             root.GetComponent<Image>().color = BackgroundColor;
-            animator = root.AddComponent<ForgottenNamesExpeditionFeedbackAnimator>();
         }
 
         private void CreateTopBar(RectTransform screen)
@@ -691,20 +601,6 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
             CreateText(party, FormatCompactScientistList(state.PartyScientistIndexes), 19, new Vector2(0.05f, 0.08f), new Vector2(0.95f, 0.60f), FontStyles.Normal, TextAlignmentOptions.Center, MutedTextColor);
             CreateText(archive, "Archive", 23, new Vector2(0.05f, 0.60f), new Vector2(0.95f, 0.95f), FontStyles.Bold, TextAlignmentOptions.Center, HighlightTextColor);
             CreateText(archive, FormatCompactScientistList(state.ArchiveScientistIndexes), 19, new Vector2(0.05f, 0.08f), new Vector2(0.95f, 0.60f), FontStyles.Normal, TextAlignmentOptions.Center, MutedTextColor);
-
-            if (pendingPartyPulse)
-            {
-                pendingPartyPulse = false;
-                animator?.PulseGraphic(party.GetComponent<Image>(), new Color(0.22f, 0.60f, 0.36f, 1f));
-                animator?.PulseScale(party);
-            }
-
-            if (pendingArchivePulse)
-            {
-                pendingArchivePulse = false;
-                animator?.PulseGraphic(archive.GetComponent<Image>(), new Color(0.42f, 0.35f, 0.68f, 1f));
-                animator?.PulseScale(archive);
-            }
         }
 
         private void CreateRoleList(RectTransform screen, Vector2 anchorMin, Vector2 anchorMax)
@@ -788,52 +684,6 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
             return text;
         }
 
-        private static TMP_InputField CreateInputField(RectTransform parent, string placeholderText, Vector2 anchorMin, Vector2 anchorMax)
-        {
-            GameObject inputObject = new GameObject(placeholderText + "Input", typeof(RectTransform), typeof(Image), typeof(TMP_InputField));
-            RectTransform rect = inputObject.GetComponent<RectTransform>();
-            rect.SetParent(parent, false);
-            rect.anchorMin = anchorMin;
-            rect.anchorMax = anchorMax;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
-            inputObject.GetComponent<Image>().color = new Color(0.92f, 0.95f, 1f, 0.95f);
-
-            GameObject textObject = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
-            RectTransform textRect = textObject.GetComponent<RectTransform>();
-            textRect.SetParent(rect, false);
-            textRect.anchorMin = Vector2.zero;
-            textRect.anchorMax = Vector2.one;
-            textRect.offsetMin = new Vector2(18f, 8f);
-            textRect.offsetMax = new Vector2(-18f, -8f);
-            TextMeshProUGUI text = textObject.GetComponent<TextMeshProUGUI>();
-            text.fontSize = 24;
-            text.color = new Color(0.05f, 0.07f, 0.10f, 1f);
-            text.alignment = TextAlignmentOptions.TopLeft;
-            text.enableWordWrapping = true;
-
-            GameObject placeholderObject = new GameObject("Placeholder", typeof(RectTransform), typeof(TextMeshProUGUI));
-            RectTransform placeholderRect = placeholderObject.GetComponent<RectTransform>();
-            placeholderRect.SetParent(rect, false);
-            placeholderRect.anchorMin = Vector2.zero;
-            placeholderRect.anchorMax = Vector2.one;
-            placeholderRect.offsetMin = new Vector2(18f, 8f);
-            placeholderRect.offsetMax = new Vector2(-18f, -8f);
-            TextMeshProUGUI placeholder = placeholderObject.GetComponent<TextMeshProUGUI>();
-            placeholder.text = placeholderText;
-            placeholder.fontSize = 24;
-            placeholder.fontStyle = FontStyles.Italic;
-            placeholder.color = new Color(0.20f, 0.24f, 0.30f, 0.70f);
-            placeholder.alignment = TextAlignmentOptions.TopLeft;
-            placeholder.enableWordWrapping = true;
-
-            TMP_InputField input = inputObject.GetComponent<TMP_InputField>();
-            input.textComponent = text;
-            input.placeholder = placeholder;
-            input.lineType = TMP_InputField.LineType.MultiLineNewline;
-            return input;
-        }
-
         private static Button CreateButton(RectTransform parent, string label, Vector2 anchor, UnityEngine.Events.UnityAction onClick)
         {
             return CreateButton(parent, label, anchor, onClick, new Vector2(740f, 100f), PrimaryButtonColor);
@@ -851,14 +701,6 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
             buttonObject.GetComponent<Image>().color = color;
 
             Button button = buttonObject.GetComponent<Button>();
-            button.transition = Selectable.Transition.ColorTint;
-            ColorBlock colors = button.colors;
-            colors.normalColor = color;
-            colors.highlightedColor = Color.Lerp(color, Color.white, 0.14f);
-            colors.pressedColor = Color.Lerp(color, Color.black, 0.16f);
-            colors.selectedColor = Color.Lerp(color, Color.white, 0.08f);
-            colors.fadeDuration = 0.06f;
-            button.colors = colors;
             button.onClick.AddListener(onClick);
 
             CreateText(rect, label, fontSize, Vector2.zero, Vector2.one, FontStyles.Bold, TextAlignmentOptions.Center);
@@ -882,6 +724,5 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
         private static Color SecondaryButtonColor => new Color(0.24f, 0.27f, 0.33f, 1f);
         private static Color MutedTextColor => new Color(0.80f, 0.86f, 0.94f, 1f);
         private static Color HighlightTextColor => new Color(0.96f, 0.78f, 0.40f, 1f);
-        private static Color WarningTextColor => new Color(1f, 0.66f, 0.36f, 1f);
     }
 }
