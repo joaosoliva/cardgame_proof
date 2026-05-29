@@ -457,21 +457,52 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                 return;
             }
 
-            Vector2 anchorMin = new Vector2(0.25f, 0.32f);
-            Vector2 anchorMax = new Vector2(0.75f, 0.66f);
-            if (step == ScienceTurnStep.ConnectionExplanation || step == ScienceTurnStep.Scoring || step == ScienceTurnStep.ActionResolution)
+            RectTransform modalPanel = CreateGameplayModalPanel(screen, GetModalNameForStep(step));
+            switch (step)
             {
-                anchorMin = new Vector2(0.22f, 0.18f);
-                anchorMax = new Vector2(0.78f, 0.84f);
+                case ScienceTurnStep.ConnectionExplanation:
+                    BuildConnectionVotingPanel(modalPanel);
+                    break;
+                case ScienceTurnStep.Scoring:
+                    BuildScoringPanel(modalPanel);
+                    break;
+                case ScienceTurnStep.ActionResolution:
+                    BuildActionResolutionPanel(modalPanel);
+                    break;
+                case ScienceTurnStep.TurnResolved:
+                    BuildTurnResolvedModal(modalPanel);
+                    break;
             }
-            else if (step == ScienceTurnStep.TurnResolved)
-            {
-                anchorMin = new Vector2(0.32f, 0.34f);
-                anchorMax = new Vector2(0.68f, 0.56f);
-            }
+        }
 
-            RectTransform contextualPanel = CreatePanel(screen, "ContextualTurnPanel", anchorMin, anchorMax, new Color(0.08f, 0.10f, 0.14f, 0.97f));
-            BuildActionPanel(contextualPanel);
+        private RectTransform CreateGameplayModalPanel(RectTransform screen, string panelName)
+        {
+            RectTransform overlay = CreatePanel(screen, panelName + "Overlay", Vector2.zero, Vector2.one, new Color(0f, 0f, 0f, 0.62f));
+            return CreatePanel(overlay, panelName, new Vector2(0.14f, 0.12f), new Vector2(0.86f, 0.88f), new Color(0.08f, 0.10f, 0.14f, 0.99f));
+        }
+
+        private static string GetModalNameForStep(ScienceTurnStep step)
+        {
+            switch (step)
+            {
+                case ScienceTurnStep.ConnectionExplanation:
+                    return "VotingModal";
+                case ScienceTurnStep.Scoring:
+                    return "ScoringModal";
+                case ScienceTurnStep.ActionResolution:
+                    return "ActionResolutionModal";
+                case ScienceTurnStep.TurnResolved:
+                    return "TurnResolvedModal";
+                default:
+                    return "GameplayStateModal";
+            }
+        }
+
+        private void BuildTurnResolvedModal(RectTransform parent)
+        {
+            CreateText(parent, "Turno resolvido", 42, new Vector2(0.08f, 0.76f), new Vector2(0.92f, 0.92f), FontStyles.Bold);
+            CreateText(parent, "A colocação ou ação foi resolvida. Passe o dispositivo para o próximo jogador quando todos estiverem prontos.", 28, new Vector2(0.10f, 0.42f), new Vector2(0.90f, 0.70f), FontStyles.Normal);
+            CreateButton(parent, "Encerrar turno", new Vector2(0.50f, 0.24f), EndTurn, new Vector2(420f, 96f));
         }
 
         private void BuildPlacementControlPanel(RectTransform parent)
@@ -791,18 +822,18 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             ScienceCardData selectedCard = turnManager?.SelectedCard;
             string cardName = selectedCard?.DisplayName ?? "carta colocada";
 
-            CreateText(parent, "Votação da conexão", 23, new Vector2(0.08f, 0.60f), new Vector2(0.92f, 0.66f), FontStyles.Bold);
+            CreateText(parent, "Votação da conexão", 44, new Vector2(0.06f, 0.84f), new Vector2(0.94f, 0.96f), FontStyles.Bold);
             string votePrompt = $"{activePlayer?.DisplayName ?? "Jogador ativo"} explicou {cardName}.\nOs jogadores aceitam essa conexão?";
             if (state != null && state.PeerReviewRequiresUnanimity)
             {
-                votePrompt += "\nPeer Review ativo: todos os votos precisam ser Sim.";
+                votePrompt += "\nPeer Review ativo: todos precisam votar Sim.";
             }
 
-            CreateText(parent, votePrompt, 17, new Vector2(0.08f, 0.48f), new Vector2(0.92f, 0.60f), FontStyles.Normal);
+            CreateText(parent, votePrompt, 28, new Vector2(0.08f, 0.66f), new Vector2(0.92f, 0.82f), FontStyles.Normal);
 
             if (state == null || state.Players.Count <= 1)
             {
-                CreateButton(parent, "Aceitar sem votação", new Vector2(0.50f, 0.36f), ResolveConnectionVoteResult, new Vector2(260f, 58f));
+                CreateButton(parent, "Aceitar sem votação", new Vector2(0.50f, 0.48f), ResolveConnectionVoteResult, new Vector2(420f, 96f));
                 return;
             }
 
@@ -812,17 +843,17 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                 SciencePlayerState player = state.Players[i];
                 if (player == null || player.PlayerIndex == activeVotingPlayerIndex) continue;
 
-                float y = 0.38f - (row * 0.105f);
+                float y = 0.55f - (row * 0.16f);
                 if (connectionVotes.TryGetValue(player.PlayerIndex, out bool accepted))
                 {
-                    CreateText(parent, $"{player.DisplayName}: {(accepted ? "Sim" : "Não")}", 17, new Vector2(0.10f, y - 0.035f), new Vector2(0.90f, y + 0.035f), FontStyles.Bold);
+                    CreateText(parent, $"{player.DisplayName}: {(accepted ? "Sim" : "Não")}", 26, new Vector2(0.12f, y - 0.045f), new Vector2(0.88f, y + 0.045f), FontStyles.Bold);
                 }
                 else
                 {
                     int voterIndex = player.PlayerIndex;
-                    CreateText(parent, player.DisplayName, 16, new Vector2(0.08f, y - 0.035f), new Vector2(0.36f, y + 0.035f), FontStyles.Normal, TextAlignmentOptions.Left);
-                    CreateButton(parent, "Sim", new Vector2(0.55f, y), () => SubmitConnectionVote(voterIndex, true), new Vector2(86f, 44f));
-                    CreateButton(parent, "Não", new Vector2(0.78f, y), () => SubmitConnectionVote(voterIndex, false), new Vector2(86f, 44f));
+                    CreateText(parent, player.DisplayName, 24, new Vector2(0.10f, y - 0.055f), new Vector2(0.36f, y + 0.055f), FontStyles.Normal, TextAlignmentOptions.Left);
+                    CreateButton(parent, "Sim", new Vector2(0.58f, y), () => SubmitConnectionVote(voterIndex, true), new Vector2(180f, 82f));
+                    CreateButton(parent, "Não", new Vector2(0.78f, y), () => SubmitConnectionVote(voterIndex, false), new Vector2(180f, 82f));
                 }
 
                 row++;
@@ -937,43 +968,43 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
         private void BuildScoringPanel(RectTransform parent)
         {
-            CreateText(parent, "Pontuação da conexão", 23, new Vector2(0.08f, 0.60f), new Vector2(0.92f, 0.66f), FontStyles.Bold);
-            string scoringDescription = $"{GetPlayerDisplayName(activeScoringPlayerIndex)} teve a conexão aceita.\nBônus são decididos manualmente pelo grupo/facilitador.";
+            CreateText(parent, "Pontuação da conexão", 44, new Vector2(0.06f, 0.84f), new Vector2(0.94f, 0.96f), FontStyles.Bold);
+            string scoringDescription = $"{GetPlayerDisplayName(activeScoringPlayerIndex)} teve a conexão aceita.\nO grupo decide manualmente os bônus.";
             if (HasCitationNeededBonus(activeScoringPlayerIndex))
             {
                 scoringDescription += "\nCitation Needed ativo: considere o bônus de guia/fato (+1).";
             }
 
-            CreateText(parent, scoringDescription, 17, new Vector2(0.08f, 0.48f), new Vector2(0.92f, 0.60f), FontStyles.Normal);
+            CreateText(parent, scoringDescription, 28, new Vector2(0.08f, 0.66f), new Vector2(0.92f, 0.82f), FontStyles.Normal);
 
             if (!basePointAwarded)
             {
-                CreateButton(parent, "Award base point and continue", new Vector2(0.50f, 0.39f), AwardBaseConnectionPoint, new Vector2(300f, 50f));
+                CreateButton(parent, "Ponto base +1", new Vector2(0.50f, 0.54f), AwardBaseConnectionPoint, new Vector2(420f, 82f));
             }
             else
             {
-                CreateText(parent, "Ponto base concedido (+1).", 16, new Vector2(0.10f, 0.36f), new Vector2(0.90f, 0.42f), FontStyles.Bold);
+                CreateText(parent, "✓ Ponto base concedido (+1).", 26, new Vector2(0.12f, 0.49f), new Vector2(0.88f, 0.58f), FontStyles.Bold);
             }
 
             if (!interestingBonusAwarded)
             {
-                CreateButton(parent, "Add interesting explanation bonus", new Vector2(0.50f, 0.29f), AwardInterestingBonus, new Vector2(300f, 48f));
+                CreateButton(parent, "Bônus explicação +1", new Vector2(0.50f, 0.40f), AwardInterestingBonus, new Vector2(420f, 78f));
             }
             else
             {
-                CreateText(parent, "Bônus de explicação interessante (+1).", 15, new Vector2(0.10f, 0.26f), new Vector2(0.90f, 0.32f), FontStyles.Bold);
+                CreateText(parent, "✓ Bônus de explicação interessante (+1).", 24, new Vector2(0.12f, 0.35f), new Vector2(0.88f, 0.44f), FontStyles.Bold);
             }
 
             if (!guideFactBonusAwarded)
             {
-                CreateButton(parent, "Add guide/fact bonus", new Vector2(0.50f, 0.20f), AwardGuideFactBonus, new Vector2(300f, 48f));
+                CreateButton(parent, "Bônus guia/fato +1", new Vector2(0.50f, 0.27f), AwardGuideFactBonus, new Vector2(420f, 78f));
             }
             else
             {
-                CreateText(parent, "Bônus de fato/guia específico (+1).", 15, new Vector2(0.10f, 0.17f), new Vector2(0.90f, 0.23f), FontStyles.Bold);
+                CreateText(parent, "✓ Bônus de fato/guia específico (+1).", 24, new Vector2(0.12f, 0.22f), new Vector2(0.88f, 0.31f), FontStyles.Bold);
             }
 
-            CreateButton(parent, "Continue", new Vector2(0.50f, 0.09f), ContinueAfterScoring, new Vector2(220f, 54f));
+            CreateButton(parent, "Continuar", new Vector2(0.50f, 0.12f), ContinueAfterScoring, new Vector2(360f, 82f));
         }
 
         private void AwardBaseConnectionPoint()
@@ -1052,14 +1083,16 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             ScienceActionCardData actionCard = turnManager?.SelectedCard as ScienceActionCardData;
             if (currentPlayer == null || actionCard == null)
             {
-                CreateText(parent, "Nenhuma ação selecionada.", 18, new Vector2(0.08f, 0.45f), new Vector2(0.92f, 0.58f), FontStyles.Italic);
+                CreateText(parent, "Nenhuma ação selecionada.", 30, new Vector2(0.08f, 0.42f), new Vector2(0.92f, 0.58f), FontStyles.Italic);
+                CreateButton(parent, "Voltar", new Vector2(0.50f, 0.24f), CancelSelection, new Vector2(320f, 82f));
                 return;
             }
 
-            CreateText(parent, "Resolver ação", 23, new Vector2(0.08f, 0.58f), new Vector2(0.92f, 0.64f), FontStyles.Bold);
-            CreateText(parent, $"{actionCard.DisplayName} [{actionCard.EffectType}]\n{actionCard.RulesText}\n\nEfeito temporário: {BuildActionEffectSummary(actionCard.EffectType)}", 16, new Vector2(0.08f, 0.31f), new Vector2(0.92f, 0.57f), FontStyles.Normal, TextAlignmentOptions.TopLeft);
-            CreateButton(parent, "Aplicar ação", new Vector2(0.50f, 0.22f), () => ResolveActionCard(currentPlayer, actionCard), new Vector2(260f, 58f));
-            CreateButton(parent, "Cancelar ação", new Vector2(0.50f, 0.13f), CancelSelection, new Vector2(260f, 52f));
+            CreateText(parent, "Resolver ação", 44, new Vector2(0.06f, 0.84f), new Vector2(0.94f, 0.96f), FontStyles.Bold);
+            string body = $"{actionCard.DisplayName} [{actionCard.EffectType}]\n\n{actionCard.RulesText}\n\nEfeito temporário: {BuildActionEffectSummary(actionCard.EffectType)}";
+            CreateText(parent, body, 28, new Vector2(0.08f, 0.34f), new Vector2(0.92f, 0.80f), FontStyles.Normal, TextAlignmentOptions.TopLeft);
+            CreateButton(parent, "Aplicar ação", new Vector2(0.38f, 0.16f), () => ResolveActionCard(currentPlayer, actionCard), new Vector2(360f, 88f));
+            CreateButton(parent, "Cancelar", new Vector2(0.64f, 0.16f), CancelSelection, new Vector2(320f, 88f));
         }
 
         private void ApplyActionEffect(SciencePlayerState currentPlayer, ScienceActionCardData actionCard)
@@ -1131,6 +1164,8 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             if (root == null) return;
 
             CloseDebugLogModal();
+            CloseCardDetailsModal();
+            CloseHandCardContextMenu();
             RectTransform parent = root.GetComponent<RectTransform>();
             debugLogModal = new GameObject("DebugLogModal", typeof(RectTransform), typeof(Image));
             RectTransform overlay = debugLogModal.GetComponent<RectTransform>();
@@ -1163,6 +1198,8 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             if (card == null || root == null) return;
 
             CloseCardDetailsModal();
+            CloseDebugLogModal();
+            CloseHandCardContextMenu();
             RectTransform parent = root.GetComponent<RectTransform>();
             cardDetailModal = new GameObject("CardDetailModal", typeof(RectTransform), typeof(Image));
             RectTransform overlay = cardDetailModal.GetComponent<RectTransform>();
@@ -1317,7 +1354,8 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             CloseCardDetailsModal();
             ClearChildren(screen);
 
-            RectTransform panel = CreatePanel(screen, "ScienceCardGameEndGameScreen", new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.92f), new Color(0.08f, 0.10f, 0.14f, 0.98f));
+            RectTransform overlay = CreatePanel(screen, "EndGameModalOverlay", Vector2.zero, Vector2.one, new Color(0f, 0f, 0f, 0.68f));
+            RectTransform panel = CreatePanel(overlay, "ScienceCardGameEndGameModal", new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.92f), new Color(0.08f, 0.10f, 0.14f, 0.98f));
             CreateText(panel, "Fim de Jogo", 56, new Vector2(0.08f, 0.82f), new Vector2(0.92f, 0.94f), FontStyles.Bold);
             CreateText(panel, $"Vencedor(es): {FormatWinnerNames(winners)}", 34, new Vector2(0.10f, 0.72f), new Vector2(0.90f, 0.80f), FontStyles.Bold);
             CreateText(panel, $"Condição: {FormatWinCondition(winCondition)}", 24, new Vector2(0.10f, 0.65f), new Vector2(0.90f, 0.71f), FontStyles.Italic);
