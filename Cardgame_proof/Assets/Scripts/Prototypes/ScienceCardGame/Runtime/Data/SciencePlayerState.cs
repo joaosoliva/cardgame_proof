@@ -31,6 +31,13 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Data
             playedCards.Add(card);
         }
 
+        public void ReturnPlayedToHand(ScienceCardData card)
+        {
+            if (card == null) return;
+            playedCards.Remove(card);
+            if (!hand.Contains(card)) hand.Add(card);
+        }
+
         public void SetScore(int score)
         {
             Score = score;

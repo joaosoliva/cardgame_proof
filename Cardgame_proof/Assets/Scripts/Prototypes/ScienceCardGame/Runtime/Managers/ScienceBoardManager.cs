@@ -91,6 +91,19 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             return boardSlots.TryGetValue(coordinate, out ScienceBoardSlotState slotState) ? slotState.RotationDegrees : 0;
         }
 
+        public bool RemoveCardAt(Vector2Int coordinate)
+        {
+            bool removedCard = boardCards.Remove(coordinate);
+            bool removedSlot = boardSlots.Remove(coordinate);
+            if (removedCard || removedSlot)
+            {
+                telemetry?.LogEvent("science_board_card_removed", $"coord={coordinate}");
+                return true;
+            }
+
+            return false;
+        }
+
         public void Cleanup()
         {
             boardCards.Clear();

@@ -19,6 +19,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         private ScienceCardGameState state;
         private ScienceDeckManager deckManager;
         private ScienceBoardManager boardManager;
+        private ScienceScoreManager scoreManager;
         private ScienceTurnManager turnManager;
         private ScienceTelemetryManager telemetry;
         private GameObject root;
@@ -27,6 +28,11 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         private int selectedPlayerCount = 2;
         private int activeVotingPlayerIndex = -1;
         private string activeVotingCardId;
+        private int activeScoringPlayerIndex = -1;
+        private string activeScoringCardId;
+        private bool basePointAwarded;
+        private bool interestingBonusAwarded;
+        private bool guideFactBonusAwarded;
 
         public GameObject Root => root;
 
@@ -35,6 +41,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             ScienceCardGameState gameState,
             ScienceDeckManager scienceDeckManager,
             ScienceBoardManager scienceBoardManager,
+            ScienceScoreManager scienceScoreManager,
             ScienceTurnManager scienceTurnManager,
             ScienceTelemetryManager telemetryManager,
             Action<int> onStartGame)
@@ -43,11 +50,13 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             state = gameState;
             deckManager = scienceDeckManager;
             boardManager = scienceBoardManager;
+            scoreManager = scienceScoreManager;
             turnManager = scienceTurnManager;
             telemetry = telemetryManager;
             selectedPlayerCount = state?.SelectedPlayerCount ?? 2;
             recentActions.Clear();
             ResetConnectionVoting();
+            ResetScoringState();
 
             if (context?.SceneRoot?.FullScreenRoot == null)
             {
@@ -87,6 +96,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             state = null;
             deckManager = null;
             boardManager = null;
+            scoreManager = null;
             turnManager = null;
             telemetry = null;
         }
@@ -288,6 +298,11 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             if (step == ScienceTurnStep.ConnectionExplanation)
             {
                 BuildConnectionVotingPanel(parent);
+            }
+
+            if (step == ScienceTurnStep.Scoring)
+            {
+                BuildScoringPanel(parent);
             }
 
             if (step == ScienceTurnStep.AwaitingBoardSlot || step == ScienceTurnStep.AwaitingPlacementConfirmation)
@@ -529,7 +544,129 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             AddLog($"Conexão {resultText}: {yesVotes} Sim / {noVotes} Não.{tieText}");
             telemetry?.LogEvent("science_connection_vote_resolved", $"turn={turnManager?.TurnNumber ?? 0};activePlayer={activeVotingPlayerIndex};card={activeVotingCardId};yes={yesVotes};no={noVotes};tied={tied};tieAccepted={tieAccepted};accepted={acceptedByVote}");
+
+            if (acceptedByVote)
+            {
+                StartScoringForAcceptedConnection();
+                BuildGameplayScreen();
+                return;
+            }
+
+            ResolveRejectedConnection();
+            BuildGameplayScreen();
+        }
+
+        private void StartScoringForAcceptedConnection()
+        {
+            activeScoringPlayerIndex = activeVotingPlayerIndex;
+            activeScoringCardId = activeVotingCardId;
+            basePointAwarded = false;
+            interestingBonusAwarded = false;
+            guideFactBonusAwarded = false;
             ResetConnectionVoting();
+            turnManager?.StartScoring();
+            telemetry?.LogEvent("science_scoring_started", $"turn={turnManager?.TurnNumber ?? 0};player={activeScoringPlayerIndex};card={activeScoringCardId}");
+        }
+
+        private void ResolveRejectedConnection()
+        {
+            SciencePlayerState currentPlayer = GetCurrentPlayer();
+            ScienceCardData selectedCard = turnManager?.SelectedCard;
+            Vector2Int coordinate = turnManager?.SelectedBoardCoordinate ?? Vector2Int.zero;
+            ScienceRejectedConnectionBehavior behavior = state?.RejectedConnectionBehavior ?? ScienceRejectedConnectionBehavior.ReturnCardToHand;
+
+            if (behavior == ScienceRejectedConnectionBehavior.RetryExplanation)
+            {
+                AddLog("Conexão rejeitada. O jogador pode tentar explicar novamente.");
+                telemetry?.LogEvent("science_connection_rejected", $"turn={turnManager?.TurnNumber ?? 0};player={activeVotingPlayerIndex};card={activeVotingCardId};behavior={behavior}");
+                ResetConnectionVoting();
+                StartConnectionVoting(currentPlayer, selectedCard);
+                return;
+            }
+
+            boardManager?.RemoveCardAt(coordinate);
+            currentPlayer?.ReturnPlayedToHand(selectedCard);
+            AddLog("Conexão rejeitada. A carta voltou para a mão do jogador ativo.");
+            telemetry?.LogEvent("science_connection_rejected", $"turn={turnManager?.TurnNumber ?? 0};player={activeVotingPlayerIndex};card={activeVotingCardId};behavior={behavior}");
+            ResetConnectionVoting();
+            turnManager?.MarkTurnResolved();
+        }
+
+        private void BuildScoringPanel(RectTransform parent)
+        {
+            CreateText(parent, "Pontuação da conexão", 23, new Vector2(0.08f, 0.60f), new Vector2(0.92f, 0.66f), FontStyles.Bold);
+            CreateText(parent, $"{GetPlayerDisplayName(activeScoringPlayerIndex)} teve a conexão aceita.\nBônus são decididos manualmente pelo grupo/facilitador.", 17, new Vector2(0.08f, 0.48f), new Vector2(0.92f, 0.60f), FontStyles.Normal);
+
+            if (!basePointAwarded)
+            {
+                CreateButton(parent, "Award base point and continue", new Vector2(0.50f, 0.39f), AwardBaseConnectionPoint, new Vector2(300f, 50f));
+            }
+            else
+            {
+                CreateText(parent, "Ponto base concedido (+1).", 16, new Vector2(0.10f, 0.36f), new Vector2(0.90f, 0.42f), FontStyles.Bold);
+            }
+
+            if (!interestingBonusAwarded)
+            {
+                CreateButton(parent, "Add interesting explanation bonus", new Vector2(0.50f, 0.29f), AwardInterestingBonus, new Vector2(300f, 48f));
+            }
+            else
+            {
+                CreateText(parent, "Bônus de explicação interessante (+1).", 15, new Vector2(0.10f, 0.26f), new Vector2(0.90f, 0.32f), FontStyles.Bold);
+            }
+
+            if (!guideFactBonusAwarded)
+            {
+                CreateButton(parent, "Add guide/fact bonus", new Vector2(0.50f, 0.20f), AwardGuideFactBonus, new Vector2(300f, 48f));
+            }
+            else
+            {
+                CreateText(parent, "Bônus de fato/guia específico (+1).", 15, new Vector2(0.10f, 0.17f), new Vector2(0.90f, 0.23f), FontStyles.Bold);
+            }
+
+            CreateButton(parent, "Continue", new Vector2(0.50f, 0.09f), ContinueAfterScoring, new Vector2(220f, 54f));
+        }
+
+        private void AwardBaseConnectionPoint()
+        {
+            if (basePointAwarded) return;
+            basePointAwarded = true;
+            scoreManager?.AddScore(activeScoringPlayerIndex, 1, "accepted_connection_base");
+            AddLog($"{GetPlayerDisplayName(activeScoringPlayerIndex)} recebeu +1 ponto pela conexão aceita.");
+            telemetry?.LogEvent("science_connection_score_awarded", $"turn={turnManager?.TurnNumber ?? 0};player={activeScoringPlayerIndex};card={activeScoringCardId};type=base;amount=1;score={GetPlayerScore(activeScoringPlayerIndex)}");
+            BuildGameplayScreen();
+        }
+
+        private void AwardInterestingBonus()
+        {
+            if (interestingBonusAwarded) return;
+            interestingBonusAwarded = true;
+            scoreManager?.AddScore(activeScoringPlayerIndex, 1, "interesting_explanation_bonus");
+            AddLog($"{GetPlayerDisplayName(activeScoringPlayerIndex)} recebeu +1 bônus por explicação interessante.");
+            telemetry?.LogEvent("science_connection_score_awarded", $"turn={turnManager?.TurnNumber ?? 0};player={activeScoringPlayerIndex};card={activeScoringCardId};type=interesting;amount=1;score={GetPlayerScore(activeScoringPlayerIndex)}");
+            BuildGameplayScreen();
+        }
+
+        private void AwardGuideFactBonus()
+        {
+            if (guideFactBonusAwarded) return;
+            guideFactBonusAwarded = true;
+            scoreManager?.AddScore(activeScoringPlayerIndex, 1, "guide_fact_bonus");
+            AddLog($"{GetPlayerDisplayName(activeScoringPlayerIndex)} recebeu +1 bônus por usar um fato específico.");
+            telemetry?.LogEvent("science_connection_score_awarded", $"turn={turnManager?.TurnNumber ?? 0};player={activeScoringPlayerIndex};card={activeScoringCardId};type=guide_fact;amount=1;score={GetPlayerScore(activeScoringPlayerIndex)}");
+            BuildGameplayScreen();
+        }
+
+        private void ContinueAfterScoring()
+        {
+            if (!basePointAwarded)
+            {
+                AwardBaseConnectionPoint();
+                return;
+            }
+
+            telemetry?.LogEvent("science_connection_scoring_completed", $"turn={turnManager?.TurnNumber ?? 0};player={activeScoringPlayerIndex};card={activeScoringCardId};base={basePointAwarded};interesting={interestingBonusAwarded};guideFact={guideFactBonusAwarded};score={GetPlayerScore(activeScoringPlayerIndex)}");
+            ResetScoringState();
             turnManager?.MarkTurnResolved();
             BuildGameplayScreen();
         }
@@ -687,6 +824,8 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                     return "Confirme a posição escolhida.";
                 case ScienceTurnStep.ConnectionExplanation:
                     return "Os demais jogadores votam a conexão.";
+                case ScienceTurnStep.Scoring:
+                    return "Atribua pontos e bônus.";
                 case ScienceTurnStep.ActionResolution:
                     return "Resolva a ação selecionada.";
                 case ScienceTurnStep.TurnResolved:
@@ -721,6 +860,8 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                     return "A prévia no tabuleiro mostra a rotação escolhida. Confirme, gire novamente ou cancele.";
                 case ScienceTurnStep.ConnectionExplanation:
                     return "O consenso dos jogadores valida a explicação; o sistema não julga automaticamente.";
+                case ScienceTurnStep.Scoring:
+                    return "A conexão foi aceita. Atribua o ponto base e bônus manuais antes de continuar.";
                 case ScienceTurnStep.TurnResolved:
                     return "A colocação/ação foi resolvida. O botão Encerrar turno agora está disponível.";
                 default:
@@ -771,11 +912,34 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             return $"Player {playerIndex + 1}";
         }
 
+        private int GetPlayerScore(int playerIndex)
+        {
+            if (state != null)
+            {
+                for (int i = 0; i < state.Players.Count; i++)
+                {
+                    SciencePlayerState player = state.Players[i];
+                    if (player != null && player.PlayerIndex == playerIndex) return player.Score;
+                }
+            }
+
+            return 0;
+        }
+
         private void ResetConnectionVoting()
         {
             connectionVotes.Clear();
             activeVotingPlayerIndex = -1;
             activeVotingCardId = null;
+        }
+
+        private void ResetScoringState()
+        {
+            activeScoringPlayerIndex = -1;
+            activeScoringCardId = null;
+            basePointAwarded = false;
+            interestingBonusAwarded = false;
+            guideFactBonusAwarded = false;
         }
 
         private string GetCurrentPlayerName()

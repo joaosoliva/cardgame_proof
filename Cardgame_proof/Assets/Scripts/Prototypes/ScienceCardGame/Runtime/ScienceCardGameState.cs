@@ -5,6 +5,12 @@ using CardgameProof.Prototypes.ScienceCardGame.Runtime.Data;
 
 namespace CardgameProof.Prototypes.ScienceCardGame.Runtime
 {
+    public enum ScienceRejectedConnectionBehavior
+    {
+        ReturnCardToHand,
+        RetryExplanation
+    }
+
     public enum ScienceCardGamePhase
     {
         Setup,
@@ -22,6 +28,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime
         public int InitialHandSize { get; private set; } = 4;
         public bool DebugRevealAllHands { get; private set; }
         public bool AcceptTiedConnectionVotes { get; private set; } = true;
+        public ScienceRejectedConnectionBehavior RejectedConnectionBehavior { get; private set; } = ScienceRejectedConnectionBehavior.ReturnCardToHand;
         public DateTime InitializedAtUtc { get; private set; }
         public ScienceCardGamePhase CurrentPhase { get; private set; } = ScienceCardGamePhase.Setup;
         public int SelectedPlayerCount { get; private set; } = 2;
@@ -55,6 +62,11 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime
         public void SetAcceptTiedConnectionVotes(bool acceptTies)
         {
             AcceptTiedConnectionVotes = acceptTies;
+        }
+
+        public void SetRejectedConnectionBehavior(ScienceRejectedConnectionBehavior behavior)
+        {
+            RejectedConnectionBehavior = behavior;
         }
 
         public void SetPhase(ScienceCardGamePhase phase)

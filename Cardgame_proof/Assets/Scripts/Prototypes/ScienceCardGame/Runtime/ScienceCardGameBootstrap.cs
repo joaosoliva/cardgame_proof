@@ -9,6 +9,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime
     {
         [SerializeField] private bool debugRevealAllHands;
         [SerializeField] private bool acceptTiedConnectionVotes = true;
+        [SerializeField] private ScienceRejectedConnectionBehavior rejectedConnectionBehavior = ScienceRejectedConnectionBehavior.ReturnCardToHand;
 
         private PrototypeRuntimeContext context;
         private ScienceCardGameState state;
@@ -35,7 +36,8 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime
             state.InitializeDefaults();
             state.SetDebugRevealAllHands(debugRevealAllHands);
             state.SetAcceptTiedConnectionVotes(acceptTiedConnectionVotes);
-            Debug.Log($"[ScienceCardGame] 00 State initialized for setup debugRevealAllHands={debugRevealAllHands} acceptTiedConnectionVotes={acceptTiedConnectionVotes}");
+            state.SetRejectedConnectionBehavior(rejectedConnectionBehavior);
+            Debug.Log($"[ScienceCardGame] 00 State initialized for setup debugRevealAllHands={debugRevealAllHands} acceptTiedConnectionVotes={acceptTiedConnectionVotes} rejectedConnectionBehavior={rejectedConnectionBehavior}");
 
             telemetryManager = new ScienceTelemetryManager();
             telemetryManager.Initialize(state);
@@ -53,7 +55,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime
             turnManager.Initialize(state, telemetryManager);
 
             uiManager = new ScienceCardGameUIManager();
-            uiManager.Initialize(context, state, deckManager, boardManager, turnManager, telemetryManager, ConfirmSetupAndDistributeCards);
+            uiManager.Initialize(context, state, deckManager, boardManager, scoreManager, turnManager, telemetryManager, ConfirmSetupAndDistributeCards);
 
             telemetryManager.LogEvent("science_bootstrap_complete", "screen=setup");
             Debug.Log("[ScienceCardGame] Bootstrap initialize complete");

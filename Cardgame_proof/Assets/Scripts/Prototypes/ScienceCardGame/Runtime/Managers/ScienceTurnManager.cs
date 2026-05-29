@@ -9,6 +9,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         AwaitingBoardSlot,
         AwaitingPlacementConfirmation,
         ConnectionExplanation,
+        Scoring,
         ActionResolution,
         TurnResolved
     }
@@ -87,6 +88,12 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         {
             CurrentStep = ScienceTurnStep.ConnectionExplanation;
             telemetry?.LogEvent("science_turn_connection_explanation_started", $"turn={TurnNumber};player={CurrentPlayerIndex}");
+        }
+
+        public void StartScoring()
+        {
+            CurrentStep = ScienceTurnStep.Scoring;
+            telemetry?.LogEvent("science_turn_scoring_started", $"turn={TurnNumber};player={CurrentPlayerIndex};card={SelectedCard?.Id ?? "none"}");
         }
 
         public void MarkTurnResolved()

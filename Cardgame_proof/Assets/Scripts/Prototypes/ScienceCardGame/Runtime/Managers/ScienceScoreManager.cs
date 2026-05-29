@@ -26,12 +26,12 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             }
         }
 
-        public void AddScore(int playerIndex, int amount)
+        public void AddScore(int playerIndex, int amount, string reason = "score")
         {
             if (state == null || playerIndex < 0 || playerIndex >= state.Players.Count) return;
             var player = state.Players[playerIndex];
             player.SetScore(player.Score + amount);
-            telemetry?.LogEvent("science_score_changed", $"player={player.DisplayName};score={player.Score}");
+            telemetry?.LogEvent("science_score_changed", $"player={player.DisplayName};amount={amount};score={player.Score};reason={reason}");
         }
 
         public void Cleanup()
