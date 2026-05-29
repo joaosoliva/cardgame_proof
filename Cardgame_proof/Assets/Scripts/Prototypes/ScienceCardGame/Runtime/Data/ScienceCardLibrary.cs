@@ -72,6 +72,22 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Data
                     ScienceFactCategory.LifeSciences,
                     ScienceFactCategory.SocietyAndEducation,
                     "Nise da Silveira transformou práticas psiquiátricas ao valorizar vínculo, criatividade e respeito aos pacientes."),
+                new ScienceCharacterCardData(
+                    "character_grace_hopper",
+                    "Grace Hopper",
+                    "Computação e Linguagens de Programação",
+                    "Ajudou a tornar computadores mais acessíveis por meio de linguagens e ferramentas de programação.",
+                    ScienceFactCategory.MathAndComputation,
+                    ScienceFactCategory.TechnologyAndInvention,
+                    "Grace Hopper trabalhou em compiladores e influenciou linguagens de programação que aproximaram pessoas e máquinas."),
+                new ScienceCharacterCardData(
+                    "character_nikola_tesla",
+                    "Nikola Tesla",
+                    "Física e Engenharia Elétrica",
+                    "Contribuiu para sistemas elétricos e invenções ligadas à corrente alternada.",
+                    ScienceFactCategory.PhysicalSciences,
+                    ScienceFactCategory.TechnologyAndInvention,
+                    "Nikola Tesla desenvolveu ideias e dispositivos ligados à eletricidade, motores e transmissão de energia em corrente alternada."),
                 new ScienceActionCardData(
                     "action_peer_review",
                     "Peer Review",
