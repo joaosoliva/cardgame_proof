@@ -8,6 +8,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime
     public sealed class ScienceCardGameBootstrap : MonoBehaviour
     {
         [SerializeField] private bool debugRevealAllHands;
+        [SerializeField] private int targetKnowledgePoints = 7;
         [SerializeField] private bool acceptTiedConnectionVotes = true;
         [SerializeField] private ScienceRejectedConnectionBehavior rejectedConnectionBehavior = ScienceRejectedConnectionBehavior.ReturnCardToHand;
 
@@ -35,9 +36,10 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime
 
             state.InitializeDefaults();
             state.SetDebugRevealAllHands(debugRevealAllHands);
+            state.SetTargetKnowledgePoints(targetKnowledgePoints);
             state.SetAcceptTiedConnectionVotes(acceptTiedConnectionVotes);
             state.SetRejectedConnectionBehavior(rejectedConnectionBehavior);
-            Debug.Log($"[ScienceCardGame] 00 State initialized for setup debugRevealAllHands={debugRevealAllHands} acceptTiedConnectionVotes={acceptTiedConnectionVotes} rejectedConnectionBehavior={rejectedConnectionBehavior}");
+            Debug.Log($"[ScienceCardGame] 00 State initialized for setup debugRevealAllHands={debugRevealAllHands} targetKnowledgePoints={targetKnowledgePoints} acceptTiedConnectionVotes={acceptTiedConnectionVotes} rejectedConnectionBehavior={rejectedConnectionBehavior}");
 
             telemetryManager = new ScienceTelemetryManager();
             telemetryManager.Initialize(state);
@@ -55,7 +57,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime
             turnManager.Initialize(state, telemetryManager);
 
             uiManager = new ScienceCardGameUIManager();
-            uiManager.Initialize(context, state, deckManager, boardManager, scoreManager, turnManager, telemetryManager, ConfirmSetupAndDistributeCards);
+            uiManager.Initialize(context, state, deckManager, boardManager, scoreManager, turnManager, telemetryManager, ConfirmSetupAndDistributeCards, RestartPrototype);
 
             telemetryManager.LogEvent("science_bootstrap_complete", "screen=setup");
             Debug.Log("[ScienceCardGame] Bootstrap initialize complete");
@@ -80,6 +82,14 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime
             context = null;
             state = null;
             Debug.Log("[ScienceCardGame] Bootstrap cleanup complete");
+        }
+
+        private void RestartPrototype()
+        {
+            PrototypeRuntimeContext restartContext = context;
+            bool revealAllHandsForDebug = debugRevealAllHands;
+            Cleanup();
+            Initialize(restartContext, new ScienceCardGameState(), revealAllHandsForDebug);
         }
 
         private void ConfirmSetupAndDistributeCards(int playerCount)

@@ -33,6 +33,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         private bool basePointAwarded;
         private bool interestingBonusAwarded;
         private bool guideFactBonusAwarded;
+        private Action onRestartPrototype;
 
         public GameObject Root => root;
 
@@ -44,7 +45,8 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             ScienceScoreManager scienceScoreManager,
             ScienceTurnManager scienceTurnManager,
             ScienceTelemetryManager telemetryManager,
-            Action<int> onStartGame)
+            Action<int> onStartGame,
+            Action restartPrototype)
         {
             context = runtimeContext;
             state = gameState;
@@ -53,6 +55,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             scoreManager = scienceScoreManager;
             turnManager = scienceTurnManager;
             telemetry = telemetryManager;
+            onRestartPrototype = restartPrototype;
             selectedPlayerCount = state?.SelectedPlayerCount ?? 2;
             recentActions.Clear();
             ResetConnectionVoting();
@@ -91,7 +94,9 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             recentActions.Clear();
             ResetConnectionVoting();
+            ResetScoringState();
             selectedPlayerCountText = null;
+            onRestartPrototype = null;
             context = null;
             state = null;
             deckManager = null;
@@ -132,6 +137,12 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             CloseCardDetailsModal();
             RectTransform screen = root.GetComponent<RectTransform>();
             ClearChildren(root.transform);
+
+            if (state != null && state.CurrentPhase == ScienceCardGamePhase.GameOver)
+            {
+                BuildEndGameScreen(screen, ResolveWinners());
+                return;
+            }
 
             RectTransform topBar = CreatePanel(screen, "TopBar", new Vector2(0.02f, 0.88f), new Vector2(0.98f, 0.98f), new Color(0.10f, 0.13f, 0.18f, 0.96f));
             RectTransform logPanel = CreatePanel(screen, "LogPanel", new Vector2(0.02f, 0.02f), new Vector2(0.20f, 0.86f), new Color(0.08f, 0.10f, 0.14f, 0.96f));
@@ -547,6 +558,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             if (acceptedByVote)
             {
+                state?.RecordAcceptedConnection();
                 StartScoringForAcceptedConnection();
                 BuildGameplayScreen();
                 return;
@@ -574,6 +586,8 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             ScienceCardData selectedCard = turnManager?.SelectedCard;
             Vector2Int coordinate = turnManager?.SelectedBoardCoordinate ?? Vector2Int.zero;
             ScienceRejectedConnectionBehavior behavior = state?.RejectedConnectionBehavior ?? ScienceRejectedConnectionBehavior.ReturnCardToHand;
+
+            state?.RecordRejectedConnection();
 
             if (behavior == ScienceRejectedConnectionBehavior.RetryExplanation)
             {
@@ -666,6 +680,12 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             }
 
             telemetry?.LogEvent("science_connection_scoring_completed", $"turn={turnManager?.TurnNumber ?? 0};player={activeScoringPlayerIndex};card={activeScoringCardId};base={basePointAwarded};interesting={interestingBonusAwarded};guideFact={guideFactBonusAwarded};score={GetPlayerScore(activeScoringPlayerIndex)}");
+            if (TryShowEndGameIfNeeded(ScienceWinCondition.TargetKnowledgePoints))
+            {
+                ResetScoringState();
+                return;
+            }
+
             ResetScoringState();
             turnManager?.MarkTurnResolved();
             BuildGameplayScreen();
@@ -676,6 +696,11 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             currentPlayer.MarkPlayed(actionCard);
             deckManager?.Discard(actionCard);
             AddLog($"{currentPlayer.DisplayName} jogou a ação {actionCard.DisplayName}. Resolução completa será implementada depois; a carta foi descartada.");
+            if (TryShowEndGameIfNeeded(ScienceWinCondition.EmptyHand))
+            {
+                return;
+            }
+
             turnManager?.MarkTurnResolved();
             BuildGameplayScreen();
         }
@@ -753,6 +778,166 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             }
 
             return card?.ShortDescription ?? "Sem detalhes disponíveis.";
+        }
+
+        private bool TryShowEndGameIfNeeded(ScienceWinCondition preferredCondition)
+        {
+            ScienceWinCondition winCondition = ResolveWinCondition(preferredCondition);
+            if (winCondition == ScienceWinCondition.None) return false;
+
+            IReadOnlyList<SciencePlayerState> winners = ResolveWinners(winCondition);
+            string winnerNames = FormatWinnerNames(winners);
+            state?.SetPhase(ScienceCardGamePhase.GameOver);
+            AddLog($"Fim de jogo: {winnerNames} venceu por {FormatWinCondition(winCondition)}.");
+            telemetry?.LogEvent("science_game_over", $"turns={turnManager?.TurnNumber ?? 0};condition={winCondition};winners={winnerNames};cardsPlaced={boardManager?.BoardCards?.Count ?? 0};accepted={state?.AcceptedConnections ?? 0};rejected={state?.RejectedConnections ?? 0}");
+            BuildEndGameScreen(root.GetComponent<RectTransform>(), winners, winCondition);
+            return true;
+        }
+
+        private ScienceWinCondition ResolveWinCondition(ScienceWinCondition preferredCondition)
+        {
+            bool hasTargetScoreWinner = HasTargetScoreWinner();
+            bool hasEmptyHandWinner = HasEmptyHandWinner();
+
+            if (preferredCondition == ScienceWinCondition.EmptyHand && hasEmptyHandWinner) return ScienceWinCondition.EmptyHand;
+            if (preferredCondition == ScienceWinCondition.TargetKnowledgePoints && hasTargetScoreWinner) return ScienceWinCondition.TargetKnowledgePoints;
+            if (hasTargetScoreWinner) return ScienceWinCondition.TargetKnowledgePoints;
+            if (hasEmptyHandWinner) return ScienceWinCondition.EmptyHand;
+            return ScienceWinCondition.None;
+        }
+
+        private bool HasTargetScoreWinner()
+        {
+            if (state == null) return false;
+            for (int i = 0; i < state.Players.Count; i++)
+            {
+                SciencePlayerState player = state.Players[i];
+                if (player != null && player.Score >= state.TargetKnowledgePoints) return true;
+            }
+
+            return false;
+        }
+
+        private bool HasEmptyHandWinner()
+        {
+            if (state == null) return false;
+            for (int i = 0; i < state.Players.Count; i++)
+            {
+                SciencePlayerState player = state.Players[i];
+                if (player != null && player.Hand.Count == 0) return true;
+            }
+
+            return false;
+        }
+
+        private IReadOnlyList<SciencePlayerState> ResolveWinners()
+        {
+            return ResolveWinners(ResolveWinCondition(ScienceWinCondition.None));
+        }
+
+        private IReadOnlyList<SciencePlayerState> ResolveWinners(ScienceWinCondition winCondition)
+        {
+            List<SciencePlayerState> winners = new List<SciencePlayerState>();
+            if (state == null) return winners;
+
+            int bestScore = int.MinValue;
+            for (int i = 0; i < state.Players.Count; i++)
+            {
+                SciencePlayerState player = state.Players[i];
+                if (player != null && player.Score > bestScore) bestScore = player.Score;
+            }
+
+            for (int i = 0; i < state.Players.Count; i++)
+            {
+                SciencePlayerState player = state.Players[i];
+                if (player == null) continue;
+
+                if (winCondition == ScienceWinCondition.TargetKnowledgePoints)
+                {
+                    if (player.Score >= state.TargetKnowledgePoints && player.Score == bestScore) winners.Add(player);
+                    continue;
+                }
+
+                if (winCondition == ScienceWinCondition.EmptyHand)
+                {
+                    if (player.Score == bestScore) winners.Add(player);
+                }
+            }
+
+            return winners;
+        }
+
+        private void BuildEndGameScreen(RectTransform screen, IReadOnlyList<SciencePlayerState> winners)
+        {
+            BuildEndGameScreen(screen, winners, ResolveWinCondition(ScienceWinCondition.None));
+        }
+
+        private void BuildEndGameScreen(RectTransform screen, IReadOnlyList<SciencePlayerState> winners, ScienceWinCondition winCondition)
+        {
+            if (screen == null) return;
+            CloseCardDetailsModal();
+            ClearChildren(screen);
+
+            RectTransform panel = CreatePanel(screen, "ScienceCardGameEndGameScreen", new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.92f), new Color(0.08f, 0.10f, 0.14f, 0.98f));
+            CreateText(panel, "Fim de Jogo", 56, new Vector2(0.08f, 0.82f), new Vector2(0.92f, 0.94f), FontStyles.Bold);
+            CreateText(panel, $"Vencedor(es): {FormatWinnerNames(winners)}", 34, new Vector2(0.10f, 0.72f), new Vector2(0.90f, 0.80f), FontStyles.Bold);
+            CreateText(panel, $"Condição: {FormatWinCondition(winCondition)}", 24, new Vector2(0.10f, 0.65f), new Vector2(0.90f, 0.71f), FontStyles.Italic);
+
+            RectTransform statsPanel = CreatePanel(panel, "FinalStatsPanel", new Vector2(0.10f, 0.28f), new Vector2(0.90f, 0.62f), new Color(0.12f, 0.16f, 0.22f, 0.92f));
+            CreateText(statsPanel, BuildFinalStatsText(), 25, new Vector2(0.05f, 0.08f), new Vector2(0.95f, 0.92f), FontStyles.Normal, TextAlignmentOptions.TopLeft);
+
+            CreateButton(panel, "Restart This Prototype", new Vector2(0.36f, 0.16f), RestartThisPrototype, new Vector2(330f, 82f));
+            CreateButton(panel, "Back to Prototype Selection", new Vector2(0.64f, 0.16f), () => context?.ReturnToSelector?.Invoke(), new Vector2(380f, 82f));
+        }
+
+        private void RestartThisPrototype()
+        {
+            telemetry?.LogEvent("science_game_restart_requested", $"turns={turnManager?.TurnNumber ?? 0};phase={state?.CurrentPhase}");
+            onRestartPrototype?.Invoke();
+        }
+
+        private string BuildFinalStatsText()
+        {
+            string scores = "Pontuações finais:";
+            if (state != null)
+            {
+                for (int i = 0; i < state.Players.Count; i++)
+                {
+                    SciencePlayerState player = state.Players[i];
+                    if (player == null) continue;
+                    scores += $"\n• {player.DisplayName}: {player.Score} pontos, {player.Hand.Count} cartas na mão";
+                }
+            }
+
+            return $"{scores}\n\nTurnos: {turnManager?.TurnNumber ?? 0}\nCartas no tabuleiro: {boardManager?.BoardCards?.Count ?? 0}\nConexões aceitas: {state?.AcceptedConnections ?? 0}\nConexões rejeitadas: {state?.RejectedConnections ?? 0}\nMeta de conhecimento: {state?.TargetKnowledgePoints ?? 7}";
+        }
+
+        private static string FormatWinCondition(ScienceWinCondition winCondition)
+        {
+            switch (winCondition)
+            {
+                case ScienceWinCondition.TargetKnowledgePoints:
+                    return "meta de Knowledge Points alcançada";
+                case ScienceWinCondition.EmptyHand:
+                    return "mão esvaziada; empate decidido pela maior pontuação";
+                default:
+                    return "não definida";
+            }
+        }
+
+        private static string FormatWinnerNames(IReadOnlyList<SciencePlayerState> winners)
+        {
+            if (winners == null || winners.Count == 0) return "sem vencedor";
+
+            string text = string.Empty;
+            for (int i = 0; i < winners.Count; i++)
+            {
+                if (winners[i] == null) continue;
+                if (!string.IsNullOrEmpty(text)) text += ", ";
+                text += winners[i].DisplayName;
+            }
+
+            return string.IsNullOrEmpty(text) ? "sem vencedor" : text;
         }
 
         private void DrawCardForCurrentPlayer()
