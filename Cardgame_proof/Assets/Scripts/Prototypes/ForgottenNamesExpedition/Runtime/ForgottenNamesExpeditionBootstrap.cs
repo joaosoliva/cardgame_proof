@@ -1,5 +1,6 @@
 using UnityEngine;
 using CardgameProof.App;
+using CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Data;
 using CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers;
 
 namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime
@@ -21,7 +22,7 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime
             }
 
             uiManager = new ForgottenNamesExpeditionUIManager();
-            uiManager.Initialize(context);
+            uiManager.Initialize(context, new ForgottenNamesExpeditionState());
             Debug.Log("[ForgottenNamesExpedition] Bootstrap initialize complete");
         }
 
