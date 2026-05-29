@@ -18,7 +18,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime
         public string PrototypeTitle { get; } = "Protótipo: Jogo de Cartas Científico";
         public string Description { get; } = "Escolha quantos jogadores participarão desta simulação inicial.";
         public bool GameplayImplemented { get; } = false;
-        public Vector2Int BoardSize { get; } = new Vector2Int(5, 3);
+        public Vector2Int BoardSize { get; } = new Vector2Int(7, 7);
         public int InitialHandSize { get; private set; } = 4;
         public bool DebugRevealAllHands { get; private set; }
         public DateTime InitializedAtUtc { get; private set; }

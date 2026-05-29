@@ -148,12 +148,12 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
         private void BuildBoardPanel(RectTransform parent)
         {
-            CreateText(parent, "Área Central do Tabuleiro", 28, new Vector2(0.04f, 0.91f), new Vector2(0.96f, 0.98f), FontStyles.Bold);
-            CreateText(parent, "Posicionamento de cartas será implementado na próxima etapa.", 18, new Vector2(0.04f, 0.84f), new Vector2(0.96f, 0.90f), FontStyles.Italic);
+            CreateText(parent, "Área Central do Tabuleiro", 28, new Vector2(0.04f, 0.92f), new Vector2(0.96f, 0.99f), FontStyles.Bold);
+            CreateText(parent, "Primeira personagem: perto do centro. Depois: adjacente a outra personagem.", 17, new Vector2(0.04f, 0.85f), new Vector2(0.96f, 0.91f), FontStyles.Italic);
 
-            RectTransform grid = CreatePanel(parent, "BoardGrid", new Vector2(0.04f, 0.06f), new Vector2(0.96f, 0.82f), new Color(0.06f, 0.12f, 0.10f, 0.92f));
-            int columns = Mathf.Max(1, state?.BoardSize.x ?? 5);
-            int rows = Mathf.Max(1, state?.BoardSize.y ?? 3);
+            RectTransform grid = CreatePanel(parent, "BoardGrid", new Vector2(0.04f, 0.04f), new Vector2(0.96f, 0.83f), new Color(0.06f, 0.12f, 0.10f, 0.92f));
+            int columns = Mathf.Max(1, state?.BoardSize.x ?? 7);
+            int rows = Mathf.Max(1, state?.BoardSize.y ?? 7);
 
             for (int y = 0; y < rows; y++)
             {
@@ -165,10 +165,11 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                     float maxY = 1f - (y / (float)rows);
                     Vector2Int coordinate = new Vector2Int(x, y);
                     bool isSelectedSlot = turnManager != null && turnManager.HasSelectedBoardCoordinate && turnManager.SelectedBoardCoordinate == coordinate;
-                    Color slotColor = isSelectedSlot ? new Color(0.82f, 0.68f, 0.24f, 0.92f) : new Color(0.15f, 0.28f, 0.23f, 0.82f);
+                    ScienceCardData selectedCard = turnManager?.SelectedCard;
+                    Color slotColor = GetBoardSlotColor(coordinate, selectedCard, isSelectedSlot);
                     RectTransform slot = CreatePanel(grid, $"BoardSlot_{x}_{y}", new Vector2(minX, minY), new Vector2(maxX, maxY), slotColor);
-                    slot.offsetMin = new Vector2(slot.offsetMin.x + 6f, slot.offsetMin.y + 6f);
-                    slot.offsetMax = new Vector2(slot.offsetMax.x - 6f, slot.offsetMax.y - 6f);
+                    slot.offsetMin = new Vector2(slot.offsetMin.x + 3f, slot.offsetMin.y + 3f);
+                    slot.offsetMax = new Vector2(slot.offsetMax.x - 3f, slot.offsetMax.y - 3f);
                     ScienceCardData boardCard = GetBoardCardAt(coordinate);
                     if (boardCard != null)
                     {
@@ -185,11 +186,30 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                             ConfigureBoardSlotButton(slot, coordinate);
                         }
 
-                        string label = isSelectedSlot ? "Selecionado" : $"{x + 1},{y + 1}";
-                        CreateText(slot, label, isSelectedSlot ? 16 : 18, new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.92f), isSelectedSlot ? FontStyles.Bold : FontStyles.Normal);
+                        string label = isSelectedSlot ? "Selecionado" : FormatBoardCoordinate(coordinate);
+                        CreateText(slot, label, isSelectedSlot ? 13 : 12, new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.92f), isSelectedSlot ? FontStyles.Bold : FontStyles.Normal);
                     }
                 }
             }
+        }
+
+        private Color GetBoardSlotColor(Vector2Int coordinate, ScienceCardData selectedCard, bool isSelectedSlot)
+        {
+            if (isSelectedSlot) return new Color(0.82f, 0.68f, 0.24f, 0.95f);
+            if (GetBoardCardAt(coordinate) != null) return new Color(0.18f, 0.24f, 0.30f, 0.88f);
+
+            if (turnManager != null && turnManager.CurrentStep == ScienceTurnStep.AwaitingBoardSlot && selectedCard != null)
+            {
+                bool isValid = boardManager != null && boardManager.CanPlaceCardAt(coordinate, selectedCard);
+                return isValid ? new Color(0.18f, 0.46f, 0.25f, 0.90f) : new Color(0.40f, 0.18f, 0.18f, 0.70f);
+            }
+
+            return new Color(0.15f, 0.28f, 0.23f, 0.82f);
+        }
+
+        private static string FormatBoardCoordinate(Vector2Int coordinate)
+        {
+            return $"{coordinate.x + 1},{coordinate.y + 1}";
         }
 
         private void BuildHandPanel(RectTransform parent)
@@ -298,14 +318,29 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
         private void SelectBoardSlot(Vector2Int coordinate)
         {
-            if (turnManager == null || !turnManager.SelectBoardSlot(coordinate))
+            if (turnManager == null)
             {
                 AddLog("Selecione uma carta de personagem antes de escolher o tabuleiro.");
                 BuildGameplayScreen();
                 return;
             }
 
-            AddLog($"Posição {coordinate.x + 1},{coordinate.y + 1} selecionada. Confirme para colocar a carta.");
+            string validationMessage = boardManager?.GetPlacementValidationMessage(coordinate, turnManager.SelectedCard);
+            if (!string.IsNullOrEmpty(validationMessage))
+            {
+                AddLog($"Posição {FormatBoardCoordinate(coordinate)} inválida: {validationMessage}");
+                BuildGameplayScreen();
+                return;
+            }
+
+            if (!turnManager.SelectBoardSlot(coordinate))
+            {
+                AddLog("Selecione uma carta de personagem antes de escolher o tabuleiro.");
+                BuildGameplayScreen();
+                return;
+            }
+
+            AddLog($"Posição {FormatBoardCoordinate(coordinate)} selecionada. Confirme para colocar a carta.");
             BuildGameplayScreen();
         }
 
@@ -329,9 +364,10 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             }
 
             Vector2Int coordinate = turnManager.SelectedBoardCoordinate;
-            if (boardManager == null || !boardManager.TryPlaceCard(coordinate, selectedCard))
+            string validationMessage = boardManager?.GetPlacementValidationMessage(coordinate, selectedCard);
+            if (!string.IsNullOrEmpty(validationMessage) || boardManager == null || !boardManager.TryPlaceCard(coordinate, selectedCard))
             {
-                AddLog("Não foi possível colocar a carta nessa posição. Escolha outro espaço livre.");
+                AddLog($"Não foi possível colocar a carta em {FormatBoardCoordinate(coordinate)}: {validationMessage ?? "posição inválida"}");
                 turnManager.CancelSelection();
                 BuildGameplayScreen();
                 return;
@@ -339,7 +375,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             currentPlayer.MarkPlayed(selectedCard);
             turnManager.StartConnectionExplanation();
-            AddLog($"{currentPlayer.DisplayName} colocou {selectedCard.DisplayName} em {coordinate.x + 1},{coordinate.y + 1}.");
+            AddLog($"{currentPlayer.DisplayName} colocou {selectedCard.DisplayName} em {FormatBoardCoordinate(coordinate)}.");
             AddLog("Explique a conexão científica proposta; a votação será implementada depois.");
             BuildGameplayScreen();
         }
@@ -531,7 +567,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             switch (turnManager?.CurrentStep ?? ScienceTurnStep.AwaitingCardSelection)
             {
                 case ScienceTurnStep.AwaitingBoardSlot:
-                    return "Clique em um slot livre do tabuleiro ou cancele para escolher outra carta.";
+                    return "Slots verdes são válidos; slots vermelhos precisam ficar perto do centro ou adjacentes a uma personagem.";
                 case ScienceTurnStep.AwaitingPlacementConfirmation:
                     return "Confirme para colocar a carta, ou cancele para voltar à seleção da mão.";
                 case ScienceTurnStep.ConnectionExplanation:

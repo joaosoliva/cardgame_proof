@@ -110,7 +110,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.UI
             switch (displayMode)
             {
                 case ScienceCardViewDisplayMode.Board:
-                    rectTransform.sizeDelta = new Vector2(118f, 150f);
+                    rectTransform.sizeDelta = new Vector2(72f, 62f);
                     break;
                 case ScienceCardViewDisplayMode.ZoomModal:
                     rectTransform.sizeDelta = new Vector2(420f, 560f);
@@ -171,7 +171,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.UI
                 case ScienceCardViewDisplayMode.ZoomModal:
                     return 34;
                 case ScienceCardViewDisplayMode.Board:
-                    return 13;
+                    return 10;
                 default:
                     return 17;
             }
@@ -184,7 +184,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.UI
                 case ScienceCardViewDisplayMode.ZoomModal:
                     return 24;
                 case ScienceCardViewDisplayMode.Board:
-                    return 10;
+                    return 7;
                 default:
                     return 12;
             }
@@ -213,7 +213,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.UI
                 case ScienceCardViewDisplayMode.ZoomModal:
                     return 20;
                 case ScienceCardViewDisplayMode.Board:
-                    return 8;
+                    return 5;
                 default:
                     return 9;
             }
