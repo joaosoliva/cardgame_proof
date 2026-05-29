@@ -73,29 +73,29 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Data
                     ScienceFactCategory.Society,
                     "Nise da Silveira transformou práticas psiquiátricas ao valorizar vínculo, criatividade e respeito aos pacientes."),
                 new ScienceActionCardData(
-                    "action_observar",
-                    "Observação Cuidadosa",
-                    "Compre uma carta e destaque uma categoria de fato em comum.",
-                    ScienceActionEffectType.DrawCards,
-                    "Compre 1 carta. Se ela compartilhar uma categoria com uma carta em mesa, anuncie a conexão."),
+                    "action_peer_review",
+                    "Peer Review",
+                    "A próxima votação de conexão precisa de unanimidade.",
+                    ScienceActionEffectType.PeerReview,
+                    "Ative antes de uma explicação importante. A próxima conexão só será aceita se todos os jogadores votantes disserem Sim."),
                 new ScienceActionCardData(
-                    "action_conexao",
-                    "Conexão Científica",
-                    "Crie uma ligação entre duas cartas de personagem.",
-                    ScienceActionEffectType.CreateConnection,
-                    "Escolha 2 personagens em jogo e explique uma conexão por área, método, impacto ou contexto."),
+                    "action_citation_needed",
+                    "Citation Needed",
+                    "Sua próxima conexão aceita destaca o bônus de guia/fato.",
+                    ScienceActionEffectType.CitationNeeded,
+                    "A próxima conexão aceita por este jogador mostra automaticamente um lembrete para considerar +1 por uso de fato específico ou guia."),
                 new ScienceActionCardData(
-                    "action_pesquisa",
-                    "Pesquisa Rápida",
-                    "Use uma mini biografia para apoiar uma conexão.",
-                    ScienceActionEffectType.ResearchHint,
-                    "Leia a mini biografia de uma carta e use essa informação para justificar uma conexão."),
+                    "action_interdisciplinary_leap",
+                    "Interdisciplinary Leap",
+                    "Sua próxima colocação pode propor uma ligação ousada entre áreas.",
+                    ScienceActionEffectType.InterdisciplinaryLeap,
+                    "Na próxima carta de personagem colocada por este jogador, ignore qualquer leitura rígida de cor/categoria; a validade depende do consenso do grupo."),
                 new ScienceActionCardData(
-                    "action_bonus",
-                    "Síntese Coletiva",
-                    "Ganhe ponto extra ao explicar uma conexão entre ciência e sociedade.",
-                    ScienceActionEffectType.BonusScore,
-                    "Se sua conexão envolver impacto social, ambiental ou de saúde, ganhe +1 ponto no protótipo futuro.")
+                    "action_open_peer_review",
+                    "Open Peer Review",
+                    "A próxima conexão enfrenta uma revisão coletiva mais exigente.",
+                    ScienceActionEffectType.PeerReview,
+                    "A próxima votação de conexão exige unanimidade. Use como teste de desafio social, não como julgamento automático da explicação.")
             };
         }
     }

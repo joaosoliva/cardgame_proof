@@ -16,6 +16,8 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Data
         public int PlayerIndex { get; }
         public string DisplayName { get; }
         public int Score { get; private set; }
+        public bool CitationNeededBonusAvailable { get; private set; }
+        public bool InterdisciplinaryLeapAvailable { get; private set; }
         public IReadOnlyList<ScienceCardData> Hand => hand;
         public IReadOnlyList<ScienceCardData> PlayedCards => playedCards;
 
@@ -43,10 +45,27 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Data
             Score = score;
         }
 
+        public void SetCitationNeededBonusAvailable(bool available)
+        {
+            CitationNeededBonusAvailable = available;
+        }
+
+        public void SetInterdisciplinaryLeapAvailable(bool available)
+        {
+            InterdisciplinaryLeapAvailable = available;
+        }
+
+        public void ResetActionModifiers()
+        {
+            CitationNeededBonusAvailable = false;
+            InterdisciplinaryLeapAvailable = false;
+        }
+
         public void ResetCards()
         {
             hand.Clear();
             playedCards.Clear();
+            ResetActionModifiers();
         }
     }
 }

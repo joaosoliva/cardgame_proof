@@ -4,11 +4,9 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Data
 {
     public enum ScienceActionEffectType
     {
-        DrawCards,
-        CreateConnection,
-        ResearchHint,
-        SwapCard,
-        BonusScore
+        PeerReview,
+        CitationNeeded,
+        InterdisciplinaryLeap
     }
 
     [Serializable]

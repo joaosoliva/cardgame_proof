@@ -37,6 +37,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime
         public int TargetKnowledgePoints { get; private set; } = 7;
         public bool DebugRevealAllHands { get; private set; }
         public bool AcceptTiedConnectionVotes { get; private set; } = true;
+        public bool PeerReviewRequiresUnanimity { get; private set; }
         public ScienceRejectedConnectionBehavior RejectedConnectionBehavior { get; private set; } = ScienceRejectedConnectionBehavior.ReturnCardToHand;
         public DateTime InitializedAtUtc { get; private set; }
         public ScienceCardGamePhase CurrentPhase { get; private set; } = ScienceCardGamePhase.Setup;
@@ -51,6 +52,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime
             CurrentPhase = ScienceCardGamePhase.Setup;
             SelectedPlayerCount = 2;
             InitialHandSize = GetInitialHandSizeForPlayerCount(SelectedPlayerCount);
+            PeerReviewRequiresUnanimity = false;
             AcceptedConnections = 0;
             RejectedConnections = 0;
             players.Clear();
@@ -60,6 +62,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime
         {
             SelectedPlayerCount = Mathf.Clamp(playerCount, 2, 4);
             InitialHandSize = GetInitialHandSizeForPlayerCount(SelectedPlayerCount);
+            PeerReviewRequiresUnanimity = false;
             AcceptedConnections = 0;
             RejectedConnections = 0;
             players.Clear();
@@ -82,6 +85,11 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime
         public void SetAcceptTiedConnectionVotes(bool acceptTies)
         {
             AcceptTiedConnectionVotes = acceptTies;
+        }
+
+        public void SetPeerReviewRequiresUnanimity(bool requiresUnanimity)
+        {
+            PeerReviewRequiresUnanimity = requiresUnanimity;
         }
 
         public void SetRejectedConnectionBehavior(ScienceRejectedConnectionBehavior behavior)

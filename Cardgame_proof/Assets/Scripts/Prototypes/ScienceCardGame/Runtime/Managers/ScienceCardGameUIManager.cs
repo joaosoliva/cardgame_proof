@@ -316,6 +316,11 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                 BuildScoringPanel(parent);
             }
 
+            if (step == ScienceTurnStep.ActionResolution)
+            {
+                BuildActionResolutionPanel(parent);
+            }
+
             if (step == ScienceTurnStep.AwaitingBoardSlot || step == ScienceTurnStep.AwaitingPlacementConfirmation)
             {
                 CreateButton(parent, "Cancelar seleção", new Vector2(0.50f, 0.28f), CancelSelection, new Vector2(260f, 58f));
@@ -363,7 +368,8 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             if (card is ScienceActionCardData actionCard)
             {
-                ResolveActionCard(currentPlayer, actionCard);
+                AddLog($"{currentPlayer.DisplayName} selecionou a ação {actionCard.DisplayName}. Revise o efeito antes de resolver.");
+                BuildGameplayScreen();
                 return;
             }
 
@@ -453,6 +459,13 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                 return;
             }
 
+            if (currentPlayer.InterdisciplinaryLeapAvailable)
+            {
+                currentPlayer.SetInterdisciplinaryLeapAvailable(false);
+                AddLog("Interdisciplinary Leap usado: esta colocação pode defender uma conexão entre áreas sem automatizar a validação de cores/categorias.");
+                telemetry?.LogEvent("science_action_modifier_consumed", $"player={currentPlayer.PlayerIndex};effect={ScienceActionEffectType.InterdisciplinaryLeap};card={selectedCard.Id};coord={coordinate}");
+            }
+
             currentPlayer.MarkPlayed(selectedCard);
             turnManager.StartConnectionExplanation();
             StartConnectionVoting(currentPlayer, selectedCard);
@@ -476,7 +489,13 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             string cardName = selectedCard?.DisplayName ?? "carta colocada";
 
             CreateText(parent, "Votação da conexão", 23, new Vector2(0.08f, 0.60f), new Vector2(0.92f, 0.66f), FontStyles.Bold);
-            CreateText(parent, $"{activePlayer?.DisplayName ?? "Jogador ativo"} explicou {cardName}.\nOs jogadores aceitam essa conexão?", 17, new Vector2(0.08f, 0.48f), new Vector2(0.92f, 0.60f), FontStyles.Normal);
+            string votePrompt = $"{activePlayer?.DisplayName ?? "Jogador ativo"} explicou {cardName}.\nOs jogadores aceitam essa conexão?";
+            if (state != null && state.PeerReviewRequiresUnanimity)
+            {
+                votePrompt += "\nPeer Review ativo: todos os votos precisam ser Sim.";
+            }
+
+            CreateText(parent, votePrompt, 17, new Vector2(0.08f, 0.48f), new Vector2(0.92f, 0.60f), FontStyles.Normal);
 
             if (state == null || state.Players.Count <= 1)
             {
@@ -547,14 +566,21 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                 else noVotes++;
             }
 
+            bool peerReviewActive = state != null && state.PeerReviewRequiresUnanimity;
             bool tied = yesVotes == noVotes;
             bool tieAccepted = state?.AcceptTiedConnectionVotes ?? true;
-            bool acceptedByVote = yesVotes > noVotes || (tied && tieAccepted);
+            bool acceptedByVote = peerReviewActive ? noVotes == 0 : yesVotes > noVotes || (tied && tieAccepted);
             string resultText = acceptedByVote ? "aceita" : "rejeitada";
-            string tieText = tied ? $" Empate: {(tieAccepted ? "aceito" : "rejeitado")} pela configuração atual." : string.Empty;
+            string tieText = tied && !peerReviewActive ? $" Empate: {(tieAccepted ? "aceito" : "rejeitado")} pela configuração atual." : string.Empty;
+            string peerReviewText = peerReviewActive ? " Peer Review exigiu unanimidade." : string.Empty;
 
-            AddLog($"Conexão {resultText}: {yesVotes} Sim / {noVotes} Não.{tieText}");
-            telemetry?.LogEvent("science_connection_vote_resolved", $"turn={turnManager?.TurnNumber ?? 0};activePlayer={activeVotingPlayerIndex};card={activeVotingCardId};yes={yesVotes};no={noVotes};tied={tied};tieAccepted={tieAccepted};accepted={acceptedByVote}");
+            AddLog($"Conexão {resultText}: {yesVotes} Sim / {noVotes} Não.{tieText}{peerReviewText}");
+            telemetry?.LogEvent("science_connection_vote_resolved", $"turn={turnManager?.TurnNumber ?? 0};activePlayer={activeVotingPlayerIndex};card={activeVotingCardId};yes={yesVotes};no={noVotes};tied={tied};tieAccepted={tieAccepted};peerReview={peerReviewActive};accepted={acceptedByVote}");
+            if (peerReviewActive)
+            {
+                state?.SetPeerReviewRequiresUnanimity(false);
+                telemetry?.LogEvent("science_action_modifier_cleared", $"effect={ScienceActionEffectType.PeerReview};turn={turnManager?.TurnNumber ?? 0};card={activeVotingCardId}");
+            }
 
             if (acceptedByVote)
             {
@@ -609,7 +635,13 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         private void BuildScoringPanel(RectTransform parent)
         {
             CreateText(parent, "Pontuação da conexão", 23, new Vector2(0.08f, 0.60f), new Vector2(0.92f, 0.66f), FontStyles.Bold);
-            CreateText(parent, $"{GetPlayerDisplayName(activeScoringPlayerIndex)} teve a conexão aceita.\nBônus são decididos manualmente pelo grupo/facilitador.", 17, new Vector2(0.08f, 0.48f), new Vector2(0.92f, 0.60f), FontStyles.Normal);
+            string scoringDescription = $"{GetPlayerDisplayName(activeScoringPlayerIndex)} teve a conexão aceita.\nBônus são decididos manualmente pelo grupo/facilitador.";
+            if (HasCitationNeededBonus(activeScoringPlayerIndex))
+            {
+                scoringDescription += "\nCitation Needed ativo: considere o bônus de guia/fato (+1).";
+            }
+
+            CreateText(parent, scoringDescription, 17, new Vector2(0.08f, 0.48f), new Vector2(0.92f, 0.60f), FontStyles.Normal);
 
             if (!basePointAwarded)
             {
@@ -667,6 +699,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             guideFactBonusAwarded = true;
             scoreManager?.AddScore(activeScoringPlayerIndex, 1, "guide_fact_bonus");
             AddLog($"{GetPlayerDisplayName(activeScoringPlayerIndex)} recebeu +1 bônus por usar um fato específico.");
+            ClearCitationNeededBonus(activeScoringPlayerIndex, "guide_fact_bonus_awarded");
             telemetry?.LogEvent("science_connection_score_awarded", $"turn={turnManager?.TurnNumber ?? 0};player={activeScoringPlayerIndex};card={activeScoringCardId};type=guide_fact;amount=1;score={GetPlayerScore(activeScoringPlayerIndex)}");
             BuildGameplayScreen();
         }
@@ -680,6 +713,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             }
 
             telemetry?.LogEvent("science_connection_scoring_completed", $"turn={turnManager?.TurnNumber ?? 0};player={activeScoringPlayerIndex};card={activeScoringCardId};base={basePointAwarded};interesting={interestingBonusAwarded};guideFact={guideFactBonusAwarded};score={GetPlayerScore(activeScoringPlayerIndex)}");
+            ClearCitationNeededBonus(activeScoringPlayerIndex, "accepted_connection_scoring_complete");
             if (TryShowEndGameIfNeeded(ScienceWinCondition.TargetKnowledgePoints))
             {
                 ResetScoringState();
@@ -693,9 +727,13 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
         private void ResolveActionCard(SciencePlayerState currentPlayer, ScienceActionCardData actionCard)
         {
+            if (currentPlayer == null || actionCard == null) return;
+
+            ApplyActionEffect(currentPlayer, actionCard);
             currentPlayer.MarkPlayed(actionCard);
             deckManager?.Discard(actionCard);
-            AddLog($"{currentPlayer.DisplayName} jogou a ação {actionCard.DisplayName}. Resolução completa será implementada depois; a carta foi descartada.");
+            AddLog($"{currentPlayer.DisplayName} usou {actionCard.DisplayName}; a carta foi descartada.");
+            telemetry?.LogEvent("science_action_card_resolved", $"turn={turnManager?.TurnNumber ?? 0};player={currentPlayer.PlayerIndex};card={actionCard.Id};effect={actionCard.EffectType}");
             if (TryShowEndGameIfNeeded(ScienceWinCondition.EmptyHand))
             {
                 return;
@@ -703,6 +741,72 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             turnManager?.MarkTurnResolved();
             BuildGameplayScreen();
+        }
+
+        private void BuildActionResolutionPanel(RectTransform parent)
+        {
+            SciencePlayerState currentPlayer = GetCurrentPlayer();
+            ScienceActionCardData actionCard = turnManager?.SelectedCard as ScienceActionCardData;
+            if (currentPlayer == null || actionCard == null)
+            {
+                CreateText(parent, "Nenhuma ação selecionada.", 18, new Vector2(0.08f, 0.45f), new Vector2(0.92f, 0.58f), FontStyles.Italic);
+                return;
+            }
+
+            CreateText(parent, "Resolver ação", 23, new Vector2(0.08f, 0.58f), new Vector2(0.92f, 0.64f), FontStyles.Bold);
+            CreateText(parent, $"{actionCard.DisplayName} [{actionCard.EffectType}]\n{actionCard.RulesText}\n\nEfeito temporário: {BuildActionEffectSummary(actionCard.EffectType)}", 16, new Vector2(0.08f, 0.31f), new Vector2(0.92f, 0.57f), FontStyles.Normal, TextAlignmentOptions.TopLeft);
+            CreateButton(parent, "Aplicar ação", new Vector2(0.50f, 0.22f), () => ResolveActionCard(currentPlayer, actionCard), new Vector2(260f, 58f));
+            CreateButton(parent, "Cancelar ação", new Vector2(0.50f, 0.13f), CancelSelection, new Vector2(260f, 52f));
+        }
+
+        private void ApplyActionEffect(SciencePlayerState currentPlayer, ScienceActionCardData actionCard)
+        {
+            switch (actionCard.EffectType)
+            {
+                case ScienceActionEffectType.PeerReview:
+                    state?.SetPeerReviewRequiresUnanimity(true);
+                    AddLog("Peer Review ativo: a próxima votação de conexão precisa de unanimidade.");
+                    break;
+                case ScienceActionEffectType.CitationNeeded:
+                    currentPlayer.SetCitationNeededBonusAvailable(true);
+                    AddLog($"Citation Needed ativo para {currentPlayer.DisplayName}: a próxima conexão aceita destacará o bônus de guia/fato.");
+                    break;
+                case ScienceActionEffectType.InterdisciplinaryLeap:
+                    currentPlayer.SetInterdisciplinaryLeapAvailable(true);
+                    AddLog($"Interdisciplinary Leap ativo para {currentPlayer.DisplayName}: a próxima colocação pode defender uma ligação entre áreas.");
+                    break;
+            }
+
+            telemetry?.LogEvent("science_action_card_used", $"turn={turnManager?.TurnNumber ?? 0};player={currentPlayer.PlayerIndex};card={actionCard.Id};effect={actionCard.EffectType}");
+        }
+
+        private static string BuildActionEffectSummary(ScienceActionEffectType effectType)
+        {
+            switch (effectType)
+            {
+                case ScienceActionEffectType.PeerReview:
+                    return "a próxima votação exige unanimidade.";
+                case ScienceActionEffectType.CitationNeeded:
+                    return "o jogador recebe um lembrete de bônus de guia/fato na próxima conexão aceita.";
+                case ScienceActionEffectType.InterdisciplinaryLeap:
+                    return "a próxima colocação de personagem pode propor uma conexão interdisciplinar ousada.";
+                default:
+                    return "efeito de teste sem resolução adicional.";
+            }
+        }
+
+        private bool HasCitationNeededBonus(int playerIndex)
+        {
+            return GetPlayerByIndex(playerIndex)?.CitationNeededBonusAvailable ?? false;
+        }
+
+        private void ClearCitationNeededBonus(int playerIndex, string reason)
+        {
+            SciencePlayerState player = GetPlayerByIndex(playerIndex);
+            if (player == null || !player.CitationNeededBonusAvailable) return;
+
+            player.SetCitationNeededBonusAvailable(false);
+            telemetry?.LogEvent("science_action_modifier_cleared", $"player={playerIndex};effect={ScienceActionEffectType.CitationNeeded};reason={reason}");
         }
 
         private void CancelSelection()
@@ -1012,7 +1116,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                 case ScienceTurnStep.Scoring:
                     return "Atribua pontos e bônus.";
                 case ScienceTurnStep.ActionResolution:
-                    return "Resolva a ação selecionada.";
+                    return "Leia o texto da ação e aplique seu efeito temporário.";
                 case ScienceTurnStep.TurnResolved:
                     return "Turno resolvido. Encerre para passar ao próximo jogador.";
                 default:
@@ -1047,6 +1151,8 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                     return "O consenso dos jogadores valida a explicação; o sistema não julga automaticamente.";
                 case ScienceTurnStep.Scoring:
                     return "A conexão foi aceita. Atribua o ponto base e bônus manuais antes de continuar.";
+                case ScienceTurnStep.ActionResolution:
+                    return "Ações criam modificadores simples de teste e são descartadas após aplicar.";
                 case ScienceTurnStep.TurnResolved:
                     return "A colocação/ação foi resolvida. O botão Encerrar turno agora está disponível.";
                 default:
@@ -1085,16 +1191,22 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
         private string GetPlayerDisplayName(int playerIndex)
         {
+            SciencePlayerState player = GetPlayerByIndex(playerIndex);
+            return player != null ? player.DisplayName : $"Player {playerIndex + 1}";
+        }
+
+        private SciencePlayerState GetPlayerByIndex(int playerIndex)
+        {
             if (state != null)
             {
                 for (int i = 0; i < state.Players.Count; i++)
                 {
                     SciencePlayerState player = state.Players[i];
-                    if (player != null && player.PlayerIndex == playerIndex) return player.DisplayName;
+                    if (player != null && player.PlayerIndex == playerIndex) return player;
                 }
             }
 
-            return $"Player {playerIndex + 1}";
+            return null;
         }
 
         private int GetPlayerScore(int playerIndex)
