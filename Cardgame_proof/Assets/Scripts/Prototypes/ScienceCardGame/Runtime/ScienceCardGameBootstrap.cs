@@ -51,7 +51,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime
             turnManager.Initialize(state, telemetryManager);
 
             uiManager = new ScienceCardGameUIManager();
-            uiManager.Initialize(context, state, deckManager, turnManager, telemetryManager, ConfirmSetupAndDistributeCards);
+            uiManager.Initialize(context, state, deckManager, boardManager, turnManager, telemetryManager, ConfirmSetupAndDistributeCards);
 
             telemetryManager.LogEvent("science_bootstrap_complete", "screen=setup");
             Debug.Log("[ScienceCardGame] Bootstrap initialize complete");

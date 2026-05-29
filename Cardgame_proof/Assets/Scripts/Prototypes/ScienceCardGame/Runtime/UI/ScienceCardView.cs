@@ -1,3 +1,4 @@
+using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -16,15 +17,17 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.UI
     {
         private RectTransform rectTransform;
         private Image background;
+        private Button button;
         private ScienceCardData cardData;
         private ScienceCardViewDisplayMode displayMode;
+        private Action<ScienceCardData> onSelected;
 
         public ScienceCardData CardData => cardData;
         public ScienceCardViewDisplayMode DisplayMode => displayMode;
 
-        public static ScienceCardView Create(RectTransform parent, string objectName, ScienceCardData data, ScienceCardViewDisplayMode mode)
+        public static ScienceCardView Create(RectTransform parent, string objectName, ScienceCardData data, ScienceCardViewDisplayMode mode, Action<ScienceCardData> onClick = null)
         {
-            GameObject cardObject = new GameObject(objectName, typeof(RectTransform), typeof(Image), typeof(ScienceCardView));
+            GameObject cardObject = new GameObject(objectName, typeof(RectTransform), typeof(Image), typeof(Button), typeof(ScienceCardView));
             RectTransform rect = cardObject.GetComponent<RectTransform>();
             rect.SetParent(parent, false);
             rect.anchorMin = new Vector2(0.5f, 0.5f);
@@ -33,6 +36,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.UI
 
             ScienceCardView view = cardObject.GetComponent<ScienceCardView>();
             view.SetData(data, mode);
+            view.SetOnSelected(onClick);
             return view;
         }
 
@@ -44,11 +48,27 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.UI
             ClearChildren(transform);
             ApplyModeSize();
             BuildVisualContent();
+            SetOnSelected(onSelected);
         }
 
         public void SetDisplayMode(ScienceCardViewDisplayMode mode)
         {
             SetData(cardData, mode);
+        }
+
+        public void SetOnSelected(Action<ScienceCardData> onClick)
+        {
+            onSelected = onClick;
+            EnsureReferences();
+
+            if (button == null) return;
+            button.onClick.RemoveAllListeners();
+            button.interactable = onSelected != null && cardData != null;
+            button.targetGraphic = background;
+            if (button.interactable)
+            {
+                button.onClick.AddListener(() => onSelected?.Invoke(cardData));
+            }
         }
 
         public static Color GetFactCategoryColor(ScienceFactCategory category)
@@ -80,6 +100,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.UI
         {
             rectTransform = GetComponent<RectTransform>();
             background = GetComponent<Image>();
+            button = GetComponent<Button>();
         }
 
         private void ApplyModeSize()

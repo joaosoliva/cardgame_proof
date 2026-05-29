@@ -17,9 +17,11 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         private PrototypeRuntimeContext context;
         private ScienceCardGameState state;
         private ScienceDeckManager deckManager;
+        private ScienceBoardManager boardManager;
         private ScienceTurnManager turnManager;
         private ScienceTelemetryManager telemetry;
         private GameObject root;
+        private GameObject cardDetailModal;
         private TextMeshProUGUI selectedPlayerCountText;
         private int selectedPlayerCount = 2;
 
@@ -29,6 +31,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             PrototypeRuntimeContext runtimeContext,
             ScienceCardGameState gameState,
             ScienceDeckManager scienceDeckManager,
+            ScienceBoardManager scienceBoardManager,
             ScienceTurnManager scienceTurnManager,
             ScienceTelemetryManager telemetryManager,
             Action<int> onStartGame)
@@ -36,6 +39,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             context = runtimeContext;
             state = gameState;
             deckManager = scienceDeckManager;
+            boardManager = scienceBoardManager;
             turnManager = scienceTurnManager;
             telemetry = telemetryManager;
             selectedPlayerCount = state?.SelectedPlayerCount ?? 2;
@@ -64,6 +68,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
         public void Cleanup()
         {
+            CloseCardDetailsModal();
             if (root != null)
             {
                 root.SetActive(false);
@@ -76,6 +81,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             context = null;
             state = null;
             deckManager = null;
+            boardManager = null;
             turnManager = null;
             telemetry = null;
         }
@@ -158,7 +164,19 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                     RectTransform slot = CreatePanel(grid, $"BoardSlot_{x}_{y}", new Vector2(minX, minY), new Vector2(maxX, maxY), new Color(0.15f, 0.28f, 0.23f, 0.82f));
                     slot.offsetMin = new Vector2(slot.offsetMin.x + 6f, slot.offsetMin.y + 6f);
                     slot.offsetMax = new Vector2(slot.offsetMax.x - 6f, slot.offsetMax.y - 6f);
-                    CreateText(slot, $"{x + 1},{y + 1}", 18, new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.92f), FontStyles.Normal);
+                    ScienceCardData boardCard = GetBoardCardAt(new Vector2Int(x, y));
+                    if (boardCard != null)
+                    {
+                        ScienceCardView boardCardView = ScienceCardView.Create(slot, $"BoardCard_{x}_{y}", boardCard, ScienceCardViewDisplayMode.Board, OpenCardDetailsModal);
+                        RectTransform boardCardRect = boardCardView.GetComponent<RectTransform>();
+                        boardCardRect.anchorMin = new Vector2(0.5f, 0.5f);
+                        boardCardRect.anchorMax = new Vector2(0.5f, 0.5f);
+                        boardCardRect.anchoredPosition = Vector2.zero;
+                    }
+                    else
+                    {
+                        CreateText(slot, $"{x + 1},{y + 1}", 18, new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.92f), FontStyles.Normal);
+                    }
                 }
             }
         }
@@ -209,8 +227,75 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
         private RectTransform CreateCardView(RectTransform parent, ScienceCardData card, string name)
         {
-            ScienceCardView view = ScienceCardView.Create(parent, name, card, ScienceCardViewDisplayMode.Hand);
+            ScienceCardView view = ScienceCardView.Create(parent, name, card, ScienceCardViewDisplayMode.Hand, OpenCardDetailsModal);
             return view.GetComponent<RectTransform>();
+        }
+
+        private ScienceCardData GetBoardCardAt(Vector2Int coordinate)
+        {
+            if (boardManager?.BoardCards == null) return null;
+            return boardManager.BoardCards.TryGetValue(coordinate, out ScienceCardData card) ? card : null;
+        }
+
+        private void OpenCardDetailsModal(ScienceCardData card)
+        {
+            if (card == null || root == null) return;
+
+            CloseCardDetailsModal();
+            RectTransform parent = root.GetComponent<RectTransform>();
+            cardDetailModal = new GameObject("CardDetailModal", typeof(RectTransform), typeof(Image));
+            RectTransform overlay = cardDetailModal.GetComponent<RectTransform>();
+            overlay.SetParent(parent, false);
+            overlay.anchorMin = Vector2.zero;
+            overlay.anchorMax = Vector2.one;
+            overlay.offsetMin = Vector2.zero;
+            overlay.offsetMax = Vector2.zero;
+
+            Image overlayImage = cardDetailModal.GetComponent<Image>();
+            overlayImage.color = new Color(0f, 0f, 0f, 0.72f);
+            overlayImage.raycastTarget = true;
+
+            RectTransform panel = CreatePanel(overlay, "CardDetailPanel", new Vector2(0.18f, 0.10f), new Vector2(0.82f, 0.90f), new Color(0.08f, 0.10f, 0.14f, 0.98f));
+            CreateText(panel, "Detalhes da Carta", 34, new Vector2(0.05f, 0.90f), new Vector2(0.95f, 0.98f), FontStyles.Bold);
+
+            ScienceCardView zoomCard = ScienceCardView.Create(panel, "ZoomCard", card, ScienceCardViewDisplayMode.ZoomModal);
+            RectTransform zoomRect = zoomCard.GetComponent<RectTransform>();
+            zoomRect.anchorMin = new Vector2(0.30f, 0.48f);
+            zoomRect.anchorMax = new Vector2(0.30f, 0.48f);
+            zoomRect.anchoredPosition = Vector2.zero;
+
+            CreateText(panel, BuildCardDetailText(card), 24, new Vector2(0.55f, 0.26f), new Vector2(0.92f, 0.82f), FontStyles.Normal, TextAlignmentOptions.TopLeft);
+            CreateButton(panel, "Close", new Vector2(0.74f, 0.14f), CloseCardDetailsModal, new Vector2(220f, 70f));
+
+            telemetry?.LogEvent("science_card_zoom_opened", $"card={card.Id};type={card.CardType}");
+            if (card is ScienceCharacterCardData characterCard)
+            {
+                telemetry?.LogEvent("science_card_minibio_viewed", $"card={characterCard.Id};name={characterCard.DisplayName}");
+            }
+        }
+
+        private void CloseCardDetailsModal()
+        {
+            if (cardDetailModal == null) return;
+            cardDetailModal.SetActive(false);
+            UnityEngine.Object.Destroy(cardDetailModal);
+            cardDetailModal = null;
+        }
+
+        private static string BuildCardDetailText(ScienceCardData card)
+        {
+            if (card is ScienceCharacterCardData characterCard)
+            {
+                return $"Área: {characterCard.Field}\nCategorias: {characterCard.FactCategoryA} + {characterCard.FactCategoryB}\n\nDescrição: {characterCard.ShortDescription}\n\nMini bio:\n{characterCard.MiniBio}";
+            }
+
+            if (card is ScienceActionCardData actionCard)
+            {
+                string rules = string.IsNullOrEmpty(actionCard.RulesText) ? actionCard.ShortDescription : actionCard.RulesText;
+                return $"Tipo de ação: {actionCard.EffectType}\n\nEfeito curto: {actionCard.ShortDescription}\n\nRegras completas:\n{rules}";
+            }
+
+            return card?.ShortDescription ?? "Sem detalhes disponíveis.";
         }
 
         private void DrawCardForCurrentPlayer()
