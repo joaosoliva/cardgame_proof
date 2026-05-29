@@ -114,6 +114,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
         private void BuildGameplayScreen()
         {
+            CloseCardDetailsModal();
             RectTransform screen = root.GetComponent<RectTransform>();
             ClearChildren(root.transform);
 
@@ -133,7 +134,8 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         private void BuildTopBar(RectTransform parent)
         {
             CreateText(parent, "Protótipo: Jogo de Cartas Científico", 28, new Vector2(0.02f, 0.10f), new Vector2(0.32f, 0.90f), FontStyles.Bold, TextAlignmentOptions.Left);
-            CreateText(parent, $"Jogador atual: {GetCurrentPlayerName()}  |  Turno {turnManager?.TurnNumber ?? 0}", 26, new Vector2(0.33f, 0.10f), new Vector2(0.58f, 0.90f), FontStyles.Bold);
+            CreateText(parent, $"Jogador atual: {GetCurrentPlayerName()}  |  Turno {turnManager?.TurnNumber ?? 0}", 25, new Vector2(0.33f, 0.34f), new Vector2(0.58f, 0.90f), FontStyles.Bold);
+            CreateText(parent, BuildTurnInstruction(), 18, new Vector2(0.33f, 0.08f), new Vector2(0.58f, 0.34f), FontStyles.Italic);
             CreateText(parent, BuildScoreLine(), 22, new Vector2(0.59f, 0.10f), new Vector2(0.82f, 0.90f), FontStyles.Normal, TextAlignmentOptions.Left);
             CreateButton(parent, "Back to Prototype Selection", new Vector2(0.91f, 0.50f), () => context?.ReturnToSelector?.Invoke(), new Vector2(280f, 62f));
         }
@@ -161,10 +163,13 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                     float maxX = (x + 1) / (float)columns;
                     float minY = 1f - ((y + 1) / (float)rows);
                     float maxY = 1f - (y / (float)rows);
-                    RectTransform slot = CreatePanel(grid, $"BoardSlot_{x}_{y}", new Vector2(minX, minY), new Vector2(maxX, maxY), new Color(0.15f, 0.28f, 0.23f, 0.82f));
+                    Vector2Int coordinate = new Vector2Int(x, y);
+                    bool isSelectedSlot = turnManager != null && turnManager.HasSelectedBoardCoordinate && turnManager.SelectedBoardCoordinate == coordinate;
+                    Color slotColor = isSelectedSlot ? new Color(0.82f, 0.68f, 0.24f, 0.92f) : new Color(0.15f, 0.28f, 0.23f, 0.82f);
+                    RectTransform slot = CreatePanel(grid, $"BoardSlot_{x}_{y}", new Vector2(minX, minY), new Vector2(maxX, maxY), slotColor);
                     slot.offsetMin = new Vector2(slot.offsetMin.x + 6f, slot.offsetMin.y + 6f);
                     slot.offsetMax = new Vector2(slot.offsetMax.x - 6f, slot.offsetMax.y - 6f);
-                    ScienceCardData boardCard = GetBoardCardAt(new Vector2Int(x, y));
+                    ScienceCardData boardCard = GetBoardCardAt(coordinate);
                     if (boardCard != null)
                     {
                         ScienceCardView boardCardView = ScienceCardView.Create(slot, $"BoardCard_{x}_{y}", boardCard, ScienceCardViewDisplayMode.Board, OpenCardDetailsModal);
@@ -175,7 +180,13 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                     }
                     else
                     {
-                        CreateText(slot, $"{x + 1},{y + 1}", 18, new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.92f), FontStyles.Normal);
+                        if (turnManager != null && turnManager.CurrentStep == ScienceTurnStep.AwaitingBoardSlot)
+                        {
+                            ConfigureBoardSlotButton(slot, coordinate);
+                        }
+
+                        string label = isSelectedSlot ? "Selecionado" : $"{x + 1},{y + 1}";
+                        CreateText(slot, label, isSelectedSlot ? 16 : 18, new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.92f), isSelectedSlot ? FontStyles.Bold : FontStyles.Normal);
                     }
                 }
             }
@@ -214,21 +225,146 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
         private void BuildActionPanel(RectTransform parent)
         {
-            CreateText(parent, "Ações", 27, new Vector2(0.08f, 0.91f), new Vector2(0.92f, 0.98f), FontStyles.Bold);
-            CreateText(parent, $"Deck: {deckManager?.DrawPile?.Count ?? 0}\nDescarte: {deckManager?.DiscardPile?.Count ?? 0}", 21, new Vector2(0.10f, 0.78f), new Vector2(0.90f, 0.89f), FontStyles.Normal);
+            CreateText(parent, "Ações do Turno", 27, new Vector2(0.08f, 0.91f), new Vector2(0.92f, 0.98f), FontStyles.Bold);
+            CreateText(parent, $"Deck: {deckManager?.DrawPile?.Count ?? 0}\nDescarte: {deckManager?.DiscardPile?.Count ?? 0}", 21, new Vector2(0.10f, 0.80f), new Vector2(0.90f, 0.89f), FontStyles.Normal);
+            CreateText(parent, BuildSelectedCardText(), 18, new Vector2(0.08f, 0.66f), new Vector2(0.92f, 0.78f), FontStyles.Normal, TextAlignmentOptions.Top);
 
-            CreateButton(parent, "Comprar carta", new Vector2(0.50f, 0.66f), DrawCardForCurrentPlayer, new Vector2(260f, 62f));
-            CreateButton(parent, "Registrar conexão", new Vector2(0.50f, 0.55f), () => AddPlaceholderAction("Conexões entre cartas ainda serão implementadas."), new Vector2(260f, 62f));
-            CreateButton(parent, "Encerrar ação", new Vector2(0.50f, 0.44f), () => AddPlaceholderAction("Ação encerrada sem alteração de estado."), new Vector2(260f, 62f));
-            CreateButton(parent, "Próximo turno", new Vector2(0.50f, 0.30f), AdvanceTurn, new Vector2(260f, 72f));
+            ScienceTurnStep step = turnManager?.CurrentStep ?? ScienceTurnStep.AwaitingCardSelection;
+            if (step == ScienceTurnStep.AwaitingPlacementConfirmation)
+            {
+                CreateButton(parent, "Confirmar posição", new Vector2(0.50f, 0.56f), ConfirmPlacement, new Vector2(260f, 68f));
+            }
 
-            CreateText(parent, "Os botões já atualizam o layout e o log, mas as regras completas de mesa ainda não foram implementadas.", 18, new Vector2(0.10f, 0.06f), new Vector2(0.90f, 0.22f), FontStyles.Italic, TextAlignmentOptions.Top);
+            if (step == ScienceTurnStep.ConnectionExplanation)
+            {
+                CreateButton(parent, "Concluir explicação", new Vector2(0.50f, 0.56f), ResolveConnectionExplanation, new Vector2(260f, 68f));
+            }
+
+            if (step == ScienceTurnStep.AwaitingBoardSlot || step == ScienceTurnStep.AwaitingPlacementConfirmation)
+            {
+                CreateButton(parent, "Cancelar seleção", new Vector2(0.50f, 0.44f), CancelSelection, new Vector2(260f, 62f));
+            }
+
+            if (step == ScienceTurnStep.TurnResolved)
+            {
+                CreateButton(parent, "Encerrar turno", new Vector2(0.50f, 0.42f), EndTurn, new Vector2(260f, 78f));
+            }
+
+            CreateText(parent, BuildTurnHelpText(), 18, new Vector2(0.10f, 0.06f), new Vector2(0.90f, 0.30f), FontStyles.Italic, TextAlignmentOptions.Top);
         }
 
         private RectTransform CreateCardView(RectTransform parent, ScienceCardData card, string name)
         {
-            ScienceCardView view = ScienceCardView.Create(parent, name, card, ScienceCardViewDisplayMode.Hand, OpenCardDetailsModal);
+            Action<ScienceCardData> onClick = turnManager != null && turnManager.CurrentStep == ScienceTurnStep.AwaitingCardSelection
+                ? SelectCardForTurn
+                : null;
+            ScienceCardView view = ScienceCardView.Create(parent, name, card, ScienceCardViewDisplayMode.Hand, onClick);
             return view.GetComponent<RectTransform>();
+        }
+
+        private void ConfigureBoardSlotButton(RectTransform slot, Vector2Int coordinate)
+        {
+            Button button = slot.gameObject.AddComponent<Button>();
+            button.targetGraphic = slot.GetComponent<Image>();
+            button.onClick.AddListener(() => SelectBoardSlot(coordinate));
+        }
+
+        private void SelectCardForTurn(ScienceCardData card)
+        {
+            SciencePlayerState currentPlayer = GetCurrentPlayer();
+            if (card == null || currentPlayer == null || !ContainsCard(currentPlayer.Hand, card))
+            {
+                AddLog("Apenas cartas da mão do jogador atual podem ser selecionadas.");
+                BuildGameplayScreen();
+                return;
+            }
+
+            if (turnManager == null || !turnManager.SelectCard(card))
+            {
+                OpenCardDetailsModal(card);
+                return;
+            }
+
+            if (card is ScienceActionCardData actionCard)
+            {
+                ResolveActionCard(currentPlayer, actionCard);
+                return;
+            }
+
+            AddLog($"{currentPlayer.DisplayName} selecionou {card.DisplayName}. Escolha um espaço livre no tabuleiro.");
+            BuildGameplayScreen();
+            OpenCardDetailsModal(card);
+        }
+
+        private void SelectBoardSlot(Vector2Int coordinate)
+        {
+            if (turnManager == null || !turnManager.SelectBoardSlot(coordinate))
+            {
+                AddLog("Selecione uma carta de personagem antes de escolher o tabuleiro.");
+                BuildGameplayScreen();
+                return;
+            }
+
+            AddLog($"Posição {coordinate.x + 1},{coordinate.y + 1} selecionada. Confirme para colocar a carta.");
+            BuildGameplayScreen();
+        }
+
+        private void ConfirmPlacement()
+        {
+            if (turnManager == null || turnManager.CurrentStep != ScienceTurnStep.AwaitingPlacementConfirmation || !turnManager.HasSelectedBoardCoordinate)
+            {
+                AddLog("Nenhuma posição aguardando confirmação.");
+                BuildGameplayScreen();
+                return;
+            }
+
+            SciencePlayerState currentPlayer = GetCurrentPlayer();
+            ScienceCardData selectedCard = turnManager.SelectedCard;
+            if (!(selectedCard is ScienceCharacterCardData) || currentPlayer == null)
+            {
+                AddLog("Somente cartas de personagem podem ser colocadas no tabuleiro nesta etapa.");
+                turnManager.CancelSelection();
+                BuildGameplayScreen();
+                return;
+            }
+
+            Vector2Int coordinate = turnManager.SelectedBoardCoordinate;
+            if (boardManager == null || !boardManager.TryPlaceCard(coordinate, selectedCard))
+            {
+                AddLog("Não foi possível colocar a carta nessa posição. Escolha outro espaço livre.");
+                turnManager.CancelSelection();
+                BuildGameplayScreen();
+                return;
+            }
+
+            currentPlayer.MarkPlayed(selectedCard);
+            turnManager.StartConnectionExplanation();
+            AddLog($"{currentPlayer.DisplayName} colocou {selectedCard.DisplayName} em {coordinate.x + 1},{coordinate.y + 1}.");
+            AddLog("Explique a conexão científica proposta; a votação será implementada depois.");
+            BuildGameplayScreen();
+        }
+
+        private void ResolveConnectionExplanation()
+        {
+            turnManager?.MarkTurnResolved();
+            AddLog("Explicação registrada. O turno pode ser encerrado.");
+            BuildGameplayScreen();
+        }
+
+        private void ResolveActionCard(SciencePlayerState currentPlayer, ScienceActionCardData actionCard)
+        {
+            currentPlayer.MarkPlayed(actionCard);
+            deckManager?.Discard(actionCard);
+            AddLog($"{currentPlayer.DisplayName} jogou a ação {actionCard.DisplayName}. Resolução completa será implementada depois; a carta foi descartada.");
+            turnManager?.MarkTurnResolved();
+            BuildGameplayScreen();
+        }
+
+        private void CancelSelection()
+        {
+            turnManager?.CancelSelection();
+            AddLog("Seleção cancelada. Escolha outra carta da mão atual.");
+            BuildGameplayScreen();
         }
 
         private ScienceCardData GetBoardCardAt(Vector2Int coordinate)
@@ -321,10 +457,17 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             BuildGameplayScreen();
         }
 
-        private void AdvanceTurn()
+        private void EndTurn()
         {
-            turnManager?.AdvanceTurn();
-            AddLog($"Turno {turnManager?.TurnNumber ?? 0}: vez de {GetCurrentPlayerName()}.");
+            if (turnManager == null || turnManager.CurrentStep != ScienceTurnStep.TurnResolved)
+            {
+                AddLog("Resolva a ação atual antes de encerrar o turno.");
+                BuildGameplayScreen();
+                return;
+            }
+
+            turnManager.AdvanceTurn();
+            AddLog($"Turno {turnManager.TurnNumber}: vez de {GetCurrentPlayerName()}.");
             BuildGameplayScreen();
         }
 
@@ -346,6 +489,57 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             if (selectedPlayerCountText != null)
             {
                 selectedPlayerCountText.text = $"Jogadores selecionados: {selectedPlayerCount}";
+            }
+        }
+
+        private string BuildTurnInstruction()
+        {
+            switch (turnManager?.CurrentStep ?? ScienceTurnStep.AwaitingCardSelection)
+            {
+                case ScienceTurnStep.AwaitingBoardSlot:
+                    return "Escolha um espaço livre no tabuleiro.";
+                case ScienceTurnStep.AwaitingPlacementConfirmation:
+                    return "Confirme a posição escolhida.";
+                case ScienceTurnStep.ConnectionExplanation:
+                    return "Explique a conexão científica.";
+                case ScienceTurnStep.ActionResolution:
+                    return "Resolva a ação selecionada.";
+                case ScienceTurnStep.TurnResolved:
+                    return "Turno resolvido. Encerre para passar ao próximo jogador.";
+                default:
+                    return "Selecione uma carta da mão atual.";
+            }
+        }
+
+        private string BuildSelectedCardText()
+        {
+            ScienceCardData selectedCard = turnManager?.SelectedCard;
+            if (selectedCard == null) return "Nenhuma carta selecionada.";
+
+            string text = $"Selecionada: {selectedCard.DisplayName} [{selectedCard.CardType}]";
+            if (turnManager != null && turnManager.HasSelectedBoardCoordinate)
+            {
+                Vector2Int coord = turnManager.SelectedBoardCoordinate;
+                text += $"\nPosição: {coord.x + 1},{coord.y + 1}";
+            }
+
+            return text;
+        }
+
+        private string BuildTurnHelpText()
+        {
+            switch (turnManager?.CurrentStep ?? ScienceTurnStep.AwaitingCardSelection)
+            {
+                case ScienceTurnStep.AwaitingBoardSlot:
+                    return "Clique em um slot livre do tabuleiro ou cancele para escolher outra carta.";
+                case ScienceTurnStep.AwaitingPlacementConfirmation:
+                    return "Confirme para colocar a carta, ou cancele para voltar à seleção da mão.";
+                case ScienceTurnStep.ConnectionExplanation:
+                    return "Fluxo de explicação/votação iniciado como placeholder. Conclua para liberar o fim do turno.";
+                case ScienceTurnStep.TurnResolved:
+                    return "A colocação/ação foi resolvida. O botão Encerrar turno agora está disponível.";
+                default:
+                    return "Clique em uma carta da mão do jogador atual para iniciar a jogada.";
             }
         }
 
@@ -401,6 +595,17 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             }
 
             telemetry?.LogEvent("science_ui_action_log", message);
+        }
+
+        private static bool ContainsCard(IReadOnlyList<ScienceCardData> cards, ScienceCardData targetCard)
+        {
+            if (cards == null || targetCard == null) return false;
+            for (int i = 0; i < cards.Count; i++)
+            {
+                if (ReferenceEquals(cards[i], targetCard)) return true;
+            }
+
+            return false;
         }
 
         private static int CountCardsOfType(SciencePlayerState player, ScienceCardType cardType)
