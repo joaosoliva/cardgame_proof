@@ -70,13 +70,18 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             return HasAdjacentCharacterCard(coordinate) ? string.Empty : "Coloque ao lado de pelo menos uma personagem existente.";
         }
 
-        public bool TryPlaceCard(Vector2Int coordinate, ScienceCardData card, int rotationDegrees = 0)
+        public bool TryPlaceCard(Vector2Int coordinate, ScienceCardData card, int rotationDegrees = 0, bool overrideValidation = false)
         {
             string validationMessage = GetPlacementValidationMessage(coordinate, card);
-            if (!string.IsNullOrEmpty(validationMessage))
+            if (!string.IsNullOrEmpty(validationMessage) && !overrideValidation)
             {
                 telemetry?.LogEvent("science_board_card_rejected", $"card={card?.Id ?? "none"};coord={coordinate};reason={validationMessage}");
                 return false;
+            }
+
+            if (!string.IsNullOrEmpty(validationMessage))
+            {
+                telemetry?.LogEvent("science_board_card_debug_override", $"card={card?.Id ?? "none"};coord={coordinate};reason={validationMessage}");
             }
 
             int normalizedRotation = ScienceBoardSlotState.NormalizeRotation(rotationDegrees);

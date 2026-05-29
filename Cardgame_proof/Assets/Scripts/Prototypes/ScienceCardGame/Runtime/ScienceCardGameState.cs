@@ -36,6 +36,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime
         public int InitialHandSize { get; private set; } = 4;
         public int TargetKnowledgePoints { get; private set; } = 7;
         public bool DebugRevealAllHands { get; private set; }
+        public bool DebugOverridePlacementValidation { get; private set; }
         public bool AcceptTiedConnectionVotes { get; private set; } = true;
         public bool PeerReviewRequiresUnanimity { get; private set; }
         public ScienceRejectedConnectionBehavior RejectedConnectionBehavior { get; private set; } = ScienceRejectedConnectionBehavior.ReturnCardToHand;
@@ -75,6 +76,11 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime
         public void SetDebugRevealAllHands(bool enabled)
         {
             DebugRevealAllHands = enabled;
+        }
+
+        public void SetDebugOverridePlacementValidation(bool enabled)
+        {
+            DebugOverridePlacementValidation = enabled;
         }
 
         public void SetTargetKnowledgePoints(int targetKnowledgePoints)

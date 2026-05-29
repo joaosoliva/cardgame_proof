@@ -61,7 +61,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
         public bool SelectBoardSlot(Vector2Int coordinate)
         {
-            if (CurrentStep != ScienceTurnStep.AwaitingBoardSlot || SelectedCard == null) return false;
+            if ((CurrentStep != ScienceTurnStep.AwaitingBoardSlot && CurrentStep != ScienceTurnStep.AwaitingPlacementConfirmation) || SelectedCard == null) return false;
 
             selectedBoardCoordinate = coordinate;
             hasSelectedBoardCoordinate = true;
