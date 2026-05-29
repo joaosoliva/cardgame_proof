@@ -49,12 +49,13 @@ namespace CardgameProof.App
         {
             if (prototypes == null) return;
 
-            float startY = 0.58f;
-            float step = 0.22f;
+            bool compactCards = prototypes.Count > 2;
+            float startY = compactCards ? 0.60f : 0.58f;
+            float step = compactCards ? 0.19f : 0.22f;
             for (int i = 0; i < prototypes.Count; i++)
             {
                 PrototypeDefinition definition = prototypes[i];
-                CreatePrototypeCard(root, definition, new Vector2(0.5f, startY - (i * step)), onSelected);
+                CreatePrototypeCard(root, definition, new Vector2(0.5f, startY - (i * step)), onSelected, compactCards);
             }
         }
 
@@ -71,7 +72,7 @@ namespace CardgameProof.App
             }
         }
 
-        private static void CreatePrototypeCard(RectTransform parent, PrototypeDefinition definition, Vector2 anchor, Action<PrototypeDefinition> onSelected)
+        private static void CreatePrototypeCard(RectTransform parent, PrototypeDefinition definition, Vector2 anchor, Action<PrototypeDefinition> onSelected, bool compact)
         {
             GameObject cardObj = new GameObject($"PrototypeCard_{definition.Id}", typeof(RectTransform), typeof(Image), typeof(Outline));
             RectTransform rect = cardObj.GetComponent<RectTransform>();
@@ -79,7 +80,7 @@ namespace CardgameProof.App
             rect.anchorMin = anchor;
             rect.anchorMax = anchor;
             rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.sizeDelta = new Vector2(860f, 190f);
+            rect.sizeDelta = compact ? new Vector2(860f, 160f) : new Vector2(860f, 190f);
 
             Image background = cardObj.GetComponent<Image>();
             background.color = new Color(0.11f, 0.16f, 0.24f, 1f);
@@ -88,12 +89,12 @@ namespace CardgameProof.App
             outline.effectColor = new Color(1f, 1f, 1f, 0.12f);
             outline.effectDistance = new Vector2(2f, -2f);
 
-            CreateText(rect, definition.DisplayName, 34, new Vector2(0.05f, 0.58f), new Vector2(0.68f, 0.88f), FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
-            CreateText(rect, definition.ShortDescription, 23, new Vector2(0.05f, 0.14f), new Vector2(0.68f, 0.58f), FontStyles.Normal, TextAlignmentOptions.TopLeft);
-            CreateStartButton(rect, "Iniciar", new Vector2(0.82f, 0.50f), () => onSelected?.Invoke(definition));
+            CreateText(rect, definition.DisplayName, compact ? 30 : 34, new Vector2(0.05f, 0.58f), new Vector2(0.68f, 0.88f), FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
+            CreateText(rect, definition.ShortDescription, compact ? 21 : 23, new Vector2(0.05f, 0.14f), new Vector2(0.68f, 0.58f), FontStyles.Normal, TextAlignmentOptions.TopLeft);
+            CreateStartButton(rect, "Iniciar", new Vector2(0.82f, 0.50f), () => onSelected?.Invoke(definition), compact);
         }
 
-        private static void CreateStartButton(RectTransform parent, string label, Vector2 anchor, UnityEngine.Events.UnityAction onClick)
+        private static void CreateStartButton(RectTransform parent, string label, Vector2 anchor, UnityEngine.Events.UnityAction onClick, bool compact)
         {
             GameObject buttonObj = new GameObject("StartButton", typeof(RectTransform), typeof(Image), typeof(Button));
             RectTransform rect = buttonObj.GetComponent<RectTransform>();
@@ -101,13 +102,13 @@ namespace CardgameProof.App
             rect.anchorMin = anchor;
             rect.anchorMax = anchor;
             rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.sizeDelta = new Vector2(230f, 96f);
+            rect.sizeDelta = compact ? new Vector2(220f, 82f) : new Vector2(230f, 96f);
             buttonObj.GetComponent<Image>().color = new Color(0.18f, 0.48f, 0.86f, 1f);
 
             Button button = buttonObj.GetComponent<Button>();
             button.onClick.AddListener(onClick);
 
-            CreateText(rect, label, 30, Vector2.zero, Vector2.one, FontStyles.Bold, TextAlignmentOptions.Center);
+            CreateText(rect, label, compact ? 27 : 30, Vector2.zero, Vector2.one, FontStyles.Bold, TextAlignmentOptions.Center);
         }
 
         private static void CreateUtilityButton(RectTransform parent, string label, Vector2 anchor, Action onClick)
