@@ -90,28 +90,25 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Data
                     "Nikola Tesla desenvolveu ideias e dispositivos ligados à eletricidade, motores e transmissão de energia em corrente alternada."),
                 new ScienceActionCardData(
                     "action_peer_review",
-                    "Peer Review",
-                    "A próxima votação de conexão precisa de unanimidade.",
+                    "Revisão por Pares",
+                    "Prepare: a próxima votação de conexão deste jogador precisa de unanimidade.",
                     ScienceActionEffectType.PeerReview,
-                    "Ative antes de uma explicação importante. A próxima conexão só será aceita se todos os jogadores votantes disserem Sim."),
+                    ScienceActionTimingType.Prepared,
+                    "Ação preparada. Jogue durante seu turno; ela fica ativa até sua próxima conexão. Quando você colocar uma carta de personagem, a votação dessa conexão exigirá unanimidade."),
                 new ScienceActionCardData(
                     "action_citation_needed",
-                    "Citation Needed",
-                    "Sua próxima conexão aceita destaca o bônus de guia/fato.",
+                    "Citação Necessária",
+                    "Prepare: sua próxima conexão aceita destaca o bônus de guia/fato.",
                     ScienceActionEffectType.CitationNeeded,
-                    "A próxima conexão aceita por este jogador mostra automaticamente um lembrete para considerar +1 por uso de fato específico ou guia."),
+                    ScienceActionTimingType.Prepared,
+                    "Ação preparada. Jogue durante seu turno; ela fica ativa até sua próxima conexão. Se a conexão for aceita, o painel de pontuação lembrará o grupo de considerar +1 por uso de fato específico ou guia."),
                 new ScienceActionCardData(
                     "action_interdisciplinary_leap",
-                    "Interdisciplinary Leap",
-                    "Sua próxima colocação pode propor uma ligação ousada entre áreas.",
+                    "Salto Interdisciplinar",
+                    "Prepare: sua próxima conexão pode defender uma ligação ousada entre áreas.",
                     ScienceActionEffectType.InterdisciplinaryLeap,
-                    "Na próxima carta de personagem colocada por este jogador, ignore qualquer leitura rígida de cor/categoria; a validade depende do consenso do grupo."),
-                new ScienceActionCardData(
-                    "action_open_peer_review",
-                    "Open Peer Review",
-                    "A próxima conexão enfrenta uma revisão coletiva mais exigente.",
-                    ScienceActionEffectType.PeerReview,
-                    "A próxima votação de conexão exige unanimidade. Use como teste de desafio social, não como julgamento automático da explicação.")
+                    ScienceActionTimingType.Prepared,
+                    "Ação preparada. Jogue durante seu turno; ela fica ativa até sua próxima conexão. Use-a para sinalizar que você tentará explicar uma ligação criativa entre áreas diferentes; o consenso do grupo continua decidindo.")
             };
         }
     }

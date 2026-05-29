@@ -188,7 +188,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.UI
                 CreateTextBacking("NameBacking", new Vector2(0.06f, 0.75f), new Vector2(0.94f, 0.97f), 0.72f);
                 CreateText("Name", actionCard.DisplayName, GetTitleSize(), new Vector2(0.07f, 0.76f), new Vector2(0.93f, 0.96f), FontStyles.Bold, TextAlignmentOptions.Center);
                 CreateText("ActionLabel", "AÇÃO", GetBodySize(), new Vector2(0.18f, 0.62f), new Vector2(0.82f, 0.74f), FontStyles.Bold, TextAlignmentOptions.Center, new Color(0.98f, 0.84f, 1f, 1f));
-                CreateText("EffectType", actionCard.EffectType.ToString(), GetBodySize(), new Vector2(0.08f, 0.50f), new Vector2(0.92f, 0.61f), FontStyles.Italic, TextAlignmentOptions.Center);
+                CreateText("EffectType", $"{GetActionTimingLabel(actionCard.TimingType)} · {actionCard.EffectType}", GetBodySize(), new Vector2(0.08f, 0.50f), new Vector2(0.92f, 0.61f), FontStyles.Italic, TextAlignmentOptions.Center);
                 string rules = string.IsNullOrEmpty(actionCard.RulesText) ? actionCard.ShortDescription : actionCard.RulesText;
                 CreateTextBacking("RulesBacking", new Vector2(0.06f, 0.06f), new Vector2(0.94f, 0.48f), 0.68f);
                 CreateText("RulesText", rules, GetBodySize(), new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.47f), FontStyles.Normal, TextAlignmentOptions.Top);
@@ -198,7 +198,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.UI
             CreateTextBacking("NameBacking", new Vector2(0.05f, 0.56f), new Vector2(0.95f, 0.97f), 0.70f);
             CreateText("Name", actionCard.DisplayName, GetTitleSize(), new Vector2(0.07f, 0.58f), new Vector2(0.93f, 0.96f), FontStyles.Bold, TextAlignmentOptions.Center);
             CreateText("ActionLabel", "AÇÃO", GetBodySize(), new Vector2(0.18f, 0.36f), new Vector2(0.82f, 0.53f), FontStyles.Bold, TextAlignmentOptions.Center, new Color(0.98f, 0.84f, 1f, 1f));
-            CreateText("EffectType", actionCard.EffectType.ToString(), GetBodySize(), new Vector2(0.08f, 0.10f), new Vector2(0.92f, 0.32f), FontStyles.Italic, TextAlignmentOptions.Center);
+            CreateText("EffectType", $"{GetActionTimingLabel(actionCard.TimingType)} · {actionCard.EffectType}", GetBodySize(), new Vector2(0.08f, 0.10f), new Vector2(0.92f, 0.32f), FontStyles.Italic, TextAlignmentOptions.Center);
         }
 
         private void BuildFactColorBase(ScienceFactCategory categoryA, ScienceFactCategory categoryB)
@@ -313,6 +313,19 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.UI
                     return 8;
                 default:
                     return 12;
+            }
+        }
+
+        private static string GetActionTimingLabel(ScienceActionTimingType timingType)
+        {
+            switch (timingType)
+            {
+                case ScienceActionTimingType.Immediate:
+                    return "Imediata";
+                case ScienceActionTimingType.Prepared:
+                    return "Preparada";
+                default:
+                    return timingType.ToString();
             }
         }
 

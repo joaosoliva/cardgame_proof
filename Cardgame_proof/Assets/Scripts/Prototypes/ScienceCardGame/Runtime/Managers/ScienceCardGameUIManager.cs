@@ -168,7 +168,8 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         {
             CreateText(parent, $"{GetCurrentPlayerName()}  |  Turno {turnManager?.TurnNumber ?? 0}", 30, new Vector2(0.02f, 0.42f), new Vector2(0.28f, 0.92f), FontStyles.Bold, TextAlignmentOptions.Left);
             CreateText(parent, BuildTurnInstruction(), 22, new Vector2(0.02f, 0.08f), new Vector2(0.46f, 0.42f), FontStyles.Italic, TextAlignmentOptions.Left);
-            CreateText(parent, BuildScoreLine(), 24, new Vector2(0.48f, 0.12f), new Vector2(0.80f, 0.90f), FontStyles.Normal, TextAlignmentOptions.Left);
+            CreateText(parent, BuildScoreLine(), 24, new Vector2(0.48f, 0.42f), new Vector2(0.80f, 0.90f), FontStyles.Normal, TextAlignmentOptions.Left);
+            CreateText(parent, BuildPreparedActionStatus(), 20, new Vector2(0.48f, 0.08f), new Vector2(0.80f, 0.42f), FontStyles.Italic, TextAlignmentOptions.Left);
             CreateButton(parent, "Debug", new Vector2(0.85f, 0.50f), OpenDebugLogModal, new Vector2(150f, 62f));
             CreateButton(parent, "Menu", new Vector2(0.94f, 0.50f), () => context?.ReturnToSelector?.Invoke(), new Vector2(150f, 62f));
         }
@@ -705,6 +706,13 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                 return;
             }
 
+            if (card is ScienceActionCardData && turnManager != null && turnManager.HasPlayedActionThisTurn)
+            {
+                AddLog("Você já jogou uma ação neste turno. Escolha uma carta de personagem.");
+                BuildGameplayScreen();
+                return;
+            }
+
             if (turnManager == null || !turnManager.SelectCard(card))
             {
                 AddLog("Esta carta não pode ser escolhida agora.");
@@ -812,12 +820,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                 return;
             }
 
-            if (currentPlayer.InterdisciplinaryLeapAvailable)
-            {
-                currentPlayer.SetInterdisciplinaryLeapAvailable(false);
-                AddLog("Interdisciplinary Leap usado: esta colocação pode defender uma conexão entre áreas sem automatizar a validação de cores/categorias.");
-                telemetry?.LogEvent("science_action_modifier_consumed", $"player={currentPlayer.PlayerIndex};effect={ScienceActionEffectType.InterdisciplinaryLeap};card={selectedCard.Id};coord={coordinate}");
-            }
+            TriggerPreparedActionForConnection(currentPlayer, selectedCard, validationResult);
 
             currentPlayer.MarkPlayed(selectedCard);
             turnManager.StartConnectionExplanation();
@@ -978,6 +981,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             ScienceRejectedConnectionBehavior behavior = state?.RejectedConnectionBehavior ?? ScienceRejectedConnectionBehavior.ReturnCardToHand;
 
             state?.RecordRejectedConnection();
+            ClearCitationNeededBonus(activeVotingPlayerIndex, "connection_rejected");
 
             if (behavior == ScienceRejectedConnectionBehavior.RetryExplanation)
             {
@@ -1099,17 +1103,27 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         {
             if (currentPlayer == null || actionCard == null) return;
 
-            ApplyActionEffect(currentPlayer, actionCard);
+            bool resolved = actionCard.TimingType == ScienceActionTimingType.Immediate
+                ? ResolveImmediateAction(currentPlayer, actionCard)
+                : PrepareAction(currentPlayer, actionCard);
+
+            if (!resolved)
+            {
+                turnManager?.CancelSelection();
+                BuildGameplayScreen();
+                return;
+            }
+
             currentPlayer.MarkPlayed(actionCard);
             deckManager?.Discard(actionCard);
-            AddLog($"{currentPlayer.DisplayName} usou {actionCard.DisplayName}; a carta foi descartada.");
-            telemetry?.LogEvent("science_action_card_resolved", $"turn={turnManager?.TurnNumber ?? 0};player={currentPlayer.PlayerIndex};card={actionCard.Id};effect={actionCard.EffectType}");
+            AddLog($"{currentPlayer.DisplayName} usou {actionCard.DisplayName}; a carta foi descartada após resolver ou preparar com sucesso.");
+            telemetry?.LogEvent("science_action_card_resolved", $"turn={turnManager?.TurnNumber ?? 0};player={currentPlayer.PlayerIndex};card={actionCard.Id};effect={actionCard.EffectType};timing={actionCard.TimingType}");
             if (TryShowEndGameIfNeeded(ScienceWinCondition.EmptyHand))
             {
                 return;
             }
 
-            turnManager?.MarkTurnResolved();
+            turnManager?.MarkActionPlayedAndContinue();
             BuildGameplayScreen();
         }
 
@@ -1125,31 +1139,79 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             }
 
             CreateText(parent, "Resolver ação", 44, new Vector2(0.06f, 0.84f), new Vector2(0.94f, 0.96f), FontStyles.Bold);
-            string body = $"{actionCard.DisplayName} [{actionCard.EffectType}]\n\n{actionCard.RulesText}\n\nEfeito temporário: {BuildActionEffectSummary(actionCard.EffectType)}";
+            string preparedWarning = actionCard.TimingType == ScienceActionTimingType.Prepared && currentPlayer.HasActivePreparedAction
+                ? "\n\nVocê já tem uma ação preparada. Cancele ou resolva sua próxima conexão antes de preparar outra."
+                : string.Empty;
+            string body = $"{actionCard.DisplayName} · {BuildActionTimingLabel(actionCard.TimingType)} [{actionCard.EffectType}]\n\n{actionCard.RulesText}\n\nEfeito temporário: {BuildActionEffectSummary(actionCard.EffectType)}{preparedWarning}";
             CreateText(parent, body, 28, new Vector2(0.08f, 0.34f), new Vector2(0.92f, 0.80f), FontStyles.Normal, TextAlignmentOptions.TopLeft);
-            CreateButton(parent, "Aplicar ação", new Vector2(0.38f, 0.16f), () => ResolveActionCard(currentPlayer, actionCard), new Vector2(360f, 88f));
+            CreateButton(parent, actionCard.TimingType == ScienceActionTimingType.Prepared ? "Preparar ação" : "Aplicar ação", new Vector2(0.38f, 0.16f), () => ResolveActionCard(currentPlayer, actionCard), new Vector2(360f, 88f));
             CreateButton(parent, "Cancelar", new Vector2(0.64f, 0.16f), CancelSelection, new Vector2(320f, 88f));
         }
 
-        private void ApplyActionEffect(SciencePlayerState currentPlayer, ScienceActionCardData actionCard)
+        private bool ResolveImmediateAction(SciencePlayerState currentPlayer, ScienceActionCardData actionCard)
         {
+            AddLog($"{actionCard.DisplayName} resolveu imediatamente.");
+            telemetry?.LogEvent("science_action_immediate_resolved", $"turn={turnManager?.TurnNumber ?? 0};player={currentPlayer.PlayerIndex};card={actionCard.Id};effect={actionCard.EffectType}");
+            return true;
+        }
+
+        private bool PrepareAction(SciencePlayerState currentPlayer, ScienceActionCardData actionCard)
+        {
+            if (currentPlayer.HasActivePreparedAction)
+            {
+                AddLog("Você já tem uma ação preparada.");
+                telemetry?.LogEvent("science_action_prepare_blocked", $"turn={turnManager?.TurnNumber ?? 0};player={currentPlayer.PlayerIndex};card={actionCard.Id};active={currentPlayer.ActivePreparedAction?.ActionCard?.Id ?? "none"}");
+                return false;
+            }
+
+            if (!currentPlayer.TryPrepareAction(actionCard))
+            {
+                AddLog("Você já tem uma ação preparada.");
+                return false;
+            }
+
+            AddLog($"{currentPlayer.DisplayName} preparou {actionCard.DisplayName}. Ela será aplicada na próxima conexão desse jogador.");
+            telemetry?.LogEvent("science_action_prepared", $"turn={turnManager?.TurnNumber ?? 0};player={currentPlayer.PlayerIndex};card={actionCard.Id};effect={actionCard.EffectType};nextConnectionOnly=true");
+            return true;
+        }
+
+        private void TriggerPreparedActionForConnection(SciencePlayerState currentPlayer, ScienceCardData selectedCard, SciencePlacementValidationResult validationResult)
+        {
+            SciencePreparedActionState preparedAction = currentPlayer?.ActivePreparedAction;
+            ScienceActionCardData actionCard = preparedAction?.ActionCard;
+            if (currentPlayer == null || actionCard == null || !currentPlayer.HasActivePreparedAction) return;
+
             switch (actionCard.EffectType)
             {
                 case ScienceActionEffectType.PeerReview:
                     state?.SetPeerReviewRequiresUnanimity(true);
-                    AddLog("Peer Review ativo: a próxima votação de conexão precisa de unanimidade.");
+                    AddLog("Revisão por Pares ativada: a votação desta conexão precisa de unanimidade.");
                     break;
                 case ScienceActionEffectType.CitationNeeded:
                     currentPlayer.SetCitationNeededBonusAvailable(true);
-                    AddLog($"Citation Needed ativo para {currentPlayer.DisplayName}: a próxima conexão aceita destacará o bônus de guia/fato.");
+                    AddLog($"Citação Necessária ativada para {currentPlayer.DisplayName}: se aceita, esta conexão destacará o bônus de guia/fato.");
                     break;
                 case ScienceActionEffectType.InterdisciplinaryLeap:
-                    currentPlayer.SetInterdisciplinaryLeapAvailable(true);
-                    AddLog($"Interdisciplinary Leap ativo para {currentPlayer.DisplayName}: a próxima colocação pode defender uma ligação entre áreas.");
+                    AddLog("Salto Interdisciplinar ativado: defenda uma ligação criativa entre áreas; o consenso do grupo decide.");
                     break;
             }
 
-            telemetry?.LogEvent("science_action_card_used", $"turn={turnManager?.TurnNumber ?? 0};player={currentPlayer.PlayerIndex};card={actionCard.Id};effect={actionCard.EffectType}");
+            preparedAction.MarkConsumed();
+            telemetry?.LogEvent("science_prepared_action_triggered", $"turn={turnManager?.TurnNumber ?? 0};player={currentPlayer.PlayerIndex};action={actionCard.Id};effect={actionCard.EffectType};card={selectedCard?.Id ?? "none"};connectionType={validationResult?.ConnectionType.ToString() ?? "none"}");
+            currentPlayer.ClearPreparedAction();
+        }
+
+        private static string BuildActionTimingLabel(ScienceActionTimingType timingType)
+        {
+            switch (timingType)
+            {
+                case ScienceActionTimingType.Immediate:
+                    return "Ação imediata";
+                case ScienceActionTimingType.Prepared:
+                    return "Ação preparada";
+                default:
+                    return timingType.ToString();
+            }
         }
 
         private static string BuildActionEffectSummary(ScienceActionEffectType effectType)
@@ -1157,11 +1219,11 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             switch (effectType)
             {
                 case ScienceActionEffectType.PeerReview:
-                    return "a próxima votação exige unanimidade.";
+                    return "prepara Revisão por Pares: a próxima votação de conexão deste jogador exige unanimidade.";
                 case ScienceActionEffectType.CitationNeeded:
-                    return "o jogador recebe um lembrete de bônus de guia/fato na próxima conexão aceita.";
+                    return "prepara Citação Necessária: a próxima conexão aceita lembra o bônus de guia/fato.";
                 case ScienceActionEffectType.InterdisciplinaryLeap:
-                    return "a próxima colocação de personagem pode propor uma conexão interdisciplinar ousada.";
+                    return "prepara Salto Interdisciplinar: a próxima conexão sinaliza uma defesa criativa entre áreas.";
                 default:
                     return "efeito de teste sem resolução adicional.";
             }
@@ -1286,7 +1348,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             if (card is ScienceActionCardData actionCard)
             {
                 string rules = string.IsNullOrEmpty(actionCard.RulesText) ? actionCard.ShortDescription : actionCard.RulesText;
-                return $"Tipo de ação: {actionCard.EffectType}\n\nEfeito curto: {actionCard.ShortDescription}\n\nRegras completas:\n{rules}";
+                return $"Tipo de ação: {BuildActionTimingLabel(actionCard.TimingType)}\nEfeito: {actionCard.EffectType}\n\nEfeito curto: {actionCard.ShortDescription}\n\nRegras completas:\n{rules}";
             }
 
             return card?.ShortDescription ?? "Sem detalhes disponíveis.";
@@ -1512,6 +1574,20 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             }
         }
 
+        private string BuildPreparedActionStatus()
+        {
+            SciencePlayerState currentPlayer = GetCurrentPlayer();
+            SciencePreparedActionState preparedAction = currentPlayer?.ActivePreparedAction;
+            if (preparedAction == null || !currentPlayer.HasActivePreparedAction)
+            {
+                return turnManager != null && turnManager.HasPlayedActionThisTurn
+                    ? "Ação deste turno: já usada"
+                    : "Ação preparada: nenhuma";
+            }
+
+            return $"Ação preparada: {preparedAction.ActionCard.DisplayName}";
+        }
+
         private string BuildTurnInstruction()
         {
             switch (turnManager?.CurrentStep ?? ScienceTurnStep.AwaitingCardSelection)
@@ -1646,7 +1722,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                 case ScienceTurnStep.Scoring:
                     return "A conexão foi aceita. Atribua o ponto base e bônus manuais antes de continuar.";
                 case ScienceTurnStep.ActionResolution:
-                    return "Ações criam modificadores simples de teste e são descartadas após aplicar.";
+                    return "Ações imediatas resolvem agora; ações preparadas ficam ativas para a próxima conexão.";
                 case ScienceTurnStep.TurnResolved:
                     return "A colocação/ação foi resolvida. O botão Encerrar turno agora está disponível.";
                 default:

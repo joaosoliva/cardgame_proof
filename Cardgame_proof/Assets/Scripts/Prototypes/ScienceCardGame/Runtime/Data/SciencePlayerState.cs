@@ -2,6 +2,32 @@ using System.Collections.Generic;
 
 namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Data
 {
+
+    public sealed class SciencePreparedActionState
+    {
+        public SciencePreparedActionState(ScienceActionCardData actionCard, int ownerPlayerIndex, bool appliesToNextConnectionOnly)
+        {
+            ActionCard = actionCard;
+            OwnerPlayerIndex = ownerPlayerIndex;
+            AppliesToNextConnectionOnly = appliesToNextConnectionOnly;
+        }
+
+        public ScienceActionCardData ActionCard { get; }
+        public int OwnerPlayerIndex { get; }
+        public bool AppliesToNextConnectionOnly { get; }
+        public bool Consumed { get; private set; }
+        public bool Expired { get; private set; }
+
+        public void MarkConsumed()
+        {
+            Consumed = true;
+        }
+
+        public void MarkExpired()
+        {
+            Expired = true;
+        }
+    }
     public sealed class SciencePlayerState
     {
         private readonly List<ScienceCardData> hand = new List<ScienceCardData>();
@@ -17,7 +43,8 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Data
         public string DisplayName { get; }
         public int Score { get; private set; }
         public bool CitationNeededBonusAvailable { get; private set; }
-        public bool InterdisciplinaryLeapAvailable { get; private set; }
+        public SciencePreparedActionState ActivePreparedAction { get; private set; }
+        public bool HasActivePreparedAction => ActivePreparedAction != null && !ActivePreparedAction.Consumed && !ActivePreparedAction.Expired;
         public IReadOnlyList<ScienceCardData> Hand => hand;
         public IReadOnlyList<ScienceCardData> PlayedCards => playedCards;
 
@@ -50,15 +77,33 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Data
             CitationNeededBonusAvailable = available;
         }
 
-        public void SetInterdisciplinaryLeapAvailable(bool available)
+
+        public bool TryPrepareAction(ScienceActionCardData actionCard)
         {
-            InterdisciplinaryLeapAvailable = available;
+            if (actionCard == null || HasActivePreparedAction) return false;
+            ActivePreparedAction = new SciencePreparedActionState(actionCard, PlayerIndex, true);
+            return true;
+        }
+
+        public void MarkPreparedActionConsumed()
+        {
+            ActivePreparedAction?.MarkConsumed();
+        }
+
+        public void MarkPreparedActionExpired()
+        {
+            ActivePreparedAction?.MarkExpired();
+        }
+
+        public void ClearPreparedAction()
+        {
+            ActivePreparedAction = null;
         }
 
         public void ResetActionModifiers()
         {
             CitationNeededBonusAvailable = false;
-            InterdisciplinaryLeapAvailable = false;
+            ActivePreparedAction = null;
         }
 
         public void ResetCards()

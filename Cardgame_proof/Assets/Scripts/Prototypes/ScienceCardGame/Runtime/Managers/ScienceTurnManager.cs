@@ -26,6 +26,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         public ScienceTurnStep CurrentStep { get; private set; } = ScienceTurnStep.AwaitingCardSelection;
         public ScienceCardData SelectedCard { get; private set; }
         public int SelectedRotationDegrees { get; private set; }
+        public bool HasPlayedActionThisTurn { get; private set; }
         public bool HasSelectedBoardCoordinate => hasSelectedBoardCoordinate;
         public Vector2Int SelectedBoardCoordinate => selectedBoardCoordinate;
 
@@ -42,6 +43,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         {
             CurrentPlayerIndex = 0;
             TurnNumber = state != null && state.Players.Count > 0 ? 1 : 0;
+            HasPlayedActionThisTurn = false;
             ClearSelection();
             CurrentStep = ScienceTurnStep.AwaitingCardSelection;
         }
@@ -49,6 +51,8 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         public bool SelectCard(ScienceCardData card)
         {
             if (card == null || CurrentStep != ScienceTurnStep.AwaitingCardSelection) return false;
+
+            if (card.CardType == ScienceCardType.Action && HasPlayedActionThisTurn) return false;
 
             SelectedCard = card;
             hasSelectedBoardCoordinate = false;
@@ -96,6 +100,14 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             telemetry?.LogEvent("science_turn_scoring_started", $"turn={TurnNumber};player={CurrentPlayerIndex};card={SelectedCard?.Id ?? "none"}");
         }
 
+        public void MarkActionPlayedAndContinue()
+        {
+            HasPlayedActionThisTurn = true;
+            ClearSelection();
+            CurrentStep = ScienceTurnStep.AwaitingCardSelection;
+            telemetry?.LogEvent("science_turn_action_played", $"turn={TurnNumber};player={CurrentPlayerIndex}");
+        }
+
         public void MarkTurnResolved()
         {
             ClearSelection();
@@ -108,6 +120,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             if (state == null || state.Players.Count == 0) return;
             CurrentPlayerIndex = (CurrentPlayerIndex + 1) % state.Players.Count;
             TurnNumber += 1;
+            HasPlayedActionThisTurn = false;
             ClearSelection();
             CurrentStep = ScienceTurnStep.AwaitingCardSelection;
             telemetry?.LogEvent("science_turn_advanced", $"turn={TurnNumber};player={CurrentPlayerIndex};step={CurrentStep}");
@@ -119,6 +132,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             telemetry = null;
             CurrentPlayerIndex = 0;
             TurnNumber = 0;
+            HasPlayedActionThisTurn = false;
             ClearSelection();
             CurrentStep = ScienceTurnStep.AwaitingCardSelection;
         }
