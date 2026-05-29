@@ -140,18 +140,25 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.UI
 
         private void BuildCharacterCard(ScienceCharacterCardData characterCard)
         {
-            background.color = new Color(0.17f, 0.29f, 0.39f, 1f);
+            background.color = new Color(0.03f, 0.04f, 0.06f, 1f);
+            BuildFactColorBase(characterCard.FactCategoryA, characterCard.FactCategoryB);
+
             if (displayMode == ScienceCardViewDisplayMode.ZoomModal)
             {
+                CreateTextBacking("NameBacking", new Vector2(0.06f, 0.74f), new Vector2(0.94f, 0.97f), 0.70f);
                 CreateText("Name", characterCard.DisplayName, GetTitleSize(), new Vector2(0.07f, 0.75f), new Vector2(0.93f, 0.96f), FontStyles.Bold, TextAlignmentOptions.Center);
+                CreateTextBacking("FieldBacking", new Vector2(0.07f, 0.61f), new Vector2(0.93f, 0.75f), 0.54f);
                 CreateText("Field", characterCard.Field, GetBodySize(), new Vector2(0.08f, 0.62f), new Vector2(0.92f, 0.74f), FontStyles.Italic, TextAlignmentOptions.Center);
                 CreateBadge("FactBadgeA", characterCard.FactCategoryA, new Vector2(0.08f, 0.48f), new Vector2(0.48f, 0.60f));
                 CreateBadge("FactBadgeB", characterCard.FactCategoryB, new Vector2(0.52f, 0.48f), new Vector2(0.92f, 0.60f));
+                CreateTextBacking("DescriptionBacking", new Vector2(0.06f, 0.06f), new Vector2(0.94f, 0.46f), 0.68f);
                 CreateText("Description", characterCard.ShortDescription, GetBodySize(), new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.45f), FontStyles.Normal, TextAlignmentOptions.Top);
                 return;
             }
 
+            CreateTextBacking("NameBacking", new Vector2(0.05f, 0.56f), new Vector2(0.95f, 0.97f), 0.68f);
             CreateText("Name", characterCard.DisplayName, GetTitleSize(), new Vector2(0.07f, 0.58f), new Vector2(0.93f, 0.96f), FontStyles.Bold, TextAlignmentOptions.Center);
+            CreateTextBacking("FieldBacking", new Vector2(0.07f, 0.36f), new Vector2(0.93f, 0.57f), 0.48f);
             CreateText("Field", characterCard.Field, GetBodySize(), new Vector2(0.08f, 0.39f), new Vector2(0.92f, 0.56f), FontStyles.Italic, TextAlignmentOptions.Center);
             CreateBadge("FactBadgeA", characterCard.FactCategoryA, new Vector2(0.08f, 0.10f), new Vector2(0.48f, 0.33f));
             CreateBadge("FactBadgeB", characterCard.FactCategoryB, new Vector2(0.52f, 0.10f), new Vector2(0.92f, 0.33f));
@@ -159,20 +166,78 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.UI
 
         private void BuildActionCard(ScienceActionCardData actionCard)
         {
-            background.color = new Color(0.31f, 0.20f, 0.43f, 1f);
+            background.color = new Color(0.05f, 0.03f, 0.08f, 1f);
+            BuildActionColorBase();
+
             if (displayMode == ScienceCardViewDisplayMode.ZoomModal)
             {
+                CreateTextBacking("NameBacking", new Vector2(0.06f, 0.75f), new Vector2(0.94f, 0.97f), 0.72f);
                 CreateText("Name", actionCard.DisplayName, GetTitleSize(), new Vector2(0.07f, 0.76f), new Vector2(0.93f, 0.96f), FontStyles.Bold, TextAlignmentOptions.Center);
-                CreateText("ActionLabel", "AÇÃO", GetBodySize(), new Vector2(0.18f, 0.62f), new Vector2(0.82f, 0.74f), FontStyles.Bold, TextAlignmentOptions.Center, new Color(0.92f, 0.74f, 1f, 1f));
+                CreateText("ActionLabel", "AÇÃO", GetBodySize(), new Vector2(0.18f, 0.62f), new Vector2(0.82f, 0.74f), FontStyles.Bold, TextAlignmentOptions.Center, new Color(0.98f, 0.84f, 1f, 1f));
                 CreateText("EffectType", actionCard.EffectType.ToString(), GetBodySize(), new Vector2(0.08f, 0.50f), new Vector2(0.92f, 0.61f), FontStyles.Italic, TextAlignmentOptions.Center);
                 string rules = string.IsNullOrEmpty(actionCard.RulesText) ? actionCard.ShortDescription : actionCard.RulesText;
+                CreateTextBacking("RulesBacking", new Vector2(0.06f, 0.06f), new Vector2(0.94f, 0.48f), 0.68f);
                 CreateText("RulesText", rules, GetBodySize(), new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.47f), FontStyles.Normal, TextAlignmentOptions.Top);
                 return;
             }
 
+            CreateTextBacking("NameBacking", new Vector2(0.05f, 0.56f), new Vector2(0.95f, 0.97f), 0.70f);
             CreateText("Name", actionCard.DisplayName, GetTitleSize(), new Vector2(0.07f, 0.58f), new Vector2(0.93f, 0.96f), FontStyles.Bold, TextAlignmentOptions.Center);
-            CreateText("ActionLabel", "AÇÃO", GetBodySize(), new Vector2(0.18f, 0.36f), new Vector2(0.82f, 0.53f), FontStyles.Bold, TextAlignmentOptions.Center, new Color(0.92f, 0.74f, 1f, 1f));
+            CreateText("ActionLabel", "AÇÃO", GetBodySize(), new Vector2(0.18f, 0.36f), new Vector2(0.82f, 0.53f), FontStyles.Bold, TextAlignmentOptions.Center, new Color(0.98f, 0.84f, 1f, 1f));
             CreateText("EffectType", actionCard.EffectType.ToString(), GetBodySize(), new Vector2(0.08f, 0.10f), new Vector2(0.92f, 0.32f), FontStyles.Italic, TextAlignmentOptions.Center);
+        }
+
+        private void BuildFactColorBase(ScienceFactCategory categoryA, ScienceFactCategory categoryB)
+        {
+            Color colorA = GetFactCategoryColor(categoryA);
+            Color colorB = GetFactCategoryColor(categoryB);
+            bool sameCategory = categoryA == categoryB;
+
+            if (sameCategory)
+            {
+                CreateColorPanel("FactColorBase", Vector2.zero, Vector2.one, colorA);
+                return;
+            }
+
+            bool verticalCard = displayMode == ScienceCardViewDisplayMode.ZoomModal;
+            if (verticalCard)
+            {
+                CreateColorPanel("FactColorTop", new Vector2(0f, 0.50f), Vector2.one, colorA);
+                CreateColorPanel("FactColorBottom", Vector2.zero, new Vector2(1f, 0.50f), colorB);
+            }
+            else
+            {
+                CreateColorPanel("FactColorLeft", Vector2.zero, new Vector2(0.50f, 1f), colorA);
+                CreateColorPanel("FactColorRight", new Vector2(0.50f, 0f), Vector2.one, colorB);
+            }
+        }
+
+        private void BuildActionColorBase()
+        {
+            CreateColorPanel("ActionBase", Vector2.zero, Vector2.one, new Color(0.25f, 0.12f, 0.38f, 1f));
+            CreateColorPanel("ActionAccent", new Vector2(0f, 0.68f), Vector2.one, new Color(0.48f, 0.20f, 0.72f, 0.92f));
+            CreateColorPanel("ActionFooter", Vector2.zero, new Vector2(1f, 0.18f), new Color(0.10f, 0.07f, 0.15f, 0.78f));
+        }
+
+        private RectTransform CreateColorPanel(string name, Vector2 anchorMin, Vector2 anchorMax, Color color)
+        {
+            GameObject panelObject = new GameObject(name, typeof(RectTransform), typeof(Image));
+            RectTransform panelRect = panelObject.GetComponent<RectTransform>();
+            panelRect.SetParent(transform, false);
+            panelRect.anchorMin = anchorMin;
+            panelRect.anchorMax = anchorMax;
+            panelRect.offsetMin = Vector2.zero;
+            panelRect.offsetMax = Vector2.zero;
+
+            Image panelImage = panelObject.GetComponent<Image>();
+            panelImage.color = color;
+            panelImage.raycastTarget = false;
+            return panelRect;
+        }
+
+        private RectTransform CreateTextBacking(string name, Vector2 anchorMin, Vector2 anchorMax, float alpha)
+        {
+            return CreateColorPanel(name, anchorMin, anchorMax, new Color(0.02f, 0.025f, 0.03f, alpha));
         }
 
         private void BuildEmptyCard()
@@ -219,6 +284,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.UI
 
             Image badgeImage = badgeObject.GetComponent<Image>();
             badgeImage.color = GetFactCategoryColor(category);
+            badgeImage.raycastTarget = false;
 
             CreateText(badgeRect, "Label", category.ToString(), GetBadgeTextSize(), Vector2.zero, Vector2.one, FontStyles.Bold, TextAlignmentOptions.Center, Color.black);
         }
