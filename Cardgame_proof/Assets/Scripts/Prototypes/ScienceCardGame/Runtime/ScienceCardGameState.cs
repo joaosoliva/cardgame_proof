@@ -21,6 +21,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime
         public Vector2Int BoardSize { get; } = new Vector2Int(7, 7);
         public int InitialHandSize { get; private set; } = 4;
         public bool DebugRevealAllHands { get; private set; }
+        public bool AcceptTiedConnectionVotes { get; private set; } = true;
         public DateTime InitializedAtUtc { get; private set; }
         public ScienceCardGamePhase CurrentPhase { get; private set; } = ScienceCardGamePhase.Setup;
         public int SelectedPlayerCount { get; private set; } = 2;
@@ -49,6 +50,11 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime
         public void SetDebugRevealAllHands(bool enabled)
         {
             DebugRevealAllHands = enabled;
+        }
+
+        public void SetAcceptTiedConnectionVotes(bool acceptTies)
+        {
+            AcceptTiedConnectionVotes = acceptTies;
         }
 
         public void SetPhase(ScienceCardGamePhase phase)

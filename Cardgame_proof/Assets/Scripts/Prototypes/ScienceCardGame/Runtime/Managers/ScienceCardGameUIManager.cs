@@ -14,6 +14,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         private const int MaxLogEntries = 7;
 
         private readonly List<string> recentActions = new List<string>();
+        private readonly Dictionary<int, bool> connectionVotes = new Dictionary<int, bool>();
         private PrototypeRuntimeContext context;
         private ScienceCardGameState state;
         private ScienceDeckManager deckManager;
@@ -24,6 +25,8 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
         private GameObject cardDetailModal;
         private TextMeshProUGUI selectedPlayerCountText;
         private int selectedPlayerCount = 2;
+        private int activeVotingPlayerIndex = -1;
+        private string activeVotingCardId;
 
         public GameObject Root => root;
 
@@ -44,6 +47,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             telemetry = telemetryManager;
             selectedPlayerCount = state?.SelectedPlayerCount ?? 2;
             recentActions.Clear();
+            ResetConnectionVoting();
 
             if (context?.SceneRoot?.FullScreenRoot == null)
             {
@@ -77,6 +81,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             }
 
             recentActions.Clear();
+            ResetConnectionVoting();
             selectedPlayerCountText = null;
             context = null;
             state = null;
@@ -282,7 +287,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             if (step == ScienceTurnStep.ConnectionExplanation)
             {
-                CreateButton(parent, "Concluir explicação", new Vector2(0.50f, 0.56f), ResolveConnectionExplanation, new Vector2(260f, 68f));
+                BuildConnectionVotingPanel(parent);
             }
 
             if (step == ScienceTurnStep.AwaitingBoardSlot || step == ScienceTurnStep.AwaitingPlacementConfirmation)
@@ -424,15 +429,108 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
             currentPlayer.MarkPlayed(selectedCard);
             turnManager.StartConnectionExplanation();
+            StartConnectionVoting(currentPlayer, selectedCard);
             AddLog($"{currentPlayer.DisplayName} colocou {selectedCard.DisplayName} em {FormatBoardCoordinate(coordinate)} com rotação {turnManager.SelectedRotationDegrees}°.");
-            AddLog("Explique a conexão científica proposta; a votação será implementada depois.");
+            AddLog("Explique a conexão científica proposta; os demais jogadores votam para aceitar a conexão.");
             BuildGameplayScreen();
         }
 
-        private void ResolveConnectionExplanation()
+        private void StartConnectionVoting(SciencePlayerState activePlayer, ScienceCardData placedCard)
         {
+            connectionVotes.Clear();
+            activeVotingPlayerIndex = activePlayer?.PlayerIndex ?? -1;
+            activeVotingCardId = placedCard?.Id;
+            telemetry?.LogEvent("science_connection_vote_started", $"turn={turnManager?.TurnNumber ?? 0};activePlayer={activeVotingPlayerIndex};card={activeVotingCardId};acceptTies={state?.AcceptTiedConnectionVotes ?? true}");
+        }
+
+        private void BuildConnectionVotingPanel(RectTransform parent)
+        {
+            SciencePlayerState activePlayer = GetCurrentPlayer();
+            ScienceCardData selectedCard = turnManager?.SelectedCard;
+            string cardName = selectedCard?.DisplayName ?? "carta colocada";
+
+            CreateText(parent, "Votação da conexão", 23, new Vector2(0.08f, 0.60f), new Vector2(0.92f, 0.66f), FontStyles.Bold);
+            CreateText(parent, $"{activePlayer?.DisplayName ?? "Jogador ativo"} explicou {cardName}.\nOs jogadores aceitam essa conexão?", 17, new Vector2(0.08f, 0.48f), new Vector2(0.92f, 0.60f), FontStyles.Normal);
+
+            if (state == null || state.Players.Count <= 1)
+            {
+                CreateButton(parent, "Aceitar sem votação", new Vector2(0.50f, 0.36f), ResolveConnectionVoteResult, new Vector2(260f, 58f));
+                return;
+            }
+
+            int row = 0;
+            for (int i = 0; i < state.Players.Count; i++)
+            {
+                SciencePlayerState player = state.Players[i];
+                if (player == null || player.PlayerIndex == activeVotingPlayerIndex) continue;
+
+                float y = 0.38f - (row * 0.105f);
+                if (connectionVotes.TryGetValue(player.PlayerIndex, out bool accepted))
+                {
+                    CreateText(parent, $"{player.DisplayName}: {(accepted ? "Sim" : "Não")}", 17, new Vector2(0.10f, y - 0.035f), new Vector2(0.90f, y + 0.035f), FontStyles.Bold);
+                }
+                else
+                {
+                    int voterIndex = player.PlayerIndex;
+                    CreateText(parent, player.DisplayName, 16, new Vector2(0.08f, y - 0.035f), new Vector2(0.36f, y + 0.035f), FontStyles.Normal, TextAlignmentOptions.Left);
+                    CreateButton(parent, "Sim", new Vector2(0.55f, y), () => SubmitConnectionVote(voterIndex, true), new Vector2(86f, 44f));
+                    CreateButton(parent, "Não", new Vector2(0.78f, y), () => SubmitConnectionVote(voterIndex, false), new Vector2(86f, 44f));
+                }
+
+                row++;
+            }
+        }
+
+        private void SubmitConnectionVote(int playerIndex, bool accepted)
+        {
+            if (turnManager == null || turnManager.CurrentStep != ScienceTurnStep.ConnectionExplanation) return;
+            if (playerIndex == activeVotingPlayerIndex)
+            {
+                AddLog("O jogador ativo não vota na própria conexão.");
+                BuildGameplayScreen();
+                return;
+            }
+
+            connectionVotes[playerIndex] = accepted;
+            AddLog($"{GetPlayerDisplayName(playerIndex)} votou {(accepted ? "Sim" : "Não")}.");
+            telemetry?.LogEvent("science_connection_vote_submitted", $"turn={turnManager.TurnNumber};activePlayer={activeVotingPlayerIndex};voter={playerIndex};card={activeVotingCardId};accepted={accepted}");
+
+            if (AreAllConnectionVotesSubmitted())
+            {
+                ResolveConnectionVoteResult();
+                return;
+            }
+
+            BuildGameplayScreen();
+        }
+
+        private bool AreAllConnectionVotesSubmitted()
+        {
+            if (state == null) return true;
+            int expectedVotes = Mathf.Max(0, state.Players.Count - 1);
+            return connectionVotes.Count >= expectedVotes;
+        }
+
+        private void ResolveConnectionVoteResult()
+        {
+            int yesVotes = 0;
+            int noVotes = 0;
+            foreach (bool accepted in connectionVotes.Values)
+            {
+                if (accepted) yesVotes++;
+                else noVotes++;
+            }
+
+            bool tied = yesVotes == noVotes;
+            bool tieAccepted = state?.AcceptTiedConnectionVotes ?? true;
+            bool acceptedByVote = yesVotes > noVotes || (tied && tieAccepted);
+            string resultText = acceptedByVote ? "aceita" : "rejeitada";
+            string tieText = tied ? $" Empate: {(tieAccepted ? "aceito" : "rejeitado")} pela configuração atual." : string.Empty;
+
+            AddLog($"Conexão {resultText}: {yesVotes} Sim / {noVotes} Não.{tieText}");
+            telemetry?.LogEvent("science_connection_vote_resolved", $"turn={turnManager?.TurnNumber ?? 0};activePlayer={activeVotingPlayerIndex};card={activeVotingCardId};yes={yesVotes};no={noVotes};tied={tied};tieAccepted={tieAccepted};accepted={acceptedByVote}");
+            ResetConnectionVoting();
             turnManager?.MarkTurnResolved();
-            AddLog("Explicação registrada. O turno pode ser encerrado.");
             BuildGameplayScreen();
         }
 
@@ -447,6 +545,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
 
         private void CancelSelection()
         {
+            ResetConnectionVoting();
             turnManager?.CancelSelection();
             AddLog("Seleção cancelada. Escolha outra carta da mão atual.");
             BuildGameplayScreen();
@@ -551,6 +650,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                 return;
             }
 
+            ResetConnectionVoting();
             turnManager.AdvanceTurn();
             AddLog($"Turno {turnManager.TurnNumber}: vez de {GetCurrentPlayerName()}.");
             BuildGameplayScreen();
@@ -586,7 +686,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                 case ScienceTurnStep.AwaitingPlacementConfirmation:
                     return "Confirme a posição escolhida.";
                 case ScienceTurnStep.ConnectionExplanation:
-                    return "Explique a conexão científica.";
+                    return "Os demais jogadores votam a conexão.";
                 case ScienceTurnStep.ActionResolution:
                     return "Resolva a ação selecionada.";
                 case ScienceTurnStep.TurnResolved:
@@ -620,7 +720,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
                 case ScienceTurnStep.AwaitingPlacementConfirmation:
                     return "A prévia no tabuleiro mostra a rotação escolhida. Confirme, gire novamente ou cancele.";
                 case ScienceTurnStep.ConnectionExplanation:
-                    return "Fluxo de explicação/votação iniciado como placeholder. Conclua para liberar o fim do turno.";
+                    return "O consenso dos jogadores valida a explicação; o sistema não julga automaticamente.";
                 case ScienceTurnStep.TurnResolved:
                     return "A colocação/ação foi resolvida. O botão Encerrar turno agora está disponível.";
                 default:
@@ -655,6 +755,27 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime.Managers
             }
 
             return text;
+        }
+
+        private string GetPlayerDisplayName(int playerIndex)
+        {
+            if (state != null)
+            {
+                for (int i = 0; i < state.Players.Count; i++)
+                {
+                    SciencePlayerState player = state.Players[i];
+                    if (player != null && player.PlayerIndex == playerIndex) return player.DisplayName;
+                }
+            }
+
+            return $"Player {playerIndex + 1}";
+        }
+
+        private void ResetConnectionVoting()
+        {
+            connectionVotes.Clear();
+            activeVotingPlayerIndex = -1;
+            activeVotingCardId = null;
         }
 
         private string GetCurrentPlayerName()

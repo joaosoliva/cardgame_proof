@@ -8,6 +8,7 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime
     public sealed class ScienceCardGameBootstrap : MonoBehaviour
     {
         [SerializeField] private bool debugRevealAllHands;
+        [SerializeField] private bool acceptTiedConnectionVotes = true;
 
         private PrototypeRuntimeContext context;
         private ScienceCardGameState state;
@@ -33,7 +34,8 @@ namespace CardgameProof.Prototypes.ScienceCardGame.Runtime
 
             state.InitializeDefaults();
             state.SetDebugRevealAllHands(debugRevealAllHands);
-            Debug.Log($"[ScienceCardGame] 00 State initialized for setup debugRevealAllHands={debugRevealAllHands}");
+            state.SetAcceptTiedConnectionVotes(acceptTiedConnectionVotes);
+            Debug.Log($"[ScienceCardGame] 00 State initialized for setup debugRevealAllHands={debugRevealAllHands} acceptTiedConnectionVotes={acceptTiedConnectionVotes}");
 
             telemetryManager = new ScienceTelemetryManager();
             telemetryManager.Initialize(state);
