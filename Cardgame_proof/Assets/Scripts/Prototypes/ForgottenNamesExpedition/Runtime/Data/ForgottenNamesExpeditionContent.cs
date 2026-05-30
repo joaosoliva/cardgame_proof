@@ -183,55 +183,75 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Data
         public static readonly IReadOnlyList<ForgottenNamesQuestion> Questions = new List<ForgottenNamesQuestion>
         {
             new ForgottenNamesQuestion(
-                "O primeiro detalhe",
-                "A premissa coloca muitas pistas, objetos ou ideias diante do grupo, mas uma delas chama atenção primeiro.",
-                "Que detalhe seu personagem escolhe observar antes dos outros, e por que ele parece importante?",
+                "O primeiro ponto de atenção",
+                "A premissa dá ao grupo muitos possíveis pontos de partida.",
+                "Qual pequeno detalhe seu personagem escolhe observar primeiro?",
                 "Use a carta de premissa como cena. Uma frase já é suficiente."),
             new ForgottenNamesQuestion(
-                "O que ficou de fora",
-                "Toda memória preserva algumas coisas e deixa outras quase invisíveis.",
-                "O que seu personagem acha que está faltando nesta versão da história?",
-                "Pense em autoria, contexto, cuidado, trabalho invisível ou consequências."),
+                "O detalhe que muda o caminho",
+                "Dentro desta expedição, algo pequeno pode mudar a forma como o grupo entende o todo.",
+                "Que detalhe da premissa faz seu personagem pensar: \"isso não pode passar despercebido\"?",
+                "Pode ser um nome, objeto, anotação, imagem, cálculo, relato ou ausência."),
+            new ForgottenNamesQuestion(
+                "O que ficou faltando",
+                "A situação da premissa mostra que uma memória pode estar incompleta.",
+                "O que seu personagem percebe que está faltando nesta versão da história?",
+                "Pense em autoria, contexto, cuidado, trabalho invisível ou consequência."),
             new ForgottenNamesQuestion(
                 "A escolha de atenção",
-                "O grupo não consegue dar o mesmo foco para tudo ao mesmo tempo.",
-                "O que seu personagem acredita que merece atenção agora, mesmo que outras coisas precisem esperar?",
-                "Não existe resposta certa. Escolha algo que ajude esta expedição a tomar forma."),
+                "A premissa força o grupo a escolher o que receberá atenção agora.",
+                "O que seu personagem acredita que merece foco neste momento da expedição?",
+                "Não existe resposta certa. Escolha algo que ajude a jornada a tomar forma."),
             new ForgottenNamesQuestion(
                 "A contribuição quase invisível",
-                "A expedição encontra algo que poderia facilmente ser tratado como detalhe menor ou nota de rodapé.",
-                "Por que seu personagem acha que essa contribuição importa?",
-                "Responda pensando no que costuma ser esquecido quando contamos histórias de ciência."),
+                "Dentro desta premissa, uma contribuição corre o risco de parecer pequena demais.",
+                "Por que seu personagem acha que essa contribuição deveria ser levada a sério?",
+                "Pense no que costuma virar nota de rodapé quando contamos histórias de ciência."),
+            new ForgottenNamesQuestion(
+                "O nome que puxa a história",
+                "O caminho aberto pela premissa faz um nome parecer mais importante do que parecia no início.",
+                "Que tipo de nome seu personagem espera encontrar ou recuperar nesta expedição?",
+                "Pense em alguém que observou, calculou, cuidou, ensinou, coletou, testou ou insistiu."),
             new ForgottenNamesQuestion(
                 "Explicar para alguém de fora",
-                "Em algum momento, alguém fora da expedição precisará entender por que esta descoberta merece cuidado.",
-                "Como seu personagem explicaria a importância disso em uma frase?",
-                "Tente falar como se explicasse para uma pessoa curiosa, mas sem conhecimento prévio."),
+                "A premissa só ganha força se alguém fora da expedição conseguir entender por que ela importa.",
+                "Como seu personagem explicaria o valor desta expedição em uma frase?",
+                "Fale como se explicasse para uma pessoa curiosa, mas sem conhecimento prévio."),
             new ForgottenNamesQuestion(
                 "O cuidado necessário",
-                "Nem tudo na expedição deve ser tratado com pressa. Algumas coisas pedem cuidado.",
-                "O que seu personagem decide tratar com mais cuidado, e por quê?",
+                "O trabalho desta expedição não pode ser feito com pressa.",
+                "O que seu personagem decide tratar com mais cuidado dentro desta premissa?",
                 "Pode ser um nome, objeto, ideia, pista, cálculo, relato ou contribuição."),
             new ForgottenNamesQuestion(
                 "A dúvida que quase interrompe tudo",
-                "Por um momento, o grupo se pergunta se esse trabalho será compreendido ou lembrado por alguém.",
+                "A premissa parece importante, mas por um momento o grupo duvida se alguém dará atenção a isso.",
                 "O que faz seu personagem continuar mesmo assim?",
                 "A resposta pode ser pequena: uma pessoa, uma pista, uma frase ou uma sensação."),
             new ForgottenNamesQuestion(
-                "Um nome que muda o caminho",
-                "Às vezes, encontrar um nome muda a forma como enxergamos todo o resto.",
-                "Que tipo de nome seu personagem espera encontrar nesta expedição?",
-                "Pense em alguém que observou, calculou, cuidou, ensinou, coletou, testou ou insistiu."),
+                "O que precisa ser comparado",
+                "Dentro desta expedição, duas pistas, nomes ou ideias parecem apontar para caminhos diferentes.",
+                "O que seu personagem acha que precisa ser comparado antes de seguir?",
+                "Compare coisas simples: duas versões, dois nomes, duas evidências, duas formas de explicar."),
+            new ForgottenNamesQuestion(
+                "A ponte entre conhecimento e pessoas",
+                "A premissa não fala apenas de descobertas, mas também de quem consegue acessá-las.",
+                "Quem seu personagem imagina sendo beneficiado se esta expedição for levada adiante?",
+                "Pode ser uma comunidade, estudantes, visitantes, pacientes, pesquisadores ou curiosos."),
             new ForgottenNamesQuestion(
                 "Uma nova forma de lembrar",
-                "A expedição começa a mudar o que o grupo entende por memória.",
-                "Depois do que encontrou até agora, o que seu personagem acha que lembrar deveria significar?",
+                "A premissa começa a mudar o que o grupo entende por memória.",
+                "Depois desta expedição, o que seu personagem acha que \"lembrar\" deveria significar?",
                 "Você pode responder com uma frase simples."),
             new ForgottenNamesQuestion(
-                "O próximo passo",
-                "A premissa não se resolve sozinha. O grupo precisa escolher como continuar.",
-                "Qual é o próximo pequeno passo que seu personagem propõe para a expedição?",
-                "Pode ser observar melhor, comparar pistas, ouvir alguém, explicar uma ideia ou registrar um nome.")
+                "O próximo pequeno passo",
+                "A premissa não se resolve sozinha. O grupo precisa escolher uma próxima ação.",
+                "Qual pequeno passo seu personagem propõe para continuar esta expedição?",
+                "Pode ser observar melhor, comparar pistas, ouvir alguém, explicar uma ideia ou registrar um nome."),
+            new ForgottenNamesQuestion(
+                "O que não deve virar rodapé",
+                "Dentro desta premissa, algumas contribuições podem ser tratadas como detalhe secundário.",
+                "O que seu personagem acha que não deveria ficar no rodapé da história?",
+                "Pense em uma pessoa, uma técnica, uma observação, um cuidado ou uma decisão.")
         };
 
         public static readonly IReadOnlyList<ForgottenNamesScientist> Scientists = new List<ForgottenNamesScientist>
