@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Data
 {
@@ -13,14 +12,28 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Data
 
     public readonly struct ForgottenNamesPremise
     {
-        public ForgottenNamesPremise(string title, string description)
+        public ForgottenNamesPremise(string id, string title, string description, string tableReminder, string questionBridge, string scientistBridge, string challengeBridge, string finalBridge, string[] answerHints)
         {
+            Id = id;
             Title = title;
             Description = description;
+            TableReminder = tableReminder;
+            QuestionBridge = questionBridge;
+            ScientistBridge = scientistBridge;
+            ChallengeBridge = challengeBridge;
+            FinalBridge = finalBridge;
+            AnswerHints = answerHints;
         }
 
+        public string Id { get; }
         public string Title { get; }
         public string Description { get; }
+        public string TableReminder { get; }
+        public string QuestionBridge { get; }
+        public string ScientistBridge { get; }
+        public string ChallengeBridge { get; }
+        public string FinalBridge { get; }
+        public string[] AnswerHints { get; }
     }
 
     public readonly struct ForgottenNamesRole
@@ -125,9 +138,36 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Data
     {
         public static readonly IReadOnlyList<ForgottenNamesPremise> Premises = new List<ForgottenNamesPremise>
         {
-            new ForgottenNamesPremise("O Arquivo Perdido", "Vocês encontraram uma caixa de anotações antigas em um arquivo esquecido. Dentro dela, há nomes, ideias e descobertas que quase desapareceram."),
-            new ForgottenNamesPremise("A Exposição que Abre Hoje", "Um museu precisa montar uma pequena exposição até o fim do dia. O desafio é decidir quais nomes e contribuições não podem ficar de fora."),
-            new ForgottenNamesPremise("A Pergunta que Ninguém Financiou", "Uma pesquisa importante nunca recebeu apoio suficiente. Agora, o grupo precisa reconstruir por que essa pergunta importava.")
+            new ForgottenNamesPremise(
+                "lost_archive",
+                "O Arquivo Perdido",
+                "Vocês encontraram uma caixa de anotações antigas em um arquivo esquecido. Dentro dela, há nomes, ideias e descobertas que quase desapareceram.",
+                "A expedição está reconstruindo uma memória quase perdida.",
+                "No arquivo, uma nova pista aparece.",
+                "Entre os registros do arquivo, este nome pede atenção.",
+                "O arquivo oferece uma pista, mas ela não se explica sozinha.",
+                "O arquivo foi aberto. Agora é preciso decidir o que não volta para o esquecimento.",
+                new[] { "documentos", "nomes", "datas", "páginas faltando", "objetos", "caligrafia", "caixas", "salas esquecidas" }),
+            new ForgottenNamesPremise(
+                "opening_exhibition",
+                "A Exposição que Abre Hoje",
+                "Um museu precisa montar uma pequena exposição até o fim do dia. O desafio é decidir quais nomes e contribuições não podem ficar de fora.",
+                "A expedição está escolhendo como uma descoberta será apresentada ao público.",
+                "Na preparação da exposição, uma escolha precisa ser feita.",
+                "Entre as possíveis peças da exposição, esta contribuição pede atenção.",
+                "A exposição precisa transformar conhecimento em algo que o público consiga perceber.",
+                "A exposição está pronta para receber visitantes. Agora é preciso decidir que memória ela vai carregar.",
+                new[] { "visitantes", "objetos", "legendas", "salas", "imagens", "primeira impressão", "vitrine", "explicação simples" }),
+            new ForgottenNamesPremise(
+                "unfunded_question",
+                "A Pergunta que Ninguém Financiou",
+                "Uma pesquisa importante nunca recebeu apoio suficiente. Agora, o grupo precisa reconstruir por que essa pergunta importava.",
+                "A expedição está defendendo o valor de uma pergunta que quase ninguém quis escutar.",
+                "Na pesquisa interrompida, uma dúvida volta a aparecer.",
+                "Enquanto seguem a pergunta esquecida, o grupo encontra uma contribuição que pode mudar o caminho.",
+                "A pergunta continua difícil, mas uma nova tentativa pode revelar seu valor.",
+                "A pergunta finalmente encontrou escuta. Agora é preciso decidir o que fazer com essa resposta.",
+                new[] { "hipótese", "tentativa", "anotação", "falta de recursos", "defesa", "curiosidade", "persistência", "valor escondido" })
         };
 
         public static readonly IReadOnlyList<ForgottenNamesRole> Roles = new List<ForgottenNamesRole>
@@ -142,11 +182,76 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Data
 
         public static readonly IReadOnlyList<ForgottenNamesQuestion> Questions = new List<ForgottenNamesQuestion>
         {
-            new ForgottenNamesQuestion("Por que esta jornada importa?", "Antes de começar, cada expedição precisa de um motivo.", "O que fez seu personagem acreditar que essa busca valia a pena?", "Você pode responder com uma frase."),
-            new ForgottenNamesQuestion("Um nome fora da página", "No arquivo, há sinais de que alguém importante ficou fora da versão mais conhecida da história.", "Que tipo de pessoa seu personagem acha que a história costuma esquecer?", "Pense em alguém que observa, cuida, calcula, ensina, coleta ou insiste."),
-            new ForgottenNamesQuestion("Um conhecimento que você ignorava", "Nem todo conhecimento parece importante à primeira vista.", "Que tipo de conhecimento seu personagem costumava ignorar antes desta expedição?", "Exemplo: plantas, estrelas, números, relatos, mapas, instrumentos, trabalho de campo."),
-            new ForgottenNamesQuestion("A primeira pista", "O grupo encontra uma anotação incompleta, mas promissora.", "Qual detalhe chama sua atenção e faz o grupo continuar?", "Pode ser uma palavra, desenho, fórmula, mapa, nome ou objeto."),
-            new ForgottenNamesQuestion("O que mudou em você?", "A expedição já mostrou que conhecimento também depende de quem é lembrado.", "O que seu personagem começa a enxergar de outro jeito?", "Uma resposta simples é suficiente.")
+            new ForgottenNamesQuestion(
+                "O primeiro ponto de atenção",
+                "A premissa dá ao grupo muitos possíveis pontos de partida.",
+                "Qual pequeno detalhe seu personagem escolhe observar primeiro?",
+                "Use a carta de premissa como cena. Uma frase já é suficiente."),
+            new ForgottenNamesQuestion(
+                "O detalhe que muda o caminho",
+                "Dentro desta expedição, algo pequeno pode mudar a forma como o grupo entende o todo.",
+                "Que detalhe da premissa faz seu personagem pensar: \"isso não pode passar despercebido\"?",
+                "Pode ser um nome, objeto, anotação, imagem, cálculo, relato ou ausência."),
+            new ForgottenNamesQuestion(
+                "O que ficou faltando",
+                "A situação da premissa mostra que uma memória pode estar incompleta.",
+                "O que seu personagem percebe que está faltando nesta versão da história?",
+                "Pense em autoria, contexto, cuidado, trabalho invisível ou consequência."),
+            new ForgottenNamesQuestion(
+                "A escolha de atenção",
+                "A premissa força o grupo a escolher o que receberá atenção agora.",
+                "O que seu personagem acredita que merece foco neste momento da expedição?",
+                "Não existe resposta certa. Escolha algo que ajude a jornada a tomar forma."),
+            new ForgottenNamesQuestion(
+                "A contribuição quase invisível",
+                "Dentro desta premissa, uma contribuição corre o risco de parecer pequena demais.",
+                "Por que seu personagem acha que essa contribuição deveria ser levada a sério?",
+                "Pense no que costuma virar nota de rodapé quando contamos histórias de ciência."),
+            new ForgottenNamesQuestion(
+                "O nome que puxa a história",
+                "O caminho aberto pela premissa faz um nome parecer mais importante do que parecia no início.",
+                "Que tipo de nome seu personagem espera encontrar ou recuperar nesta expedição?",
+                "Pense em alguém que observou, calculou, cuidou, ensinou, coletou, testou ou insistiu."),
+            new ForgottenNamesQuestion(
+                "Explicar para alguém de fora",
+                "A premissa só ganha força se alguém fora da expedição conseguir entender por que ela importa.",
+                "Como seu personagem explicaria o valor desta expedição em uma frase?",
+                "Fale como se explicasse para uma pessoa curiosa, mas sem conhecimento prévio."),
+            new ForgottenNamesQuestion(
+                "O cuidado necessário",
+                "O trabalho desta expedição não pode ser feito com pressa.",
+                "O que seu personagem decide tratar com mais cuidado dentro desta premissa?",
+                "Pode ser um nome, objeto, ideia, pista, cálculo, relato ou contribuição."),
+            new ForgottenNamesQuestion(
+                "A dúvida que quase interrompe tudo",
+                "A premissa parece importante, mas por um momento o grupo duvida se alguém dará atenção a isso.",
+                "O que faz seu personagem continuar mesmo assim?",
+                "A resposta pode ser pequena: uma pessoa, uma pista, uma frase ou uma sensação."),
+            new ForgottenNamesQuestion(
+                "O que precisa ser comparado",
+                "Dentro desta expedição, duas pistas, nomes ou ideias parecem apontar para caminhos diferentes.",
+                "O que seu personagem acha que precisa ser comparado antes de seguir?",
+                "Compare coisas simples: duas versões, dois nomes, duas evidências, duas formas de explicar."),
+            new ForgottenNamesQuestion(
+                "A ponte entre conhecimento e pessoas",
+                "A premissa não fala apenas de descobertas, mas também de quem consegue acessá-las.",
+                "Quem seu personagem imagina sendo beneficiado se esta expedição for levada adiante?",
+                "Pode ser uma comunidade, estudantes, visitantes, pacientes, pesquisadores ou curiosos."),
+            new ForgottenNamesQuestion(
+                "Uma nova forma de lembrar",
+                "A premissa começa a mudar o que o grupo entende por memória.",
+                "Depois desta expedição, o que seu personagem acha que \"lembrar\" deveria significar?",
+                "Você pode responder com uma frase simples."),
+            new ForgottenNamesQuestion(
+                "O próximo pequeno passo",
+                "A premissa não se resolve sozinha. O grupo precisa escolher uma próxima ação.",
+                "Qual pequeno passo seu personagem propõe para continuar esta expedição?",
+                "Pode ser observar melhor, comparar pistas, ouvir alguém, explicar uma ideia ou registrar um nome."),
+            new ForgottenNamesQuestion(
+                "O que não deve virar rodapé",
+                "Dentro desta premissa, algumas contribuições podem ser tratadas como detalhe secundário.",
+                "O que seu personagem acha que não deveria ficar no rodapé da história?",
+                "Pense em uma pessoa, uma técnica, uma observação, um cuidado ou uma decisão.")
         };
 
         public static readonly IReadOnlyList<ForgottenNamesScientist> Scientists = new List<ForgottenNamesScientist>
@@ -216,7 +321,7 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Data
 
         public static readonly ForgottenNamesFinalCard FinalCard = new ForgottenNamesFinalCard(
             "O que não deixamos desaparecer",
-            "A expedição termina, mas o mundo ainda pode esquecer o que vocês descobriram.",
+            "A expedição termina quando esta carta aparecer.",
             "Que nome, ideia ou contribuição seu personagem escolhe preservar — e como?",
             "Nós lembramos ______ porque ______.");
 
@@ -226,19 +331,6 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Data
             "Responda com uma frase ou com mais detalhes. As duas formas são válidas.",
             "Cientistas na Party ajudam agora. Cientistas no Archive serão lembrados depois.",
             "No final, o grupo decide o que não quer deixar desaparecer."
-        };
-
-        public static readonly IReadOnlyList<ForgottenNamesDeckCard> DemoDeck = new List<ForgottenNamesDeckCard>
-        {
-            new ForgottenNamesDeckCard(ForgottenNamesCardType.Question, 0),
-            new ForgottenNamesDeckCard(ForgottenNamesCardType.Scientist, 0),
-            new ForgottenNamesDeckCard(ForgottenNamesCardType.Question, 1),
-            new ForgottenNamesDeckCard(ForgottenNamesCardType.Scientist, 1),
-            new ForgottenNamesDeckCard(ForgottenNamesCardType.Challenge, 0),
-            new ForgottenNamesDeckCard(ForgottenNamesCardType.Scientist, 2),
-            new ForgottenNamesDeckCard(ForgottenNamesCardType.Challenge, 1),
-            new ForgottenNamesDeckCard(ForgottenNamesCardType.Question, 4),
-            new ForgottenNamesDeckCard(ForgottenNamesCardType.Final, 0)
         };
 
         public static string JoinTags(IEnumerable<string> tags)
