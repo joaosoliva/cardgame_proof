@@ -109,7 +109,8 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
                 RectTransform card = CreatePanel(screen, $"PremiseCard_{i}", new Vector2(0.07f, centerY - 0.075f), new Vector2(0.93f, centerY + 0.075f), new Color(0.12f, 0.16f, 0.24f, 0.98f));
                 CreateText(card, PremiseIcons[i % PremiseIcons.Length], 40, new Vector2(0.04f, 0.18f), new Vector2(0.16f, 0.84f), FontStyles.Bold, TextAlignmentOptions.Center, HighlightTextColor);
                 CreateText(card, premise.Title, 29, new Vector2(0.18f, 0.56f), new Vector2(0.78f, 0.90f), FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
-                CreateText(card, premise.Description, 20, new Vector2(0.18f, 0.12f), new Vector2(0.94f, 0.56f), FontStyles.Normal, TextAlignmentOptions.TopLeft, MutedTextColor);
+                CreateText(card, premise.Description, 19, new Vector2(0.18f, 0.24f), new Vector2(0.94f, 0.56f), FontStyles.Normal, TextAlignmentOptions.TopLeft, MutedTextColor);
+                CreateText(card, premise.TableReminder, 18, new Vector2(0.18f, 0.08f), new Vector2(0.94f, 0.24f), FontStyles.Italic, TextAlignmentOptions.TopLeft, HighlightTextColor);
                 CreateButton(card, "Escolher", new Vector2(0.84f, 0.73f), () => SelectPremise(premiseIndex), new Vector2(190f, 54f), PrimaryButtonColor, 19);
             }
 
@@ -129,7 +130,9 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
             RectTransform card = CreatePanel(screen, "SelectedPremiseCard", new Vector2(0.08f, 0.34f), new Vector2(0.92f, 0.75f), new Color(0.13f, 0.18f, 0.28f, 0.98f));
             CreateText(card, PremiseIcons[state.SelectedPremiseIndex % PremiseIcons.Length], 58, new Vector2(0.08f, 0.68f), new Vector2(0.92f, 0.88f), FontStyles.Bold, TextAlignmentOptions.Center, HighlightTextColor);
             CreateText(card, state.SelectedPremise.Title, 40, new Vector2(0.08f, 0.50f), new Vector2(0.92f, 0.68f), FontStyles.Bold, TextAlignmentOptions.Center);
-            CreateText(card, state.SelectedPremise.Description, 27, new Vector2(0.10f, 0.20f), new Vector2(0.90f, 0.48f), FontStyles.Normal, TextAlignmentOptions.Center, MutedTextColor);
+            CreateText(card, state.SelectedPremise.Description, 25, new Vector2(0.10f, 0.34f), new Vector2(0.90f, 0.50f), FontStyles.Normal, TextAlignmentOptions.Center, MutedTextColor);
+            CreateText(card, state.SelectedPremise.TableReminder, 24, new Vector2(0.10f, 0.22f), new Vector2(0.90f, 0.34f), FontStyles.Bold, TextAlignmentOptions.Center, HighlightTextColor);
+            CreateText(card, "Pense em: " + FormatAnswerHints(state.SelectedPremise), 21, new Vector2(0.10f, 0.10f), new Vector2(0.90f, 0.22f), FontStyles.Normal, TextAlignmentOptions.Center, MutedTextColor);
             CreateText(screen, "Esta será a premissa da expedição.", 30, new Vector2(0.10f, 0.25f), new Vector2(0.90f, 0.31f), FontStyles.Bold, TextAlignmentOptions.Center, HighlightTextColor);
             CreateButton(screen, "Continuar", new Vector2(0.5f, 0.15f), ShowPlayerSetup);
             CreateButton(screen, "Trocar premissa", new Vector2(0.5f, 0.06f), ShowPremiseSelection, new Vector2(560f, 76f), SecondaryButtonColor, 24);
@@ -171,10 +174,10 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
             CreateText(screen, "Carta Final da Expedição", 48, new Vector2(0.06f, 0.86f), new Vector2(0.94f, 0.95f), FontStyles.Bold, TextAlignmentOptions.Center);
             CreateText(screen, "Esta carta mostra o ponto de chegada da jornada. Ela não é um spoiler: ela ajuda o grupo a entender para onde a história está caminhando.", 24, new Vector2(0.09f, 0.76f), new Vector2(0.91f, 0.85f), FontStyles.Normal, TextAlignmentOptions.Center, MutedTextColor);
             RectTransform card = CreatePanel(screen, "FinalPreviewCard", new Vector2(0.08f, 0.30f), new Vector2(0.92f, 0.73f), new Color(0.18f, 0.14f, 0.09f, 0.98f));
-            CreateText(card, "Destino da jornada", 24, new Vector2(0.08f, 0.86f), new Vector2(0.92f, 0.95f), FontStyles.Bold, TextAlignmentOptions.Center, HighlightTextColor);
-            CreateText(card, finalCard.Title, 38, new Vector2(0.08f, 0.70f), new Vector2(0.92f, 0.84f), FontStyles.Bold, TextAlignmentOptions.Center);
-            CreateText(card, "A expedição termina quando esta carta aparecer.", 28, new Vector2(0.10f, 0.55f), new Vector2(0.90f, 0.67f), FontStyles.Normal, TextAlignmentOptions.Center, MutedTextColor);
-            CreateText(card, finalCard.FinalPrompt, 31, new Vector2(0.10f, 0.28f), new Vector2(0.90f, 0.50f), FontStyles.Bold, TextAlignmentOptions.Center);
+            CreateText(card, state.SelectedPremise.Title, 25, new Vector2(0.08f, 0.86f), new Vector2(0.92f, 0.95f), FontStyles.Bold, TextAlignmentOptions.Center, HighlightTextColor);
+            CreateText(card, state.SelectedPremise.FinalBridge, 24, new Vector2(0.09f, 0.72f), new Vector2(0.91f, 0.84f), FontStyles.Italic, TextAlignmentOptions.Center, MutedTextColor);
+            CreateText(card, finalCard.Title, 37, new Vector2(0.08f, 0.56f), new Vector2(0.92f, 0.70f), FontStyles.Bold, TextAlignmentOptions.Center);
+            CreateText(card, finalCard.FinalPrompt, 30, new Vector2(0.10f, 0.28f), new Vector2(0.90f, 0.52f), FontStyles.Bold, TextAlignmentOptions.Center);
             CreateText(card, finalCard.GroupSentence, 27, new Vector2(0.10f, 0.12f), new Vector2(0.90f, 0.24f), FontStyles.Italic, TextAlignmentOptions.Center, HighlightTextColor);
             CreateButton(screen, "Entendi", new Vector2(0.5f, 0.17f), ShowTutorialScreen);
             CreateButton(screen, "Voltar", new Vector2(0.5f, 0.07f), ShowPlayerSetup, new Vector2(520f, 76f), SecondaryButtonColor, 24);
@@ -194,13 +197,16 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
                 CreateText(screen, $"{i + 1}. {rules[i]}", 25, new Vector2(0.12f, centerY - 0.030f), new Vector2(0.88f, centerY + 0.030f), FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
             }
 
-            CreateText(screen, "A sequência tem 9 cartas: Pergunta, Cientista, Pergunta, Cientista, Desafio, Cientista, Desafio, Pergunta e Final.", 23, new Vector2(0.10f, 0.22f), new Vector2(0.90f, 0.31f), FontStyles.Normal, TextAlignmentOptions.Center, MutedTextColor);
+            CreateText(screen, "A sequência é gerada no começo da sessão: blocos curtos de perguntas, três cientistas, dois desafios e a carta final sempre por último.", 23, new Vector2(0.10f, 0.22f), new Vector2(0.90f, 0.31f), FontStyles.Normal, TextAlignmentOptions.Center, MutedTextColor);
             CreateButton(screen, "Abrir mesa de cartas", new Vector2(0.5f, 0.13f), StartCardTable);
             CreateButton(screen, "Voltar", new Vector2(0.5f, 0.05f), ShowPlayerSetup, new Vector2(520f, 70f), SecondaryButtonColor, 24);
         }
 
         private void StartCardTable()
         {
+            state.GenerateSessionDeck();
+            activeQuestionDeckIndex = -1;
+            questionRevealStep = 0;
             sessionStarted = true;
             ShowMainCardTable();
         }
@@ -246,6 +252,7 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
             if (questionRevealStep <= 0)
             {
                 RectTransform coveredCard = CreateMainCardPanel(screen, "QuestionCardBack", new Color(0.08f, 0.12f, 0.20f, 0.98f));
+                CreateText(coveredCard, state.SelectedPremise.QuestionBridge, 24, new Vector2(0.08f, 0.74f), new Vector2(0.92f, 0.86f), FontStyles.Italic, TextAlignmentOptions.Center, MutedTextColor);
                 CreateText(coveredCard, "Carta de Pergunta", 34, new Vector2(0.08f, 0.54f), new Vector2(0.92f, 0.68f), FontStyles.Bold, TextAlignmentOptions.Center, HighlightTextColor);
                 CreateText(coveredCard, "Respirem, virem a carta e leiam juntos.", 26, new Vector2(0.12f, 0.40f), new Vector2(0.88f, 0.52f), FontStyles.Italic, TextAlignmentOptions.Center, MutedTextColor);
                 CreateButton(screen, "Revelar", new Vector2(0.5f, 0.19f), () => SetQuestionRevealStep(1), new Vector2(720f, 100f), PrimaryButtonColor, 30);
@@ -253,13 +260,14 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
             else
             {
                 RectTransform cardPanel = CreateMainCardPanel(screen, "QuestionCard", new Color(0.12f, 0.16f, 0.25f, 0.98f));
-                CreateText(cardPanel, "Pergunta", 26, new Vector2(0.08f, 0.88f), new Vector2(0.92f, 0.95f), FontStyles.Bold, TextAlignmentOptions.Center, HighlightTextColor);
-                CreateText(cardPanel, question.Title, 40, new Vector2(0.08f, 0.74f), new Vector2(0.92f, 0.87f), FontStyles.Bold, TextAlignmentOptions.Center);
-                CreateText(cardPanel, question.Body, 29, new Vector2(0.09f, 0.55f), new Vector2(0.91f, 0.70f), FontStyles.Normal, TextAlignmentOptions.Center, MutedTextColor);
+                CreateText(cardPanel, "Pergunta", 24, new Vector2(0.08f, 0.90f), new Vector2(0.92f, 0.96f), FontStyles.Bold, TextAlignmentOptions.Center, HighlightTextColor);
+                CreateText(cardPanel, state.SelectedPremise.QuestionBridge, 22, new Vector2(0.08f, 0.80f), new Vector2(0.92f, 0.89f), FontStyles.Italic, TextAlignmentOptions.Center, MutedTextColor);
+                CreateText(cardPanel, question.Title, 37, new Vector2(0.08f, 0.67f), new Vector2(0.92f, 0.79f), FontStyles.Bold, TextAlignmentOptions.Center);
+                CreateText(cardPanel, question.Body, 26, new Vector2(0.09f, 0.51f), new Vector2(0.91f, 0.65f), FontStyles.Normal, TextAlignmentOptions.Center, MutedTextColor);
 
                 if (questionRevealStep >= 2)
                 {
-                    CreateText(cardPanel, question.Question, 34, new Vector2(0.08f, 0.32f), new Vector2(0.92f, 0.51f), FontStyles.Bold, TextAlignmentOptions.Center);
+                    CreateText(cardPanel, question.Question, 34, new Vector2(0.08f, 0.31f), new Vector2(0.92f, 0.49f), FontStyles.Bold, TextAlignmentOptions.Center);
                     CreateText(cardPanel, QuestionHelperText + "\n" + question.Helper, 24, new Vector2(0.10f, 0.13f), new Vector2(0.90f, 0.29f), FontStyles.Italic, TextAlignmentOptions.Center, MutedTextColor);
                     CreateButton(screen, "Concluir", new Vector2(0.5f, 0.19f), () => CompleteCurrentPrompt($"Pergunta respondida: {question.Title}"), new Vector2(720f, 100f), PrimaryButtonColor, 30);
                 }
@@ -283,14 +291,15 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
         private void BuildScientistCard(RectTransform screen, int scientistIndex, ForgottenNamesScientist scientist)
         {
             RectTransform cardPanel = CreateMainCardPanel(screen, "ScientistCard", new Color(0.11f, 0.18f, 0.18f, 0.98f));
-            CreateText(cardPanel, "Cientista encontrada", 25, new Vector2(0.08f, 0.89f), new Vector2(0.92f, 0.96f), FontStyles.Bold, TextAlignmentOptions.Center, HighlightTextColor);
-            CreateText(cardPanel, scientist.Name, 42, new Vector2(0.08f, 0.79f), new Vector2(0.92f, 0.89f), FontStyles.Bold, TextAlignmentOptions.Center);
-            CreateText(cardPanel, scientist.Field, 25, new Vector2(0.08f, 0.72f), new Vector2(0.92f, 0.78f), FontStyles.Italic, TextAlignmentOptions.Center, MutedTextColor);
-            CreateText(cardPanel, scientist.ShortContribution, 25, new Vector2(0.08f, 0.57f), new Vector2(0.92f, 0.70f), FontStyles.Normal, TextAlignmentOptions.Center);
-            CreateText(cardPanel, scientist.HumanHook, 23, new Vector2(0.08f, 0.46f), new Vector2(0.92f, 0.56f), FontStyles.Normal, TextAlignmentOptions.Center, MutedTextColor);
-            CreateText(cardPanel, "Tags: " + ForgottenNamesExpeditionContent.JoinTags(scientist.Tags), 22, new Vector2(0.08f, 0.38f), new Vector2(0.92f, 0.44f), FontStyles.Bold, TextAlignmentOptions.Center, HighlightTextColor);
-            CreateText(cardPanel, scientist.EncounterPrompt, 22, new Vector2(0.08f, 0.20f), new Vector2(0.92f, 0.36f), FontStyles.Normal, TextAlignmentOptions.Center);
-            CreateText(cardPanel, ScientistHelperText, 21, new Vector2(0.10f, 0.10f), new Vector2(0.90f, 0.18f), FontStyles.Italic, TextAlignmentOptions.Center, MutedTextColor);
+            CreateText(cardPanel, "Cientista encontrada", 23, new Vector2(0.08f, 0.91f), new Vector2(0.92f, 0.97f), FontStyles.Bold, TextAlignmentOptions.Center, HighlightTextColor);
+            CreateText(cardPanel, state.SelectedPremise.ScientistBridge, 21, new Vector2(0.08f, 0.82f), new Vector2(0.92f, 0.90f), FontStyles.Italic, TextAlignmentOptions.Center, MutedTextColor);
+            CreateText(cardPanel, scientist.Name, 38, new Vector2(0.08f, 0.72f), new Vector2(0.92f, 0.82f), FontStyles.Bold, TextAlignmentOptions.Center);
+            CreateText(cardPanel, scientist.Field, 23, new Vector2(0.08f, 0.66f), new Vector2(0.92f, 0.72f), FontStyles.Italic, TextAlignmentOptions.Center, MutedTextColor);
+            CreateText(cardPanel, scientist.ShortContribution, 23, new Vector2(0.08f, 0.52f), new Vector2(0.92f, 0.64f), FontStyles.Normal, TextAlignmentOptions.Center);
+            CreateText(cardPanel, scientist.HumanHook, 21, new Vector2(0.08f, 0.42f), new Vector2(0.92f, 0.51f), FontStyles.Normal, TextAlignmentOptions.Center, MutedTextColor);
+            CreateText(cardPanel, "Tags: " + ForgottenNamesExpeditionContent.JoinTags(scientist.Tags), 20, new Vector2(0.08f, 0.35f), new Vector2(0.92f, 0.41f), FontStyles.Bold, TextAlignmentOptions.Center, HighlightTextColor);
+            CreateText(cardPanel, scientist.EncounterPrompt, 20, new Vector2(0.08f, 0.18f), new Vector2(0.92f, 0.34f), FontStyles.Normal, TextAlignmentOptions.Center);
+            CreateText(cardPanel, ScientistHelperText, 19, new Vector2(0.10f, 0.09f), new Vector2(0.90f, 0.17f), FontStyles.Italic, TextAlignmentOptions.Center, MutedTextColor);
 
             CreateButton(screen, "Adicionar à Party", new Vector2(0.28f, 0.19f), () => AddScientistToParty(scientistIndex), new Vector2(430f, 92f), PrimaryButtonColor, 26);
             CreateButton(screen, "Registrar no Archive", new Vector2(0.72f, 0.19f), () => AddScientistToArchive(scientistIndex), new Vector2(430f, 92f), PrimaryButtonColor, 26);
@@ -301,11 +310,12 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
         private void BuildChallengeCard(RectTransform screen, int challengeIndex, ForgottenNamesChallenge challenge)
         {
             RectTransform cardPanel = CreateMainCardPanel(screen, "ChallengeCard", new Color(0.18f, 0.13f, 0.18f, 0.98f));
-            CreateText(cardPanel, "Desafio", 24, new Vector2(0.08f, 0.88f), new Vector2(0.92f, 0.95f), FontStyles.Bold, TextAlignmentOptions.Center, HighlightTextColor);
-            CreateText(cardPanel, challenge.Title, 40, new Vector2(0.08f, 0.78f), new Vector2(0.92f, 0.88f), FontStyles.Bold, TextAlignmentOptions.Center);
-            CreateText(cardPanel, challenge.Situation, 28, new Vector2(0.08f, 0.64f), new Vector2(0.92f, 0.75f), FontStyles.Normal, TextAlignmentOptions.Center);
-            CreateText(cardPanel, "Tags recomendadas: " + ForgottenNamesExpeditionContent.JoinTags(challenge.RecommendedTags), 23, new Vector2(0.08f, 0.56f), new Vector2(0.92f, 0.62f), FontStyles.Bold, TextAlignmentOptions.Center, HighlightTextColor);
-            CreateText(cardPanel, ChallengeHelperText, 23, new Vector2(0.10f, 0.45f), new Vector2(0.90f, 0.54f), FontStyles.Italic, TextAlignmentOptions.Center, MutedTextColor);
+            CreateText(cardPanel, "Desafio", 23, new Vector2(0.08f, 0.91f), new Vector2(0.92f, 0.97f), FontStyles.Bold, TextAlignmentOptions.Center, HighlightTextColor);
+            CreateText(cardPanel, state.SelectedPremise.ChallengeBridge, 21, new Vector2(0.08f, 0.81f), new Vector2(0.92f, 0.90f), FontStyles.Italic, TextAlignmentOptions.Center, MutedTextColor);
+            CreateText(cardPanel, challenge.Title, 38, new Vector2(0.08f, 0.70f), new Vector2(0.92f, 0.80f), FontStyles.Bold, TextAlignmentOptions.Center);
+            CreateText(cardPanel, challenge.Situation, 25, new Vector2(0.08f, 0.58f), new Vector2(0.92f, 0.68f), FontStyles.Normal, TextAlignmentOptions.Center);
+            CreateText(cardPanel, "Tags recomendadas: " + ForgottenNamesExpeditionContent.JoinTags(challenge.RecommendedTags), 23, new Vector2(0.08f, 0.50f), new Vector2(0.92f, 0.56f), FontStyles.Bold, TextAlignmentOptions.Center, HighlightTextColor);
+            CreateText(cardPanel, ChallengeHelperText, 23, new Vector2(0.10f, 0.40f), new Vector2(0.90f, 0.49f), FontStyles.Italic, TextAlignmentOptions.Center, MutedTextColor);
             CreateChallengeHelperButtons(cardPanel, challengeIndex, challenge);
 
             CreateButton(screen, "Encerrar", new Vector2(0.5f, 0.09f), ShowSessionSummary, new Vector2(380f, 82f), SecondaryButtonColor, 24);
@@ -336,10 +346,11 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
         {
             ForgottenNamesFinalCard finalCard = ForgottenNamesExpeditionContent.FinalCard;
             RectTransform cardPanel = CreateMainCardPanel(screen, "FinalCard", new Color(0.17f, 0.14f, 0.10f, 0.98f));
-            CreateText(cardPanel, "Carta Final • Ritual de encerramento", 25, new Vector2(0.08f, 0.86f), new Vector2(0.92f, 0.94f), FontStyles.Bold, TextAlignmentOptions.Center, HighlightTextColor);
-            CreateText(cardPanel, finalCard.Title, 40, new Vector2(0.08f, 0.75f), new Vector2(0.92f, 0.84f), FontStyles.Bold, TextAlignmentOptions.Center);
-            CreateText(cardPanel, finalCard.Body, 28, new Vector2(0.08f, 0.61f), new Vector2(0.92f, 0.72f), FontStyles.Normal, TextAlignmentOptions.Center, MutedTextColor);
-            CreateText(cardPanel, finalCard.FinalPrompt, 32, new Vector2(0.08f, 0.42f), new Vector2(0.92f, 0.58f), FontStyles.Bold, TextAlignmentOptions.Center);
+            CreateText(cardPanel, "Carta Final • Ritual de encerramento", 23, new Vector2(0.08f, 0.91f), new Vector2(0.92f, 0.97f), FontStyles.Bold, TextAlignmentOptions.Center, HighlightTextColor);
+            CreateText(cardPanel, state.SelectedPremise.FinalBridge, 22, new Vector2(0.08f, 0.79f), new Vector2(0.92f, 0.90f), FontStyles.Italic, TextAlignmentOptions.Center, MutedTextColor);
+            CreateText(cardPanel, finalCard.Title, 38, new Vector2(0.08f, 0.67f), new Vector2(0.92f, 0.78f), FontStyles.Bold, TextAlignmentOptions.Center);
+            CreateText(cardPanel, finalCard.Body, 25, new Vector2(0.08f, 0.56f), new Vector2(0.92f, 0.65f), FontStyles.Normal, TextAlignmentOptions.Center, MutedTextColor);
+            CreateText(cardPanel, finalCard.FinalPrompt, 30, new Vector2(0.08f, 0.39f), new Vector2(0.92f, 0.55f), FontStyles.Bold, TextAlignmentOptions.Center);
             CreateText(cardPanel, FinalHelperText, 24, new Vector2(0.10f, 0.31f), new Vector2(0.90f, 0.40f), FontStyles.Italic, TextAlignmentOptions.Center, MutedTextColor);
             CreateText(cardPanel, finalCard.GroupSentence, 30, new Vector2(0.10f, 0.17f), new Vector2(0.90f, 0.29f), FontStyles.Italic, TextAlignmentOptions.Center, HighlightTextColor);
 
@@ -717,9 +728,10 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
             CreateText(screen, $"Carta {Mathf.Min(state.CurrentDeckIndex + 1, state.TotalCards)}/{state.TotalCards}", 23, new Vector2(0.62f, 0.946f), new Vector2(0.94f, 0.986f), FontStyles.Normal, TextAlignmentOptions.MidlineRight);
 
             RectTransform premiseCard = CreatePanel(screen, "PinnedPremiseCard", new Vector2(0.05f, 0.805f), new Vector2(0.95f, 0.935f), new Color(0.13f, 0.18f, 0.28f, 0.98f));
-            CreateText(premiseCard, "Premissa da expedição", 20, new Vector2(0.05f, 0.64f), new Vector2(0.95f, 0.92f), FontStyles.Bold, TextAlignmentOptions.MidlineLeft, HighlightTextColor);
-            CreateText(premiseCard, state.SelectedPremise.Title, 25, new Vector2(0.05f, 0.34f), new Vector2(0.95f, 0.66f), FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
-            CreateText(premiseCard, state.SelectedPremise.Description, 17, new Vector2(0.05f, 0.06f), new Vector2(0.95f, 0.34f), FontStyles.Normal, TextAlignmentOptions.TopLeft, MutedTextColor);
+            CreateText(premiseCard, "Premissa da expedição", 19, new Vector2(0.05f, 0.68f), new Vector2(0.95f, 0.94f), FontStyles.Bold, TextAlignmentOptions.MidlineLeft, HighlightTextColor);
+            CreateText(premiseCard, state.SelectedPremise.Title, 24, new Vector2(0.05f, 0.45f), new Vector2(0.95f, 0.70f), FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
+            CreateText(premiseCard, state.SelectedPremise.TableReminder, 18, new Vector2(0.05f, 0.23f), new Vector2(0.95f, 0.45f), FontStyles.Normal, TextAlignmentOptions.TopLeft, MutedTextColor);
+            CreateText(premiseCard, "Pense em: " + FormatAnswerHints(state.SelectedPremise), 16, new Vector2(0.05f, 0.03f), new Vector2(0.95f, 0.22f), FontStyles.Italic, TextAlignmentOptions.TopLeft, HighlightTextColor);
         }
 
         private void CreatePartyArchiveAreas(RectTransform screen)
@@ -751,6 +763,11 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Managers
         private static RectTransform CreateMainCardPanel(RectTransform screen, string name, Color color)
         {
             return CreatePanel(screen, name, new Vector2(0.06f, 0.27f), new Vector2(0.94f, 0.67f), color);
+        }
+
+        private static string FormatAnswerHints(ForgottenNamesPremise premise)
+        {
+            return ForgottenNamesExpeditionContent.JoinTags(premise.AnswerHints);
         }
 
         private static string FormatCompactScientistList(List<int> indexes)
