@@ -216,7 +216,7 @@ namespace CardgameProof.Prototypes.ForgottenNamesExpedition.Runtime.Data
 
         public static readonly ForgottenNamesFinalCard FinalCard = new ForgottenNamesFinalCard(
             "O que não deixamos desaparecer",
-            "A expedição termina, mas o mundo ainda pode esquecer o que vocês descobriram.",
+            "A expedição termina quando esta carta aparecer.",
             "Que nome, ideia ou contribuição seu personagem escolhe preservar — e como?",
             "Nós lembramos ______ porque ______.");
 
